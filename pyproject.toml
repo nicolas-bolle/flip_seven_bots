@@ -1,0 +1,14 @@
+[project]
+name = "flip-seven-bots"
+version = "0.1.0"
+description = "Bots for the game Flip 7"
+readme = "README.md"
+authors = [
+    { name = "nicolas-bolle", email = "nicolasbolle@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]
+build-backend = "uv_build"
