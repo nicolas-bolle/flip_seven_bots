@@ -1,6 +1,6 @@
 """Public, immutable values shared by the engine, bots, and UI."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from random import Random
@@ -342,8 +342,12 @@ class Observation:
     players: tuple[PlayerView, ...]
     """Public player snapshots in seat order; index with a player ID."""
 
-    cards_remaining: int
-    """Number of undrawn cards, excluding the discard pile."""
+    draw_pile: tuple[Card, ...]
+    """Undrawn cards, excluding the discard pile, in a fixed sorted order.
+
+    The composition is public because the full deck and every revealed card
+    are known; the order in which the cards will be drawn is hidden.
+    """
 
     discard: tuple[Card, ...]
     """Cards currently in the public discard pile."""
@@ -360,9 +364,14 @@ class Observation:
     events: tuple[GameEvent, ...]
     """Public events of the current round, in order; reset when a new round starts."""
 
-    _sampler: Callable[[Random], Game] | None = field(
+    _sampler: Callable[[Random, Sequence[Card]], Game] | None = field(
         default=None, repr=False, compare=False
     )
+
+    @property
+    def cards_remaining(self) -> int:
+        """Number of undrawn cards, excluding the discard pile."""
+        return len(self.draw_pile)
 
     @property
     def legal_actions(self) -> tuple[Action, ...]:
@@ -372,14 +381,19 @@ class Observation:
             return ()
         return decision.actions
 
-    def sample_game(self, rng: Random) -> Game:
+    def sample_game(self, rng: Random, *, next_draws: Sequence[Card] = ()) -> Game:
         """Return an independent game consistent with this observation.
 
         The hidden deck order and future reshuffles are drawn from ``rng``, so
-        the copy can be played forward to simulate possible outcomes. Raises
-        ``RuntimeError`` if the original game has advanced since this snapshot,
-        or ``ValueError`` if the observation is not linked to a game.
+        the copy can be played forward to simulate possible outcomes.
+        ``next_draws`` fixes the next cards drawn, in order; they must be in
+        ``draw_pile``, or in ``discard`` when the draw pile is empty and the
+        next draw would reshuffle it.
+
+        Raises ``RuntimeError`` if the original game has advanced since this
+        snapshot, or ``ValueError`` if the observation is not linked to a game
+        or ``next_draws`` are unavailable.
         """
         if self._sampler is None:
             raise ValueError("observation is not linked to a game")
-        return self._sampler(rng)
+        return self._sampler(rng, next_draws)

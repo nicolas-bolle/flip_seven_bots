@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import pygame
 import pytest
 
-from flip_seven_bots.bots import ThresholdBot
+from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
 from flip_seven_bots.ui.options import MAX_PLAYERS
 from flip_seven_bots.ui.setup_scene import (
     ADD_BUTTON,
@@ -53,6 +53,8 @@ def test_setup_edits_mode_seats_and_parameters() -> None:
     replace_field(scene, _row_rects(1)[2], "25")
     click(scene, _row_rects(2)[3])
     click(scene, ADD_BUTTON)
+    for _ in range(3):  # human -> random -> threshold -> expected value
+        click(scene, _row_rects(2)[1])
     click(scene, START_BUTTON)
 
     assert scene.result is not None
@@ -60,6 +62,7 @@ def test_setup_edits_mode_seats_and_parameters() -> None:
     assert [seat.name for seat in scene.result.seats] == ["Ann 1", "Ann 2", "Player 3"]
     assert isinstance(scene.result.seats[1].bot, ThresholdBot)
     assert scene.result.seats[1].bot.threshold == 25
+    assert isinstance(scene.result.seats[2].bot, ExpectedValueBot)
 
 
 def test_setup_validates_names_and_player_limit() -> None:

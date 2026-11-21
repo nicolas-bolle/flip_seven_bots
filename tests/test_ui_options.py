@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from flip_seven_bots.bots import RandomBot, ThresholdBot
+from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.ui.options import MAX_PLAYERS, parse_options
 
 
@@ -19,14 +19,15 @@ def test_no_options_gives_the_default_table() -> None:
 def test_seats_follow_option_order() -> None:
     seats = parse_options(
         ["--bot", "random", "--human", "Ann", "--bot", "threshold:20",
-         "--human", "Ben"]
+         "--human", "Ben", "--bot", "expected"]
     ).seats
     assert [seat.name for seat in seats] == [
-        "Random bot", "Ann", "Threshold 20", "Ben",
+        "Random bot", "Ann", "Threshold 20", "Ben", "Expected value bot",
     ]
     assert isinstance(seats[0].bot, RandomBot)
     assert seats[1].bot is None
     assert isinstance(seats[2].bot, ThresholdBot) and seats[2].bot.threshold == 20
+    assert isinstance(seats[4].bot, ExpectedValueBot)
 
 
 def test_a_table_can_be_all_bots() -> None:
@@ -44,12 +45,13 @@ def test_duplicate_names_are_numbered() -> None:
     [
         ["--bot", "chess"],
         ["--bot", "random:3"],
+        ["--bot", "expected:3"],
         ["--bot", "threshold:lots"],
         ["--bot", "threshold:-1"],
         ["--human", " "],
         ["--bot", "random"] * (MAX_PLAYERS + 1),
     ],
-    ids=["unknown", "random-param", "not-a-number", "negative",
+    ids=["unknown", "random-param", "expected-param", "not-a-number", "negative",
          "blank-name", "too-many"],
 )
 def test_invalid_options_are_rejected(argv: list[str]) -> None:

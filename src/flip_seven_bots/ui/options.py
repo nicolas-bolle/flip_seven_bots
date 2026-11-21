@@ -7,12 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from flip_seven_bots.bots import RandomBot, ThresholdBot
+from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 
 from .table import Seat
 
 MAX_PLAYERS = 6
-BOT_KINDS = ("random", "threshold[:SCORE]")
+BOT_KINDS = ("random", "threshold[:SCORE]", "expected")
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,8 @@ def _bot_seat(spec: str) -> Seat:
             if threshold < 0:
                 raise argparse.ArgumentTypeError("threshold must not be negative")
             return Seat(f"Threshold {threshold}", ThresholdBot(threshold))
+        case "expected", None:
+            return Seat("Expected value bot", ExpectedValueBot())
     raise argparse.ArgumentTypeError(
         f"unknown bot {spec!r}; choose from {', '.join(BOT_KINDS)}"
     )

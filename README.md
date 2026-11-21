@@ -25,7 +25,8 @@ round.
 
 Any command-line options skip setup and start immediately. Choose players with
 `--human NAME` and `--bot KIND`; seats are filled in the order given, up to six
-players. Bot kinds are `random` and `threshold[:SCORE]` (default 30).
+players. Bot kinds are `random`, `threshold[:SCORE]` (default 30), and
+`expected` (`ExpectedValueBot`).
 Every card is public, so several humans can share the screen and take turns. A
 table of only bots can be watched. Bot decisions take at least one second each.
 Number cards appear below modifiers and other cards and are sorted by value.
@@ -152,8 +153,8 @@ decisions, whose `CHOOSE_CARD` actions use `target` for the card owner and
 `card_index` to index that player's `cards` in the current observation. Swap
 uses two such decisions; during the second, `decision.first` is the card
 already picked. In Brutal Mode a `FlipSevenBonus` decision offers `TAKE_BONUS`
-or a `CHOOSE_TARGET` action to subtract the bonus from another player. Existing
-random and threshold bots support these choices.
+or a `CHOOSE_TARGET` action to subtract the bonus from another player. The
+included bots support these choices.
 
 The Zero affects the round score, not accumulated points. A duplicate number
 received through a swap or steal causes a bust, and Brutal Mode modifiers can
@@ -161,14 +162,21 @@ give a busted player a negative round score.
 
 ### Looking ahead
 
-The deck order is the only hidden information, so
+The deck order is the only hidden information. `observation.draw_pile` lists
+the undrawn cards in a fixed sorted order, and
 `observation.sample_game(rng)` returns an independent `Game` that matches the
 observation with the remaining deck reshuffled by `rng`. Bots can apply
 candidate actions to it and play it forward with
 `flip_seven_bots.simulation.run(game, bots, stop=...)`. An observation can only
-be sampled until the real game advances. `bots.rollouts.best_action` does this
-for any decision, scoring each legal action by the simulated round margin.
-The example bot above uses it for Flip Three targets.
+be sampled until the real game advances. Pass `next_draws=(card, ...)` to fix
+the next cards drawn in the sample.
+
+`ExpectedValueBot` uses this to hit only when the expected round score after
+one more card, averaged over `draw_pile` and scored by the engine, beats its
+current score (`policies.expected_hit_score`). For any decision,
+`bots.rollouts.best_action` instead plays sampled games to the end of the round
+and picks the action with the best average margin over the leading opponent;
+the example bot above uses it for Flip Three targets.
 
 Training integrations are not implemented yet.
 

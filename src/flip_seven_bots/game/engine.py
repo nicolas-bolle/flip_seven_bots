@@ -6,7 +6,7 @@ decision is needed, then resumes the queue when ``Game.apply`` is called.
 
 import copy
 from collections import deque
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from functools import partial
 from random import Random
@@ -219,7 +219,7 @@ class Game:
             round_number=self._round_number,
             dealer=self._dealer,
             players=views,
-            cards_remaining=len(self._deck),
+            draw_pile=self._deck.composition,
             discard=self._deck.discard_pile,
             decision=self._pending,
             last_round=self._last_round,
@@ -264,10 +264,12 @@ class Game:
                     self._tasks.appendleft(_Draw(player))
         self._advance()
 
-    def _sample(self, version: int, rng: Random) -> Game:
+    def _sample(self, version: int, rng: Random, next_draws: Sequence[Card]) -> Game:
         if version != self._version:
             raise RuntimeError("observation is out of date; the game has advanced")
-        return self.determinize(rng)
+        clone = self.determinize(rng)
+        clone._deck.stack(next_draws)
+        return clone
 
     def _start_round(self) -> None:
         self._round_number += 1

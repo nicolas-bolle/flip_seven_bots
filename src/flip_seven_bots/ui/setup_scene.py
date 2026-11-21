@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from flip_seven_bots.bots import RandomBot, ThresholdBot
+from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 
 from .game_scene import (
     ACCENT,
@@ -31,11 +31,12 @@ VENGEANCE_BUTTON = pygame.Rect(365, 150, 330, 52)
 BRUTAL_BUTTON = pygame.Rect(710, 150, 270, 52)
 ADD_BUTTON = pygame.Rect(90, 735, 220, 52)
 START_BUTTON = pygame.Rect(1000, 790, 190, 60)
-KINDS = ("human", "random", "threshold")
+KINDS = ("human", "random", "threshold", "expected")
 KIND_LABELS = {
     "human": "Human",
     "random": "Random bot",
     "threshold": "Threshold bot",
+    "expected": "Expected value bot",
 }
 MAX_NAME_LENGTH = 24
 MAX_PARAMETER_LENGTH = 6
@@ -65,6 +66,8 @@ def _initial_player(seat: Seat) -> _PlayerSetting:
             return _PlayerSetting(seat.name, "random")
         case ThresholdBot(threshold=threshold):
             return _PlayerSetting(seat.name, "threshold", str(threshold))
+        case ExpectedValueBot():
+            return _PlayerSetting(seat.name, "expected")
     raise ValueError(f"unsupported setup bot: {seat.bot!r}")
 
 

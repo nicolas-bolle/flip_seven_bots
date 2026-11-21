@@ -4,8 +4,10 @@ from random import Random
 import pytest
 
 from flip_seven_bots.bots import (
+    ExpectedValueBot,
     RandomBot,
     ThresholdBot,
+    policies,
     rollouts,
 )
 from flip_seven_bots.game import (
@@ -126,3 +128,21 @@ def test_rollouts_evaluate_hit_or_stay_decisions() -> None:
 def test_rollouts_need_at_least_one_sample() -> None:
     with pytest.raises(ValueError, match="samples"):
         rollouts.best_action(opening_observation(), ThresholdBot(0), samples=0, rng=Random(0))
+
+
+@pytest.mark.parametrize(
+    ("unseen", "expected", "action"),
+    [((5, 3), 4, STAY), ((5, 3, 3), 16 / 3, HIT)],
+    ids=["bust-risk-too-high", "worth-the-risk"],
+)
+def test_expected_value_bot_compares_hit_average_with_current_score(
+    unseen: tuple[int, ...], expected: float, action: Action
+) -> None:
+    # Holding a 5: drawing the other 5 busts (0), while a 3 makes 8.
+    game = Game(1, deck=Deck.stacked([number(5)] + [number(v) for v in unseen]))
+    observation = game.observe(0)
+    decision = observation.decision
+    assert isinstance(decision, HitOrStay)
+
+    assert policies.expected_hit_score(observation, decision) == pytest.approx(expected)
+    assert ExpectedValueBot().choose_action(observation) == action
