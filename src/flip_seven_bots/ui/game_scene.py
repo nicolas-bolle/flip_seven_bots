@@ -7,16 +7,21 @@ import pygame
 from flip_seven_bots.bots import Bot, RandomBot, ThresholdBot
 from flip_seven_bots.game import (
     Action,
+    ActionChosen,
     ActionType,
     Card,
+    CardDrawn,
     CardType,
-    EventType,
+    DiscardShuffled,
     Game,
     GameEvent,
     Observation,
     PlayerStatus,
+    PlayerView,
+    RoundEnded,
+    RoundResult,
+    RoundStarted,
 )
-from flip_seven_bots.game.model import PlayerView, RoundResult
 
 HUMAN = 0
 NAMES = ("You", "Random bot", "Threshold bot")
@@ -60,30 +65,21 @@ def _card_label(card: Card) -> str:
 
 
 def _event_text(event: GameEvent) -> str:
-    if event.kind is EventType.ROUND_STARTED:
-        return f"Round {event.round_number} started"
-    if event.kind is EventType.DISCARD_SHUFFLED:
-        return "Discard pile reshuffled"
-    if event.kind is EventType.ROUND_ENDED:
-        if event.result is not None and event.result.flip_seven_player is not None:
-            return f"{NAMES[event.result.flip_seven_player]} got Flip 7!"
-        return f"Round {event.round_number} ended"
-    if event.player is None:
-        raise ValueError(f"event is missing a player: {event}")
-    name = NAMES[event.player]
-    if event.kind is EventType.CARD_DRAWN:
-        if event.card is None:
-            raise ValueError("card-drawn event is missing its card")
-        return f"{name} drew {_card_label(event.card)}"
-    if event.kind is EventType.ACTION_CHOSEN:
-        if event.action is None:
-            raise ValueError("action event is missing its action")
-        if event.action.kind is ActionType.CHOOSE_TARGET:
-            if event.action.target is None:
-                raise ValueError("target action is missing its target")
-            return f"{name} chose {NAMES[event.action.target]}"
-        return f"{name} chose {event.action.kind.name.lower()}"
-    raise ValueError(f"unknown event type: {event.kind}")
+    match event:
+        case RoundStarted(round_number=round_number):
+            return f"Round {round_number} started"
+        case DiscardShuffled():
+            return "Discard pile reshuffled"
+        case RoundEnded(result=result):
+            if result.flip_seven_player is not None:
+                return f"{NAMES[result.flip_seven_player]} got Flip 7!"
+            return f"Round {result.round_number} ended"
+        case CardDrawn(player=player, card=card):
+            return f"{NAMES[player]} drew {_card_label(card)}"
+        case ActionChosen(player=player, action=action):
+            if action.target is not None:
+                return f"{NAMES[player]} chose {NAMES[action.target]}"
+            return f"{NAMES[player]} chose {action.kind.name.lower()}"
 
 
 class GameScene:
@@ -154,7 +150,7 @@ class GameScene:
             screen,
             self._font,
             f"Round {observation.round_number}  |  Dealer: {NAMES[observation.dealer]}"
-            f"  |  Deck: {observation.cards_remaining}  |  Discard: {observation.discard_count}",
+            f"  |  Deck: {observation.cards_remaining}  |  Discard: {len(observation.discard)}",
             (35, 69),
             MUTED,
         )

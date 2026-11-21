@@ -4,10 +4,8 @@ from random import Random
 
 from flip_seven_bots.game import Action, ActionType, Observation
 
-from .base import Bot
 
-
-class RandomBot(Bot):
+class RandomBot:
     def __init__(self, seed: int | None = None):
         self._random = Random(seed)
 
@@ -17,7 +15,7 @@ class RandomBot(Bot):
         return self._random.choice(observation.legal_actions)
 
 
-class ThresholdBot(Bot):
+class ThresholdBot:
     """Stay at a chosen round score and otherwise hit when possible."""
 
     def __init__(self, threshold: int):

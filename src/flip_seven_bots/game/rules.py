@@ -1,6 +1,7 @@
 """Deck and scoring rules for the base game."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 
 from .model import Card, CardType
 
@@ -26,3 +27,16 @@ def score_cards(cards: Iterable[Card]) -> int:
     multiplier = 2 if any(card.kind is CardType.MULTIPLY for card in cards) else 1
     modifiers = sum(card.value for card in cards if card.kind is CardType.ADD)
     return number_total * multiplier + modifiers
+
+
+@dataclass(frozen=True)
+class Rules:
+    """Settings for a match; the defaults are the base game."""
+
+    target_score: int = TARGET_SCORE
+    flip_seven_bonus: int = FLIP_SEVEN_BONUS
+    build_deck: Callable[[], list[Card]] = build_deck
+    score_cards: Callable[[Iterable[Card]], int] = score_cards
+
+    def __deepcopy__(self, memo: dict) -> Rules:
+        return self
