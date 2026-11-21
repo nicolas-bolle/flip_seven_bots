@@ -49,6 +49,23 @@ def test_bot_moves_once_its_delay_has_passed() -> None:
     assert table.game.current_player == 2
 
 
+def test_default_bot_delay_is_at_least_one_second_for_each_decision() -> None:
+    draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2)]
+    table = Table(
+        [Seat("You"), Seat("A", StayBot()), Seat("B", StayBot())],
+        new_game=lambda count, _seed: Game(count, dealer=2, deck=Deck.stacked(draws)),
+    )
+    table.choose(STAY)
+    table.update(1_000)
+    table.update(1_999)
+    assert table.game.current_player == 1
+    table.update(2_000)
+    assert table.game.current_player == 2
+    table.update(2_000)
+    table.update(2_999)
+    assert table.game.current_player == 2
+
+
 def test_human_cannot_act_on_a_bot_turn() -> None:
     table = make_table()
     table.choose(STAY)

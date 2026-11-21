@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import pygame
@@ -193,6 +194,27 @@ def test_large_hand_renders_in_smallest_panel() -> None:
 
     assert len(table.observation.players[0].cards) == len(hand)
     scene.render(pygame.Surface((1280, 900)))
+
+
+@pytest.mark.parametrize("player_count", [3, 6])
+def test_non_number_cards_are_above_numbers(
+    player_count: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scene, table = make_scene(numbers(*range(1, player_count + 1)), player_count)
+    player = table.observation.players[0]
+    player = replace(
+        player,
+        cards=(Card(CardType.NUMBER, 1), Card(CardType.ADD, 4), Card(CardType.NUMBER, 2)),
+    )
+    cards: list[tuple[Card, pygame.Rect]] = []
+    monkeypatch.setattr(scene, "_draw_card", lambda _screen, card, rect: cards.append((card, rect)))
+    panel = pygame.Rect(30, 112, 895, (582 // player_count) - 12)
+    scene._draw_player(pygame.Surface((1280, 900)), player, panel, table.observation)
+
+    modifier = next(rect for card, rect in cards if card.kind is CardType.ADD)
+    number_rects = [rect for card, rect in cards if card.kind is CardType.NUMBER]
+    assert all(modifier.bottom <= rect.top for rect in number_rects)
+    assert all(panel.contains(rect) for _, rect in cards)
 
 
 def type_text(scene: GameScene, text: str) -> None:

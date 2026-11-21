@@ -19,6 +19,8 @@ filled in the order given, up to six players. Bot kinds are `random`,
 `threshold[:SCORE]` (default 30), and `montecarlo[:SAMPLES]` (default 50).
 Every card is public, so several humans can share the screen and take turns.
 A table of only bots can be watched.
+Bot decisions take at least one second each. Number cards appear below
+modifiers and other cards; resolved Freeze and Flip 3 cards are discarded.
 
 ```shell
 uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25
@@ -63,8 +65,8 @@ To implement a bot, provide `choose_action(observation)` and return one of
 `observation.legal_actions`. The engine pauses both for hit/stay decisions and
 for selecting targets for action cards. Observations contain immutable
 snapshots of public cards, scores, and the discard pile, but not the shuffled
-deck. Cards are included after a player stays or busts because they were
-revealed earlier in the round. Only the current player receives legal actions.
+deck. Cards still held after a player stays or busts remain visible because
+they were revealed earlier in the round. Only the current player receives legal actions.
 `last_round` contains the most recently completed round's scores, including any
 Flip 7 bonus; a player's `round_score` is the in-progress score without it.
 `events` contains the current round's public draws, decisions, discard

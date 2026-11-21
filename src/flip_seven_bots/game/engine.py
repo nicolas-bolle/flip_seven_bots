@@ -57,6 +57,7 @@ class _Player:
 @dataclass(eq=False)
 class _FlipSequence:
     player: int
+    card: Card
     deferred: list[_Resolve] = field(default_factory=list)
 
 
@@ -272,9 +273,15 @@ class Game:
                 case _Resolve(sequence=sequence) as effect:
                     if sequence is None or not self._players[sequence.player].is_busted:
                         self._resolve(effect)
+                    else:
+                        self._discard_action(effect.player, effect.card)
                 case _FinishFlip(sequence=sequence):
+                    self._discard_action(sequence.player, sequence.card)
                     if not self._players[sequence.player].is_busted:
                         self._tasks.extendleft(reversed(sequence.deferred))
+                    else:
+                        for effect in sequence.deferred:
+                            self._discard_action(effect.player, effect.card)
                 case _FindTurn(start=start):
                     self._find_turn(start)
                 case _EndRound(flip_seven_player=flip_seven_player):
@@ -345,16 +352,27 @@ class Game:
     def _apply_target(self, decision: _TargetDecision, target: int) -> None:
         self._players[decision.player].cards.remove(decision.card)
         recipient = self._players[target]
-        recipient.cards.append(decision.card)
         if decision.card.kind is CardType.FREEZE:
             recipient.status = PlayerStatus.STAYED
+            self._deck.discard((decision.card,))
         elif decision.card.kind is CardType.FLIP_THREE:
-            sequence = _FlipSequence(target)
+            recipient.cards.append(decision.card)
+            sequence = _FlipSequence(target, decision.card)
             self._tasks.appendleft(_FinishFlip(sequence))
             for _ in range(3):
                 self._tasks.appendleft(_Draw(target, sequence))
+        else:
+            recipient.cards.append(decision.card)
+
+    def _discard_action(self, player: int, card: Card) -> None:
+        self._players[player].cards.remove(card)
+        self._deck.discard((card,))
 
     def _end_round(self, flip_seven_player: int | None) -> None:
+        for index, player in enumerate(self._players):
+            for card in player.cards[:]:
+                if card.kind in (CardType.FREEZE, CardType.FLIP_THREE):
+                    self._discard_action(index, card)
         scores = tuple(
             player.round_score(self._rules.score_cards)
             + (self._rules.flip_seven_bonus if index == flip_seven_player else 0)

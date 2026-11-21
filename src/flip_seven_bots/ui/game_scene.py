@@ -126,6 +126,7 @@ class GameScene:
         self._font = pygame.font.Font(None, 25)
         self._small_font = pygame.font.Font(None, 21)
         self._card_font = pygame.font.Font(None, 25)
+        self._compact_card_font = pygame.font.Font(None, 16)
 
     @property
     def dialog_open(self) -> bool:
@@ -341,16 +342,21 @@ class GameScene:
             )
             return
 
-        # Up to 12 cards per row; extra rows overlap if a hand outgrows its panel.
-        card_height = max(24, min(51, rect.height - 58))
-        available = rect.height - 58 - card_height
         columns = 12
-        rows = (len(player.cards) + columns - 1) // columns
-        spacing_y = min(card_height + 6, available // (rows - 1)) if rows > 1 else 0
-        for index, card in enumerate(player.cards):
-            x = rect.x + 16 + (index % columns) * 70
-            y = rect.y + 50 + (index // columns) * spacing_y
-            self._draw_card(screen, card, pygame.Rect(x, y, 62, card_height))
+        groups = (
+            [card for card in player.cards if card.kind is not CardType.NUMBER],
+            [card for card in player.cards if card.kind is CardType.NUMBER],
+        )
+        rows = sum((len(group) + columns - 1) // columns for group in groups)
+        gap = 2
+        card_height = min(51, (rect.height - 47 - gap * (rows - 1)) // rows)
+        row = 0
+        for group in groups:
+            for index, card in enumerate(group):
+                x = rect.x + 16 + (index % columns) * 70
+                y = rect.y + 42 + (row + index // columns) * (card_height + gap)
+                self._draw_card(screen, card, pygame.Rect(x, y, 62, card_height))
+            row += (len(group) + columns - 1) // columns
 
     def _draw_card(self, screen: pygame.Surface, card: Card, rect: pygame.Rect) -> None:
         if card.kind is CardType.NUMBER:
@@ -369,9 +375,10 @@ class GameScene:
             text = (
                 "2ND CH." if card.kind is CardType.SECOND_CHANCE else card_label(card)
             )
-            label = self._card_font.render(text, True, (25, 45, 46))
+            font = self._compact_card_font if rect.height < 22 else self._card_font
+            label = font.render(text, True, (25, 45, 46))
             if label.get_width() > rect.width - 6:
-                label = self._small_font.render(text, True, (25, 45, 46))
+                label = self._compact_card_font.render(text, True, (25, 45, 46))
             screen.blit(label, label.get_rect(center=rect.center))
 
     def _draw_activity(self, screen: pygame.Surface, observation: Observation) -> None:

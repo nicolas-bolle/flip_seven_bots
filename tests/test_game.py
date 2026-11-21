@@ -87,13 +87,75 @@ def test_deferred_action_and_second_chance_during_flip_three() -> None:
     observation = game.observe(1)
     assert observation.pending_card == FREEZE
     assert observation.players[1].status == PlayerStatus.ACTIVE
-    assert observation.discard == (CHANCE, number(2))
+    assert observation.discard == (CHANCE, number(2), FLIP_THREE)
     assert CHANCE not in observation.players[1].cards
     assert [e.card for e in observation.events if isinstance(e, CardDrawn)] == draws
 
     game.apply(target(0))
     assert game.observe(1).players[0].status == PlayerStatus.STAYED
     assert game.current_player == 1
+
+
+def test_resolved_action_cards_are_discarded_not_kept_in_hands() -> None:
+    game = stacked_game(
+        [number(2), number(4), FLIP_THREE, FREEZE, number(5), number(6)]
+    )
+    game.apply(HIT)
+    assert FLIP_THREE in game.observe(1).players[1].cards
+    game.apply(target(0))
+
+    observation = game.observe(0)
+    assert observation.pending_card == FREEZE
+    assert FLIP_THREE in observation.discard
+    assert all(FLIP_THREE not in player.cards for player in observation.players)
+    assert FREEZE in observation.players[0].cards
+
+    game.apply(target(1))
+    observation = game.observe(0)
+    assert FREEZE in observation.discard
+    assert all(FREEZE not in player.cards for player in observation.players)
+
+
+def test_bust_discards_cancelled_deferred_actions() -> None:
+    game = stacked_game([number(2), number(4), FLIP_THREE, FREEZE, number(2)])
+    game.apply(HIT)
+    game.apply(target(1))
+
+    observation = game.observe(0)
+    assert observation.players[1].status is PlayerStatus.BUSTED
+    assert observation.discard == (FLIP_THREE, FREEZE)
+    assert FREEZE not in observation.players[1].cards
+
+
+def test_flip_three_is_not_reshuffled_during_its_own_draws() -> None:
+    game = stacked_game(
+        [CHANCE, number(8), number(2), number(9), FLIP_THREE, number(2), number(5)]
+    )
+    game.apply(HIT)
+    game.apply(HIT)
+    game.apply(HIT)
+    game.apply(target(1))
+
+    observation = game.observe(0)
+    draws = [event.card for event in observation.events if isinstance(event, CardDrawn)]
+    assert len(draws) == 8
+    assert FLIP_THREE not in draws[-3:]
+    assert any(isinstance(event, DiscardShuffled) for event in observation.events)
+    assert FLIP_THREE in observation.discard
+
+
+def test_flip_seven_discards_unfinished_actions_even_at_game_end() -> None:
+    draws = [number(n) for n in (0, 1, 2, 3, 4)] + [FLIP_THREE, FREEZE]
+    draws += [number(n) for n in (5, 6)]
+    game = stacked_game(draws, player_count=1, rules=Rules(target_score=1))
+    for _ in range(5):
+        game.apply(HIT)
+    game.apply(target(0))
+
+    observation = game.observe(0)
+    assert game.is_finished
+    assert observation.discard == (FLIP_THREE, FREEZE)
+    assert all(card.kind is CardType.NUMBER for card in observation.players[0].cards)
 
 
 def test_bust_cancels_deferred_actions() -> None:
@@ -293,7 +355,8 @@ def test_freezing_player_during_initial_deal_skips_their_deal() -> None:
     game.apply(target(0))
     observation = game.observe(1)
     assert observation.players[0].status is PlayerStatus.STAYED
-    assert observation.players[0].cards == (FREEZE,)
+    assert observation.players[0].cards == ()
+    assert observation.discard == (FREEZE,)
     assert observation.players[1].cards == ()
     assert observation.legal_actions == (HIT,)
 

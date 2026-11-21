@@ -7,7 +7,7 @@ from random import Random
 from flip_seven_bots.bots import Bot
 from flip_seven_bots.game import Action, Game, Observation, RoundResult
 
-BOT_DELAY_MS = 700
+MINIMUM_BOT_TIME_SECONDS = 1
 
 
 def seeded_game(player_count: int, seed: int) -> Game:
@@ -47,7 +47,7 @@ class Table:
         *,
         seed: int | None = None,
         new_game: Callable[[int, int], Game] = seeded_game,
-        bot_delay_ms: int = BOT_DELAY_MS,
+        bot_delay_ms: int = MINIMUM_BOT_TIME_SECONDS * 1000,
     ):
         if not seats:
             raise ValueError("a table needs at least one seat")
