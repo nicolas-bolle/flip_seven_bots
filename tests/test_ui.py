@@ -230,6 +230,108 @@ def test_non_number_cards_are_above_numbers(
     assert all(panel.contains(rect) for _, rect in cards)
 
 
+def test_hand_cards_are_sorted_within_each_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(numbers(3, 1, 2))
+    hand = (
+        Card(CardType.NUMBER, 12), Card(CardType.FLIP_THREE), Card(CardType.ADD, 10),
+        Card(CardType.NUMBER, 2), Card(CardType.SECOND_CHANCE), Card(CardType.ADD, 2),
+        Card(CardType.NUMBER, 0), Card(CardType.FREEZE), Card(CardType.MULTIPLY, 2),
+    )
+    player = replace(table.observation.players[0], cards=hand)
+    drawn: list[tuple[Card, pygame.Rect]] = []
+    monkeypatch.setattr(scene, "_draw_card", lambda _screen, card, rect: drawn.append((card, rect)))
+    scene._draw_player(
+        pygame.Surface((1280, 900)), player, pygame.Rect(30, 112, 895, 180),
+        table.observation,
+    )
+
+    ordered = [card for card, _ in sorted(drawn, key=lambda item: (item[1].y, item[1].x))]
+    assert ordered == [
+        Card(CardType.ADD, 2), Card(CardType.ADD, 10), Card(CardType.MULTIPLY, 2),
+        Card(CardType.SECOND_CHANCE), Card(CardType.FREEZE), Card(CardType.FLIP_THREE),
+        *numbers(0, 2, 12),
+    ]
+
+
+def test_live_score_uses_round_scoring_and_total_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(
+        numbers(5) + [Card(CardType.ADD, 4), Card(CardType.MULTIPLY, 2)] + numbers(9),
+        player_count=1,
+    )
+    press(scene, pygame.K_h)
+    press(scene, pygame.K_h)
+    texts: list[str] = []
+    monkeypatch.setattr(
+        scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert table.observation.players[0].round_score == 14
+    assert "Total: 0    Live: 14" in texts
+
+    press(scene, pygame.K_s)
+    press(scene, pygame.K_RETURN)
+    texts.clear()
+    scene.render(pygame.Surface((1280, 900)))
+    assert "Total: 14    Live: 9" in texts
+
+
+def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    scene, table = make_scene(numbers(3, 2, 3), seats=[Seat("Ann"), Seat("Ben")])
+    press(scene, pygame.K_h)
+    texts: list[str] = []
+    monkeypatch.setattr(
+        scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert table.observation.players[0].status is PlayerStatus.BUSTED
+    assert "Total: 0    Live: 0" in texts
+
+
+def test_sorted_number_cards_wrap_in_ascending_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(numbers(3, 1, 2))
+    player = replace(table.observation.players[0], cards=tuple(numbers(*range(12, -1, -1))))
+    drawn: list[tuple[Card, pygame.Rect]] = []
+    monkeypatch.setattr(scene, "_draw_card", lambda _screen, card, rect: drawn.append((card, rect)))
+    scene._draw_player(
+        pygame.Surface((1280, 900)), player, pygame.Rect(30, 112, 895, 180),
+        table.observation,
+    )
+    ordered = [card.value for card, _ in sorted(drawn, key=lambda item: (item[1].y, item[1].x))]
+    assert ordered == list(range(13))
+    assert len({rect.y for _, rect in drawn}) == 2
+
+
+def test_animation_lands_at_new_cards_sorted_position(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(numbers(9, 1), player_count=1)
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
+    scene.update(scene._now)
+    scene.update(scene._now + CARD_ANIMATION_MS - 1)
+    frame = pygame.Surface((1280, 900), pygame.SRCALPHA)
+    scene._draw_animation(frame, table.observation)
+    arriving = frame.get_bounding_rect()
+    scene.update(scene._now + 1)
+
+    drawn: list[tuple[Card, pygame.Rect]] = []
+    monkeypatch.setattr(scene, "_draw_card", lambda _screen, card, rect: drawn.append((card, rect)))
+    scene._draw_player(
+        pygame.Surface((1280, 900)), table.observation.players[0],
+        pygame.Rect(30, 112, 895, 570), table.observation,
+    )
+    one = next(rect for card, rect in drawn if card.value == 1)
+    nine = next(rect for card, rect in drawn if card.value == 9)
+    assert one.x < nine.x
+    assert abs(arriving.centerx - one.centerx) <= 1
+    assert abs(arriving.centery - one.centery) <= 1
+
+
 def test_deal_flips_and_moves_cards_before_revealing_their_hands(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -243,7 +345,7 @@ def test_deal_flips_and_moves_cards_before_revealing_their_hands(
         scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
     )
     scene.render(pygame.Surface((1280, 900)))
-    assert "Round: ...    Total: 0" in texts
+    assert "Total: 0    Live: ..." in texts
     assert not any("drew" in text for text in texts)
 
     def frame() -> pygame.Rect:

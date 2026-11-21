@@ -20,7 +20,11 @@ filled in the order given, up to six players. Bot kinds are `random`,
 Every card is public, so several humans can share the screen and take turns.
 A table of only bots can be watched.
 Bot decisions take at least one second each. Number cards appear below
-modifiers and other cards; resolved Freeze and Flip 3 cards are discarded.
+modifiers and other cards and are sorted by value. Other cards are ordered
+as additions (lowest first), multipliers, Second Chance, Freeze, and Flip 3;
+resolved Freeze and Flip 3 cards are discarded.
+Each player's total score appears beside their live round score, which is zero
+if they bust and excludes any Flip 7 bonus.
 Cards flip over and move from the deck to each hand as they are dealt.
 Play waits for the animations to finish.
 

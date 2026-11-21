@@ -45,6 +45,13 @@ MAX_REPORT_LENGTH = 4000
 NOTICE_MS = 6000
 CARD_ANIMATION_MS = 600
 DECK_RECT = pygame.Rect(855, 22, 42, 60)
+NON_NUMBER_ORDER = {
+    CardType.ADD: 0,
+    CardType.MULTIPLY: 1,
+    CardType.SECOND_CHANCE: 2,
+    CardType.FREEZE: 3,
+    CardType.FLIP_THREE: 4,
+}
 
 
 class Command(Enum):
@@ -108,8 +115,14 @@ def _player_rects(count: int) -> list[pygame.Rect]:
 def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
     columns = 12
     groups = (
-        [i for i, card in enumerate(cards) if card.kind is not CardType.NUMBER],
-        [i for i, card in enumerate(cards) if card.kind is CardType.NUMBER],
+        sorted(
+            (i for i, card in enumerate(cards) if card.kind is not CardType.NUMBER),
+            key=lambda i: (NON_NUMBER_ORDER[cards[i].kind], cards[i].value),
+        ),
+        sorted(
+            (i for i, card in enumerate(cards) if card.kind is CardType.NUMBER),
+            key=lambda i: cards[i].value,
+        ),
     )
     rows = sum((len(group) + columns - 1) // columns for group in groups)
     if not rows:
@@ -441,8 +454,8 @@ class GameScene:
         self._text(
             screen, self._small_font, status, (rect.x + 200, rect.y + 19), ACCENT
         )
-        round_score = "..." if waiting else str(player.round_score)
-        score = f"Round: {round_score}    Total: {player.total_score}"
+        live_score = "..." if waiting else str(player.round_score)
+        score = f"Total: {player.total_score}    Live: {live_score}"
         self._text(screen, self._font, score, (rect.x + 570, rect.y + 16))
 
         if not player.cards:
