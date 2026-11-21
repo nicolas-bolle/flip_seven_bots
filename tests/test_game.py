@@ -175,3 +175,44 @@ def test_match_ends_after_round_and_reports_tied_winners(
     assert observation.legal_actions == ()
     with pytest.raises(ValueError, match="illegal action"):
         game.apply(Action(ActionType.HIT))
+
+
+@pytest.mark.parametrize(
+    ("player_count", "dealer", "message"),
+    [(0, 0, "player_count"), (2, -1, "dealer"), (2, 2, "dealer")],
+)
+def test_invalid_game_setup(player_count: int, dealer: int, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        Game(player_count, dealer=dealer)
+
+
+@pytest.mark.parametrize("player", [-1, 2])
+def test_invalid_observer(player: int) -> None:
+    game = Game(2, seed=42)
+    with pytest.raises(ValueError, match="player"):
+        game.observe(player)
+
+
+def test_draw_fails_if_deck_and_discard_are_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = game_with_draws([number(2)], monkeypatch, player_count=1)
+    with pytest.raises(RuntimeError, match="no cards are available"):
+        game.apply(Action(ActionType.HIT))
+
+
+def test_freezing_player_during_initial_deal_skips_their_deal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game = game_with_draws([Card(CardType.FREEZE), number(9)], monkeypatch)
+    assert game.observe(1).pending_card == Card(CardType.FREEZE)
+
+    game.apply(Action(ActionType.CHOOSE_TARGET, 0))
+    observation = game.observe(1)
+    assert observation.players[0].status is PlayerStatus.STAYED
+    assert observation.players[0].cards == (Card(CardType.FREEZE),)
+    assert observation.players[1].cards == ()
+    assert observation.legal_actions == (Action(ActionType.HIT),)
+
+    game.apply(Action(ActionType.HIT))
+    assert game.observe(1).players[1].cards == (number(9),)
