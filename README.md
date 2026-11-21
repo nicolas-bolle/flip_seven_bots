@@ -10,29 +10,41 @@ Run the Pygame interface with:
 uv run python -m flip_seven_bots.ui
 ```
 
-You play the base game against a random bot and a bot that stays at 30 points.
-Use the buttons or their displayed keyboard shortcuts to hit, stay, or choose
-a player when an action card requires a target. Press Escape or close the
-window to quit. The activity panel shows the current round's draws and
-decisions; a summary appears after each round.
+The Game setup screen defaults to the base game against a random bot and a bot
+that stays at 30 points. Choose With A Vengeance and optionally Brutal Mode,
+edit player names and types, add or remove seats, then press Start. Click a
+name or value to edit it; Ctrl+A clears the field.
 
-Choose the players with `--human NAME` and `--bot KIND` options; seats are
-filled in the order given, up to six players. Bot kinds are `random`,
+Use the buttons or their displayed keyboard shortcuts to hit, stay, or choose
+a player when an action card requires a target. For Swap, Steal, and Discard,
+click a highlighted card; Swap requires two cards from different players. In
+Brutal Mode, a player who gets Flip 7 can take the bonus or subtract it from
+another player. Press Escape or close the window to quit. The activity panel
+shows the current round's draws and decisions; a summary appears after each
+round.
+
+Any command-line options skip setup and start immediately. Choose players with
+`--human NAME` and `--bot KIND`; seats are filled in the order given, up to six
+players. Bot kinds are `random`,
 `threshold[:SCORE]` (default 30), and `montecarlo[:SAMPLES]` (default 50).
 Every card is public, so several humans can share the screen and take turns. A
 table of only bots can be watched. Bot decisions take at least one second each.
 Number cards appear below modifiers and other cards and are sorted by value.
-Other cards are ordered as additions (lowest first), multipliers, Second Chance,
-Freeze, and Flip 3; Each player's total score appears beside their live round
-score, which is zero if they bust and excludes any Flip 7 bonus. Cards flip
-over and move from the deck to each hand as they are dealt. Play waits for the
-animations to finish.
+Other cards are ordered by modifier and action type; modifiers of the same type
+are ordered by value. Each player's total score appears beside their live round
+score, which excludes any Flip 7 bonus. Busted players normally score zero,
+but can score negatively in Brutal Mode. Cards flip over and move from the deck
+to each hand as they are dealt. Play waits for the animations to finish.
 
 ```shell
 uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25
+uv run python -m flip_seven_bots.ui --vengeance --human Ann --bot random
+uv run python -m flip_seven_bots.ui --brutal
 ```
 
-`--seed N` makes the decks repeatable; bots keep their own randomness.
+`--vengeance` selects With A Vengeance; `--brutal` selects it with Brutal Mode.
+Either flag alone uses the default players. `--seed N` makes the decks
+repeatable; bots keep their own randomness.
 
 ### Bug reports
 
@@ -86,8 +98,7 @@ cards in a fixed order (useful in tests).
 
 ### With A Vengeance
 
-The headless engine also supports With A Vengeance; the Pygame interface still
-uses the base game.
+The headless engine also supports With A Vengeance.
 
 ```python
 from flip_seven_bots.bots import ThresholdBot

@@ -1,6 +1,7 @@
 """Command-line options for the game window."""
 
 import argparse
+import sys
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -19,6 +20,9 @@ class Options:
     seats: list[Seat]
     seed: int | None
     bug_dir: Path
+    vengeance: bool
+    brutal: bool
+    show_setup: bool
 
 
 def default_seats() -> list[Seat]:
@@ -81,7 +85,7 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
         description=(
             "Play Flip 7 at one screen. Seats are filled in the order the options "
             "are given; players take turns at the same keyboard and mouse. With no "
-            "options, you play against a random bot and a threshold bot."
+            "options, configure the game on the setup screen."
         ),
     )
     parser.add_argument(
@@ -112,10 +116,20 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
         metavar="PATH",
         help="folder for bug and crash reports (default: %(default)s)",
     )
+    parser.add_argument(
+        "--vengeance", action="store_true", help="play With A Vengeance"
+    )
+    parser.add_argument(
+        "--brutal", action="store_true", help="play With A Vengeance in Brutal Mode"
+    )
     args = parser.parse_args(argv)
     seats: list[Seat] | None = args.seats
     if not seats:
         seats = default_seats()
     elif len(seats) > MAX_PLAYERS:
         parser.error(f"at most {MAX_PLAYERS} players fit on the screen")
-    return Options(_number_duplicates(seats), args.seed, args.bug_dir)
+    show_setup = not (sys.argv[1:] if argv is None else argv)
+    return Options(
+        _number_duplicates(seats), args.seed, args.bug_dir,
+        args.vengeance or args.brutal, args.brutal, show_setup,
+    )

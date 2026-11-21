@@ -5,6 +5,7 @@ from pathlib import Path
 import pygame
 import pytest
 
+from flip_seven_bots.bots import ThresholdBot
 from flip_seven_bots.game import (
     Action,
     ActionChosen,
@@ -22,8 +23,15 @@ from flip_seven_bots.game import (
     RoundResult,
     RoundStarted,
     Rules,
+    VengeanceRules,
 )
-from flip_seven_bots.ui.game_scene import CARD_ANIMATION_MS, Button, Command, GameScene
+from flip_seven_bots.ui.game_scene import (
+    CARD_ANIMATION_MS,
+    Button,
+    Command,
+    GameScene,
+    _card_rects,
+)
 from flip_seven_bots.ui.table import Seat, Table
 from flip_seven_bots.ui.text import card_label, event_text
 
@@ -99,6 +107,137 @@ def press(scene: GameScene, key: int) -> None:
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
     if not scene.dialog_open:
         finish_animations(scene)
+
+
+def test_vengeance_cards_sort_and_render() -> None:
+    cards = [
+        Card(CardType.NUMBER, 13), Card(CardType.ZERO), Card(CardType.UNLUCKY_SEVEN, 7),
+        Card(CardType.LUCKY_THIRTEEN, 13), Card(CardType.SUBTRACT, 2),
+        Card(CardType.SUBTRACT, 10), Card(CardType.DIVIDE, 2),
+        *(Card(kind) for kind in (
+            CardType.JUST_ONE_MORE, CardType.FLIP_FOUR, CardType.SWAP,
+            CardType.STEAL, CardType.DISCARD,
+        )),
+    ]
+    rects = _card_rects(cards, pygame.Rect(30, 112, 895, 570))
+    assert rects[1].left < rects[2].left < rects[0].left <= rects[3].left
+    assert rects[5].left < rects[4].left and rects[4].top < rects[1].top
+    scene, _ = make_scene(numbers(1, 2, 3))
+    surface = pygame.Surface((1280, 900))
+    for card, rect in zip(cards, rects):
+        scene._draw_card(surface, card, rect)
+
+
+@pytest.mark.parametrize("kind", [CardType.STEAL, CardType.DISCARD])
+def test_vengeance_card_selection_uses_highlighted_cards(kind: CardType) -> None:
+    scene, table = make_scene(numbers(9, 2, 4) + [Card(kind)], rules=VengeanceRules())
+    press(scene, pygame.K_h)
+    choices = play_buttons(scene)
+    assert choices and all(
+        isinstance(choice.action, Action) and choice.action.kind is ActionType.CHOOSE_CARD
+        for choice in choices
+    )
+    scene.render(pygame.Surface((1280, 900)), choices[0].rect.center)
+    choice = next(
+        choice for choice in choices
+        if isinstance(choice.action, Action) and choice.action.target == 1
+    )
+    assert isinstance(choice.action, Action) and choice.action.card_index is not None
+    selected = table.observation.players[1].cards[choice.action.card_index]
+    click(scene, choice)
+    assert Card(kind) in table.observation.discard
+    if kind is CardType.STEAL:
+        assert selected in table.observation.players[0].cards
+    else:
+        assert selected in table.observation.discard
+
+
+@pytest.mark.parametrize(
+    "card",
+    [
+        Card(CardType.SUBTRACT, 4), Card(CardType.DIVIDE, 2),
+        Card(CardType.JUST_ONE_MORE), Card(CardType.FLIP_FOUR),
+    ],
+)
+def test_vengeance_player_target_buttons(card: Card) -> None:
+    scene, table = make_scene(
+        numbers(9, 2, 4) + [card] + numbers(5, 6, 7, 8, 10),
+        rules=VengeanceRules(),
+    )
+    press(scene, pygame.K_h)
+    assert table.observation.pending_card == card
+    scene.render(pygame.Surface((1280, 900)))
+    press(scene, pygame.K_2)
+    assert table.moves[-1].action == Action(ActionType.CHOOSE_TARGET, 1)
+
+
+def test_swap_uses_two_card_clicks_and_blocks_selection_during_dialog() -> None:
+    scene, table = make_scene(
+        numbers(9, 2, 4) + [Card(CardType.SWAP)], rules=VengeanceRules()
+    )
+    press(scene, pygame.K_h)
+    first = next(
+        b for b in play_buttons(scene) if isinstance(b.action, Action) and b.action.target == 0
+    )
+    click(scene, first)
+    assert scene._swap_first == (0, 0)
+    assert all(
+        isinstance(b.action, Action) and b.action.target != 0 for b in play_buttons(scene)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    second = next(
+        b for b in play_buttons(scene) if isinstance(b.action, Action) and b.action.target == 1
+    )
+    press(scene, pygame.K_F1)
+    click(scene, second)
+    assert scene._swap_first == (0, 0)
+    press(scene, pygame.K_ESCAPE)
+    click(scene, second)
+    assert scene._swap_first is None
+    assert numbers(2)[0] in table.observation.players[0].cards
+    assert numbers(9)[0] in table.observation.players[1].cards
+
+
+@pytest.mark.parametrize("take_bonus", [True, False])
+def test_brutal_flip_seven_bonus_choice(
+    take_bonus: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(
+        numbers(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+        player_count=2,
+        rules=VengeanceRules(brutal=True, target_score=1000),
+    )
+    for _ in range(6):
+        press(scene, pygame.K_h)
+        if table.human_to_act is None and table.round_summary is None:
+            scene.update(scene._now)
+    assert any(b.label.startswith("Take bonus") for b in play_buttons(scene))
+    scene.render(pygame.Surface((1280, 900)))
+    press(scene, pygame.K_b if take_bonus else pygame.K_2)
+    assert table.round_summary is not None
+    assert table.round_summary.scores[1] == (2 if take_bonus else -13)
+    texts: list[str] = []
+    monkeypatch.setattr(
+        scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert any("Bot 1:  -13" in text for text in texts) is not take_bonus
+
+
+@pytest.mark.parametrize("brutal", [False, True])
+def test_vengeance_game_completes_through_scene(brutal: bool) -> None:
+    table = Table(
+        [Seat("Bot 1", ThresholdBot(25)), Seat("Bot 2", ThresholdBot(25))],
+        seed=42, rules=VengeanceRules(brutal=brutal), bot_delay_ms=0,
+    )
+    scene = GameScene(table)
+    for tick in range(10000):
+        scene.update(tick * 100000)
+        if table.round_summary is not None and not scene._animating:
+            press(scene, pygame.K_RETURN)
+        if table.game.is_finished and table.round_summary is None and not scene._animating:
+            break
+    assert table.game.is_finished
 
 
 def test_buttons_offer_the_legal_actions_with_seat_names() -> None:

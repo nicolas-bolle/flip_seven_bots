@@ -5,11 +5,17 @@ import re
 import subprocess
 from collections.abc import Mapping
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 from flip_seven_bots.bots import Bot, FlipThreeMonteCarloBot, ThresholdBot
-from flip_seven_bots.game import Action, ActionType, Game, Rules
-from flip_seven_bots.game.rules import build_deck, score_cards
+from flip_seven_bots.game import Action, ActionType, Game, Rules, VengeanceRules
+from flip_seven_bots.game.rules import (
+    build_deck,
+    build_vengeance_deck,
+    score_cards,
+    score_vengeance_cards,
+)
 
 from .table import Move, Table
 from .text import card_label, event_text
@@ -61,8 +67,11 @@ def _cell(text: str) -> str:
 
 
 def _action_text(action: Action, names: tuple[str, ...]) -> str:
+    if action.kind is ActionType.CHOOSE_CARD:
+        assert action.target is not None and action.card_index is not None
+        return f"choose {names[action.target]}'s card at index {action.card_index}"
     if action.target is not None:
-        return f"give to {names[action.target]}"
+        return f"choose {names[action.target]}"
     return action.kind.name.lower()
 
 
@@ -73,6 +82,8 @@ def _move_json(move: Move) -> dict[str, object]:
     }
     if move.action.target is not None:
         data["target"] = move.action.target
+    if move.action.card_index is not None:
+        data["card_index"] = move.action.card_index
     return data
 
 
@@ -88,11 +99,21 @@ def _replay_json(data: Mapping[str, object], moves: list[Move]) -> str:
 
 def _replayable(table: Table) -> bool:
     rules = table.game.rules
-    return (
-        table.replayable
-        and rules.build_deck is build_deck
-        and rules.score_cards is score_cards
-    )
+    if not table.replayable:
+        return False
+    if isinstance(rules, VengeanceRules):
+        scoring = rules.score_cards
+        if rules.brutal:
+            valid_score = (
+                isinstance(scoring, partial)
+                and scoring.func is score_vengeance_cards
+                and not scoring.args
+                and scoring.keywords == {"brutal": True}
+            )
+        else:
+            valid_score = scoring is score_vengeance_cards
+        return rules.build_deck is build_vengeance_deck and valid_score
+    return rules.build_deck is build_deck and rules.score_cards is score_cards
 
 
 def _status(table: Table) -> str:
@@ -102,7 +123,11 @@ def _status(table: Table) -> str:
         return "Game over; winners: " + ", ".join(table.names[i] for i in game.winners)
     player = observation.current_player
     assert player is not None  # unfinished games await a decision
-    if observation.pending_card is not None:
+    if any(action.kind is ActionType.CHOOSE_CARD for action in observation.legal_actions):
+        decision = f"choose a card for {card_label(observation.pending_card)}" if observation.pending_card else "choose a card"
+    elif any(action.kind is ActionType.TAKE_BONUS for action in observation.legal_actions):
+        decision = "take the Flip 7 bonus or subtract it from a player"
+    elif observation.pending_card is not None:
         decision = f"choose a player for {card_label(observation.pending_card)}"
     else:
         decision = "hit or stay"
@@ -134,11 +159,17 @@ def report_markdown(
         lines += ["## Error", "", "```text", error.rstrip(), "```", ""]
 
     rules = game.rules
+    mode = (
+        "With A Vengeance (Brutal Mode)" if isinstance(rules, VengeanceRules) and rules.brutal
+        else "With A Vengeance" if isinstance(rules, VengeanceRules)
+        else "Flip 7"
+    )
     seed = "random" if table.seed is None else str(table.seed)
     lines += [
         "## Table",
         "",
         f"- **Table seed:** {seed}; **game seed:** {table.game_seed}",
+        f"- **Mode:** {mode}",
         (
             f"- **Rules:** target score {rules.target_score}, "
             f"Flip 7 bonus {rules.flip_seven_bonus}"
@@ -169,7 +200,7 @@ def report_markdown(
     if observation.last_round is not None:
         result = observation.last_round
         scores = ", ".join(
-            f"{names[i]} +{score} (total {total})"
+            f"{names[i]} {score:+d} (total {total})"
             for i, (score, total) in enumerate(zip(result.scores, result.totals))
         )
         lines.append(f"- **Last round ({result.round_number}):** {scores}")
@@ -195,14 +226,17 @@ def report_markdown(
         "",
     ]
     if _replayable(table):
-        replay_data = {
-            "format": REPORT_FORMAT,
+        replay_data: dict[str, object] = {
+            "format": 2 if isinstance(rules, VengeanceRules) else REPORT_FORMAT,
             "players": len(table.seats),
             "game_seed": table.game_seed,
             "starting_dealer": table.starting_dealer,
             "target_score": rules.target_score,
             "flip_seven_bonus": rules.flip_seven_bonus,
         }
+        if isinstance(rules, VengeanceRules):
+            replay_data["mode"] = "vengeance"
+            replay_data["brutal"] = rules.brutal
         lines += [
             (
                 f"{len(table.moves)} moves so far. Rebuild the game with "
@@ -253,15 +287,25 @@ def replay(report: Path | str, *, moves: int | None = None) -> Game:
     if not blocks:
         raise ValueError("report has no replay data")
     data = json.loads(blocks[-1])
-    if data["format"] != REPORT_FORMAT:
+    if data["format"] not in (REPORT_FORMAT, 2):
         raise ValueError(f"unsupported report format: {data['format']}")
+    if data["format"] == 2:
+        if data.get("mode") != "vengeance" or not isinstance(data.get("brutal"), bool):
+            raise ValueError("invalid Vengeance replay rules")
+        rules = VengeanceRules(
+            target_score=data["target_score"],
+            flip_seven_bonus=data["flip_seven_bonus"],
+            brutal=data["brutal"],
+        )
+    else:
+        rules = Rules(
+            target_score=data["target_score"], flip_seven_bonus=data["flip_seven_bonus"]
+        )
     game = Game(
         data["players"],
         seed=data["game_seed"],
         dealer=data["starting_dealer"],
-        rules=Rules(
-            target_score=data["target_score"], flip_seven_bonus=data["flip_seven_bonus"]
-        ),
+        rules=rules,
     )
     for index, move in enumerate(data["moves"][:moves], start=1):
         if game.current_player != move["player"]:
@@ -269,5 +313,7 @@ def replay(report: Path | str, *, moves: int | None = None) -> Game:
                 f"replay diverged at move {index}: expected player {move['player']}, "
                 f"game is waiting for {game.current_player}"
             )
-        game.apply(Action(ActionType[move["action"].upper()], move.get("target")))
+        game.apply(Action(
+            ActionType[move["action"].upper()], move.get("target"), move.get("card_index")
+        ))
     return game

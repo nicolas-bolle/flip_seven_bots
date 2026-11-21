@@ -13,6 +13,7 @@ def test_no_options_gives_the_default_table() -> None:
     seats = options.seats
     assert [seat.name for seat in seats] == ["You", "Random bot", "Threshold bot"]
     assert [seat.bot is None for seat in seats] == [True, False, False]
+    assert options.show_setup and not options.vengeance and not options.brutal
 
 
 def test_seats_follow_option_order() -> None:
@@ -62,3 +63,12 @@ def test_seed_and_bug_folder_can_be_set() -> None:
     options = parse_options(["--seed", "7", "--bug-dir", "reports/flip"])
     assert options.seed == 7
     assert options.bug_dir == Path("reports/flip")
+    assert not options.show_setup
+
+
+@pytest.mark.parametrize(("flag", "brutal"), [("--vengeance", False), ("--brutal", True)])
+def test_mode_flags_skip_setup_with_default_players(flag: str, brutal: bool) -> None:
+    options = parse_options([flag])
+    assert options.vengeance and options.brutal is brutal
+    assert not options.show_setup
+    assert [seat.name for seat in options.seats] == ["You", "Random bot", "Threshold bot"]

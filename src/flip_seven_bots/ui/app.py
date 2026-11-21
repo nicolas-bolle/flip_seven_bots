@@ -7,9 +7,12 @@ from pathlib import Path
 
 import pygame
 
+from flip_seven_bots.game import VengeanceRules
+
 from .bug_report import write_report
 from .game_scene import GameScene
 from .options import parse_options
+from .setup_scene import SetupScene
 from .table import Table
 
 
@@ -30,13 +33,18 @@ def _report_crash(table: Table, directory: Path) -> None:
 
 def main(argv: Sequence[str] | None = None) -> None:
     options = parse_options(argv)
-    table = Table(options.seats, seed=options.seed)
+    table: Table | None = None
     pygame.init()
     try:
         screen = pygame.display.set_mode((1280, 900))
         pygame.display.set_caption("Flip 7")
         clock = pygame.time.Clock()
-        scene = GameScene(table, report_dir=options.bug_dir)
+        if options.show_setup:
+            scene: SetupScene | GameScene = SetupScene()
+        else:
+            rules = VengeanceRules(brutal=options.brutal) if options.vengeance else None
+            table = Table(options.seats, seed=options.seed, rules=rules)
+            scene = GameScene(table, report_dir=options.bug_dir)
 
         running = True
         while running:
@@ -49,6 +57,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                     running = False
                 else:
                     scene.handle_event(event)
+                    if isinstance(scene, SetupScene) and scene.result is not None:
+                        result = scene.result
+                        rules = VengeanceRules(brutal=result.brutal) if result.vengeance else None
+                        table = Table(result.seats, seed=options.seed, rules=rules)
+                        scene = GameScene(table, report_dir=options.bug_dir)
 
             if running:
                 scene.update(pygame.time.get_ticks())
@@ -56,7 +69,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 pygame.display.flip()
                 clock.tick(60)
     except Exception:
-        _report_crash(table, options.bug_dir)
+        if table is not None:
+            _report_crash(table, options.bug_dir)
         raise
     finally:
         pygame.quit()

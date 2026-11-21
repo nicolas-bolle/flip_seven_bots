@@ -47,10 +47,17 @@ CARD_ANIMATION_MS = 600
 DECK_RECT = pygame.Rect(855, 22, 42, 60)
 NON_NUMBER_ORDER = {
     CardType.ADD: 0,
-    CardType.MULTIPLY: 1,
-    CardType.SECOND_CHANCE: 2,
-    CardType.FREEZE: 3,
-    CardType.FLIP_THREE: 4,
+    CardType.SUBTRACT: 1,
+    CardType.MULTIPLY: 2,
+    CardType.DIVIDE: 3,
+    CardType.SECOND_CHANCE: 4,
+    CardType.FREEZE: 5,
+    CardType.FLIP_THREE: 6,
+    CardType.JUST_ONE_MORE: 7,
+    CardType.FLIP_FOUR: 8,
+    CardType.SWAP: 9,
+    CardType.STEAL: 10,
+    CardType.DISCARD: 11,
 }
 
 
@@ -116,11 +123,14 @@ def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
     columns = 12
     groups = (
         sorted(
-            (i for i, card in enumerate(cards) if card.kind is not CardType.NUMBER),
-            key=lambda i: (NON_NUMBER_ORDER[cards[i].kind], cards[i].value),
+            (i for i, card in enumerate(cards) if not card.is_number),
+            key=lambda i: (
+                NON_NUMBER_ORDER[cards[i].kind],
+                -cards[i].value if cards[i].kind is CardType.SUBTRACT else cards[i].value,
+            ),
         ),
         sorted(
-            (i for i, card in enumerate(cards) if card.kind is CardType.NUMBER),
+            (i for i, card in enumerate(cards) if card.is_number),
             key=lambda i: cards[i].value,
         ),
     )
@@ -146,11 +156,13 @@ def _action_button(action: Action, names: Sequence[str], rect: pygame.Rect) -> B
             return Button(rect, "Hit  [H]", action, pygame.K_h)
         case Action(kind=ActionType.STAY):
             return Button(rect, "Stay  [S]", action, pygame.K_s)
-        case Action(target=int(target)) if target < 9:
+        case Action(kind=ActionType.TAKE_BONUS):
+            return Button(rect, "Take bonus  [B]", action, pygame.K_b)
+        case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)) if target < 9:
             return Button(
                 rect, f"{names[target]}  [{target + 1}]", action, pygame.K_1 + target
             )
-        case Action(target=int(target)):
+        case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)):
             return Button(rect, names[target], action)
     raise ValueError(f"unsupported action: {action}")
 
@@ -170,6 +182,7 @@ class GameScene:
         self._draws: deque[_AnimatedDraw] = deque()
         self._draw_started: int | None = None
         self._previous_round: Observation | None = None
+        self._swap_first: tuple[int, int] | None = None
         self._title_font = pygame.font.Font(None, 42)
         self._heading_font = pygame.font.Font(None, 30)
         self._font = pygame.font.Font(None, 25)
@@ -224,6 +237,20 @@ class GameScene:
         if table.human_to_act is None:
             return ()
         actions = table.observation.legal_actions
+        if actions and actions[0].kind is ActionType.CHOOSE_CARD:
+            observation = table.observation
+            panels = _player_rects(len(observation.players))
+            return tuple(
+                Button(
+                    _card_rects(observation.players[action.target].cards, panels[action.target])[
+                        action.card_index
+                    ],
+                    "",
+                    action,
+                )
+                for action in actions
+                if action.target is not None and action.card_index is not None
+            )
         gap = 15
         width = min(
             195, (CONTROLS.width - 40 - gap * (len(actions) - 1)) // len(actions)
@@ -259,6 +286,7 @@ class GameScene:
                 self._draws.clear()
                 self._draw_started = None
                 self._previous_round = None
+                self._swap_first = None
                 self._queue_draws(None)
             case Button(action=Command.REPORT_BUG):
                 self._report_text = ""
@@ -272,6 +300,7 @@ class GameScene:
             case Button(action=Action() as action):
                 before = self._table.observation
                 self._table.choose(action)
+                self._track_swap(before, action)
                 self._queue_draws(before)
 
     def update(self, now: int) -> None:
@@ -293,7 +322,25 @@ class GameScene:
         moves = len(self._table.moves)
         self._table.update(now)
         if len(self._table.moves) != moves:
+            self._track_swap(before, self._table.moves[-1].action)
             self._queue_draws(before)
+
+    def _track_swap(self, before: Observation, action: Action) -> None:
+        after = self._table.observation
+        if (
+            self._swap_first is None
+            and before.pending_card is not None
+            and before.pending_card.kind is CardType.SWAP
+            and action.kind is ActionType.CHOOSE_CARD
+            and action.target is not None
+            and action.card_index is not None
+            and after.pending_card == before.pending_card
+            and after.current_player == before.current_player
+            and any(a.kind is ActionType.CHOOSE_CARD for a in after.legal_actions)
+        ):
+            self._swap_first = (action.target, action.card_index)
+        else:
+            self._swap_first = None
 
     @property
     def _animating(self) -> bool:
@@ -397,6 +444,11 @@ class GameScene:
             observation.players, _player_rects(len(observation.players))
         ):
             self._draw_player(screen, player, rect, observation)
+        if self._swap_first is not None and not self._animating:
+            owner, index = self._swap_first
+            panel = _player_rects(len(observation.players))[owner]
+            rect = _card_rects(observation.players[owner].cards, panel)[index]
+            pygame.draw.rect(screen, ACCENT, rect.inflate(4, 4), width=2, border_radius=6)
         self._draw_activity(screen, observation)
         self._draw_controls(screen, observation)
         if self._animating:
@@ -525,9 +577,9 @@ class GameScene:
         screen.blit(flipped, flipped.get_rect(center=center))
 
     def _draw_card(self, screen: pygame.Surface, card: Card, rect: pygame.Rect) -> None:
-        if card.kind is CardType.NUMBER:
+        if card.is_number:
             color = (232, 224, 193)
-        elif card.kind in (CardType.ADD, CardType.MULTIPLY):
+        elif card.kind in (CardType.ADD, CardType.MULTIPLY, CardType.SUBTRACT, CardType.DIVIDE):
             color = (236, 195, 106)
         else:
             color = (147, 205, 196)
@@ -599,9 +651,19 @@ class GameScene:
                 if len(table.humans) == 1
                 else f"{table.names[player]}'s turn"
             )
-            if observation.pending_card is not None:
+            actions = observation.legal_actions
+            if any(action.kind is ActionType.CHOOSE_CARD for action in actions):
+                card = card_label(observation.pending_card) if observation.pending_card else "card"
+                step = "second" if self._swap_first is not None else "first"
+                choice = f"the {step} card" if observation.pending_card and observation.pending_card.kind is CardType.SWAP else "a card"
+                message = f"{turn}: choose {choice} for {card}"
+            elif any(action.kind is ActionType.TAKE_BONUS for action in actions):
+                message = f"{turn}: take the bonus or subtract it from a player"
+            elif observation.pending_card is not None:
                 card = card_label(observation.pending_card)
                 message = f"{turn}: choose a player for {card}"
+            elif len(actions) == 1 and actions[0].kind is ActionType.HIT:
+                message = f"{turn}: you must hit"
             else:
                 message = f"{turn}: hit or stay"
         self._text(
@@ -610,7 +672,7 @@ class GameScene:
         self._text(
             screen,
             self._small_font,
-            "Click a button or use its shortcut. Esc quits.",
+            "Click a button or highlighted card, or use a shortcut. Esc quits.",
             (CONTROLS.x + 20, CONTROLS.y + 52),
             MUTED,
         )
@@ -629,14 +691,14 @@ class GameScene:
         rect = self._overlay(screen, f"Round {result.round_number} complete")
         names = self._table.names
         if result.flip_seven_player is not None:
-            message = f"{names[result.flip_seven_player]} earned the Flip 7 bonus!"
+            message = f"{names[result.flip_seven_player]} got Flip 7!"
             self._text(screen, self._font, message, (rect.x + 28, rect.y + 75), ACTIVE)
         spacing = min(45, 190 // len(names))
         for index, (score, total) in enumerate(zip(result.scores, result.totals)):
             self._text(
                 screen,
                 self._heading_font,
-                f"{names[index]}:  +{score}    total {total}",
+                f"{names[index]}:  {score:+d}    total {total}",
                 (rect.x + 28, rect.y + 120 + index * spacing),
             )
 
@@ -702,6 +764,11 @@ class GameScene:
         self, screen: pygame.Surface, button: Button, mouse_pos: tuple[int, int] | None
     ) -> None:
         hovered = mouse_pos is not None and button.rect.collidepoint(mouse_pos)
+        if isinstance(button.action, Action) and button.action.kind is ActionType.CHOOSE_CARD:
+            pygame.draw.rect(
+                screen, ACCENT if hovered else ACTIVE, button.rect, width=2, border_radius=6
+            )
+            return
         pygame.draw.rect(
             screen, BUTTON_HOVER if hovered else BUTTON, button.rect, border_radius=8
         )

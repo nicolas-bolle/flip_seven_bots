@@ -12,6 +12,7 @@ from flip_seven_bots.game import (
     Deck,
     Game,
     Observation,
+    VengeanceRules,
 )
 from flip_seven_bots.ui.bug_report import replay, write_report
 from flip_seven_bots.ui.table import Seat, Table
@@ -100,3 +101,30 @@ def test_replay_ignores_replay_data_typed_into_the_message(tmp_path: Path) -> No
     fake = '## Replay\n\n```json\n{"format": 1, "players": 1}\n```'
     path = write_report(table, fake, tmp_path, now=NOW)
     assert replay(path).observe(0) == table.game.observe(0)
+
+
+@pytest.mark.parametrize("brutal", [False, True])
+def test_vengeance_report_replays_card_choices_and_rules(tmp_path: Path, brutal: bool) -> None:
+    table = Table(
+        [Seat("Ann"), Seat("Ben"), Seat("Cam")],
+        seed=4,
+        rules=VengeanceRules(brutal=brutal, target_score=1000),
+    )
+    chosen_card = False
+    for _ in range(250):
+        if table.round_summary is not None:
+            table.dismiss_summary()
+        if table.game.is_finished:
+            break
+        choices = table.observation.legal_actions
+        card_choices = [action for action in choices if action.kind is ActionType.CHOOSE_CARD]
+        action = card_choices[-1] if card_choices else choices[0]
+        chosen_card |= action.kind is ActionType.CHOOSE_CARD
+        table.choose(action)
+    assert chosen_card
+    path = write_report(table, "check", tmp_path, now=NOW)
+    assert '"card_index":' in path.read_text()
+    game = replay(path)
+    assert isinstance(game.rules, VengeanceRules) and game.rules.brutal is brutal
+    assert game.observe(0) == table.game.observe(0)
+    assert game.hidden_deck() == table.game.hidden_deck()

@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from random import Random
 
 from flip_seven_bots.bots import Bot
-from flip_seven_bots.game import Action, Game, Observation, RoundResult
+from flip_seven_bots.game import Action, Game, Observation, RoundResult, Rules
 
 MINIMUM_BOT_TIME_SECONDS = 1
 
 
-def seeded_game(player_count: int, seed: int) -> Game:
-    return Game(player_count, seed=seed)
+def seeded_game(player_count: int, seed: int, *, rules: Rules | None = None) -> Game:
+    return Game(player_count, seed=seed, rules=rules)
 
 
 @dataclass(frozen=True)
@@ -48,9 +48,12 @@ class Table:
         seed: int | None = None,
         new_game: Callable[[int, int], Game] = seeded_game,
         bot_delay_ms: int = MINIMUM_BOT_TIME_SECONDS * 1000,
+        rules: Rules | None = None,
     ):
         if not seats:
             raise ValueError("a table needs at least one seat")
+        if rules is not None and new_game is not seeded_game:
+            raise ValueError("pass rules to the custom game factory instead")
         self.seats = tuple(seats)
         self.humans = tuple(
             index for index, seat in enumerate(seats) if seat.bot is None
@@ -59,6 +62,7 @@ class Table:
         self.replayable = new_game is seeded_game
         self._random = Random(seed)
         self._new_game = new_game
+        self._rules = rules
         self._bot_delay_ms = bot_delay_ms
         self._paused = False
         self.restart()
@@ -122,7 +126,10 @@ class Table:
 
     def restart(self) -> None:
         self._game_seed = self._random.getrandbits(64)
-        self._game = self._new_game(len(self.seats), self._game_seed)
+        if self._new_game is seeded_game:
+            self._game = seeded_game(len(self.seats), self._game_seed, rules=self._rules)
+        else:
+            self._game = self._new_game(len(self.seats), self._game_seed)
         self._starting_dealer = self._game.observe(0).dealer
         self._moves: list[Move] = []
         self._shown_round = 0
