@@ -27,7 +27,7 @@ def make_table(rules: Rules | None = None, bot_delay_ms: int = 0) -> Table:
     draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2, 7, 8, 9)]
     return Table(
         [Seat("You"), Seat("A", StayBot()), Seat("B", StayBot())],
-        new_game=lambda count: Game(count, dealer=2, deck=Deck.stacked(draws), rules=rules),
+        new_game=lambda count, _seed: Game(count, dealer=2, deck=Deck.stacked(draws), rules=rules),
         bot_delay_ms=bot_delay_ms,
     )
 
@@ -89,7 +89,7 @@ def test_each_human_acts_on_their_own_turn() -> None:
     draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2)]
     table = Table(
         [Seat("Ann"), Seat("Bot", StayBot()), Seat("Ben")],
-        new_game=lambda count: Game(count, dealer=2, deck=Deck.stacked(draws)),
+        new_game=lambda count, _seed: Game(count, dealer=2, deck=Deck.stacked(draws)),
         bot_delay_ms=0,
     )
     assert table.human_to_act == 0
@@ -103,7 +103,7 @@ def test_each_human_acts_on_their_own_turn() -> None:
 def test_bots_play_a_table_without_humans() -> None:
     table = Table(
         [Seat("A", StayBot()), Seat("B", StayBot())],
-        new_game=lambda count: Game(count, seed=1),
+        new_game=lambda count, _seed: Game(count, seed=1),
         bot_delay_ms=0,
     )
     table.update(0)
@@ -115,3 +115,41 @@ def test_bots_play_a_table_without_humans() -> None:
 def test_table_needs_a_seat() -> None:
     with pytest.raises(ValueError, match="at least one seat"):
         Table([])
+
+
+def test_seed_makes_games_repeatable() -> None:
+    def deals(seed: int | None) -> list[tuple[Card, ...]]:
+        table = Table([Seat("You"), Seat("A", StayBot())], seed=seed)
+        first = table.game.hidden_deck()
+        table.restart()
+        return [first, table.game.hidden_deck()]
+
+    first_game, second_game = deals(5)
+    assert deals(5) == [first_game, second_game]
+    assert first_game != second_game
+    assert deals(6)[0] != first_game
+
+
+def test_moves_are_recorded_and_reset_on_restart() -> None:
+    table = make_table()
+    table.choose(STAY)
+    table.update(0)
+    assert [(move.player, move.action) for move in table.moves] == [(0, STAY), (1, STAY)]
+
+    table.restart()
+    assert table.moves == ()
+
+
+def test_pause_stops_humans_and_bots_until_resumed() -> None:
+    table = make_table()
+    table.pause()
+    assert table.human_to_act is None
+    table.resume()
+    table.choose(STAY)
+
+    table.pause()
+    table.update(10_000)
+    assert table.game.current_player == 1
+    table.resume()
+    table.update(10_000)
+    assert table.game.current_player == 2

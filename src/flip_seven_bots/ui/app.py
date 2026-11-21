@@ -1,28 +1,50 @@
 """Pygame application loop."""
 
+import sys
+import traceback
 from collections.abc import Sequence
+from pathlib import Path
 
 import pygame
 
+from .bug_report import write_report
 from .game_scene import GameScene
-from .players import parse_seats
+from .options import parse_options
 from .table import Table
 
 
+def _report_crash(table: Table, directory: Path) -> None:
+    try:
+        path = write_report(
+            table,
+            "Automatic report: the game crashed.",
+            directory,
+            error=traceback.format_exc(),
+        )
+    # The original crash matters more than a failure to report it.
+    except Exception as error:  # noqa: BLE001
+        print(f"Could not save a crash report: {error!r}", file=sys.stderr)
+    else:
+        print(f"Crash report saved to {path}", file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> None:
-    seats = parse_seats(argv)
+    options = parse_options(argv)
+    table = Table(options.seats, seed=options.seed)
     pygame.init()
     try:
         screen = pygame.display.set_mode((1280, 900))
         pygame.display.set_caption("Flip 7")
         clock = pygame.time.Clock()
-        scene = GameScene(Table(seats))
+        scene = GameScene(table, report_dir=options.bug_dir)
 
         running = True
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (
-                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                    event.type == pygame.KEYDOWN
+                    and event.key == pygame.K_ESCAPE
+                    and not scene.dialog_open
                 ):
                     running = False
                 else:
@@ -33,5 +55,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 scene.render(screen, pygame.mouse.get_pos())
                 pygame.display.flip()
                 clock.tick(60)
+    except Exception:
+        _report_crash(table, options.bug_dir)
+        raise
     finally:
         pygame.quit()

@@ -156,6 +156,14 @@ class Game:
         return self._last_round
 
     @property
+    def rules(self) -> Rules:
+        return self._rules
+
+    def hidden_deck(self) -> tuple[Card, ...]:
+        """The undrawn cards, next card first. For debugging only; bots must not use it."""
+        return self._deck.remaining
+
+    @property
     def is_finished(self) -> bool:
         return bool(self._winners)
 

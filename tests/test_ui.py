@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import pygame
 import pytest
@@ -21,13 +22,9 @@ from flip_seven_bots.game import (
     RoundStarted,
     Rules,
 )
-from flip_seven_bots.ui.game_scene import (
-    Button,
-    GameScene,
-    _card_label,
-    _event_text,
-)
+from flip_seven_bots.ui.game_scene import Button, Command, GameScene
 from flip_seven_bots.ui.table import Seat, Table
+from flip_seven_bots.ui.text import card_label, event_text
 
 NAMES = ("You", "Random bot", "Threshold bot")
 FREEZE = Card(CardType.FREEZE)
@@ -52,22 +49,28 @@ def make_scene(
     player_count: int = 3,
     rules: Rules | None = None,
     seats: list[Seat] | None = None,
+    report_dir: Path = Path("unused-bug-reports"),
 ) -> tuple[GameScene, Table]:
     """Seat 0 is dealt first and acts first; by default it is the only human and bots stay."""
     if seats is None:
         seats = [Seat("You")] + [Seat(f"Bot {i}", StayBot()) for i in range(1, player_count)]
     table = Table(
         seats,
-        new_game=lambda count: Game(
+        new_game=lambda count, _seed: Game(
             count, dealer=count - 1, deck=Deck.stacked(draws), rules=rules
         ),
         bot_delay_ms=0,
     )
-    return GameScene(table), table
+    return GameScene(table, report_dir=report_dir), table
 
 
 def numbers(*values: int) -> list[Card]:
     return [Card(CardType.NUMBER, value) for value in values]
+
+
+def play_buttons(scene: GameScene) -> list[Button]:
+    """The on-screen buttons other than the always-present bug report button."""
+    return [b for b in scene.buttons() if b.action is not Command.REPORT_BUG]
 
 
 def button(scene: GameScene, label: str) -> Button:
@@ -86,10 +89,10 @@ def press(scene: GameScene, key: int) -> None:
 
 def test_buttons_offer_the_legal_actions_with_seat_names() -> None:
     scene, _ = make_scene(numbers(3, 1, 2) + [FREEZE])
-    assert [b.label for b in scene.buttons()] == ["Hit  [H]", "Stay  [S]"]
+    assert [b.label for b in play_buttons(scene)] == ["Hit  [H]", "Stay  [S]"]
 
     press(scene, pygame.K_h)
-    assert [(b.label, b.shortcut) for b in scene.buttons()] == [
+    assert [(b.label, b.shortcut) for b in play_buttons(scene)] == [
         ("You  [1]", pygame.K_1), ("Bot 1  [2]", pygame.K_2), ("Bot 2  [3]", pygame.K_3),
     ]
 
@@ -101,7 +104,7 @@ def test_clicking_buttons_hits_and_chooses_a_target() -> None:
 
     click(scene, button(scene, "Bot 2"))
     assert table.observation.players[2].status is PlayerStatus.STAYED
-    assert scene.buttons() == ()
+    assert play_buttons(scene) == []
 
 
 def test_shortcut_keys_hit_and_choose_a_target() -> None:
@@ -124,7 +127,7 @@ def test_continue_dismisses_round_summary() -> None:
     press(scene, pygame.K_s)
     scene.update(0)
     scene.update(0)
-    assert [b.label for b in scene.buttons()] == ["Continue  [Enter]"]
+    assert [b.label for b in play_buttons(scene)] == ["Continue  [Enter]"]
     scene.render(pygame.Surface((1280, 900)))
 
     press(scene, pygame.K_RETURN)
@@ -138,7 +141,7 @@ def test_play_again_restarts_finished_game() -> None:
     scene.update(0)
     press(scene, pygame.K_RETURN)
     finished = table.game
-    assert [b.label for b in scene.buttons()] == ["Play again  [R]"]
+    assert [b.label for b in play_buttons(scene)] == ["Play again  [R]"]
     scene.render(pygame.Surface((1280, 900)))
 
     press(scene, pygame.K_r)
@@ -165,7 +168,7 @@ def test_humans_take_turns_and_are_named_in_the_prompt(
     assert "Ben's turn: hit or stay" in texts
     press(scene, pygame.K_s)
     assert table.human_to_act is None
-    assert scene.buttons() == ()
+    assert play_buttons(scene) == []
 
 
 @pytest.mark.parametrize("player_count", range(1, 7))
@@ -176,7 +179,7 @@ def test_target_buttons_fit_on_screen_for_any_player_count(player_count: int) ->
 
     scene.render(pygame.Surface((1280, 900)), mouse_pos=(0, 0))
     screen = pygame.Rect(0, 0, 1280, 900)
-    assert len(scene.buttons()) == player_count
+    assert len(play_buttons(scene)) == player_count
     assert all(screen.contains(b.rect) for b in scene.buttons())
 
 
@@ -192,6 +195,79 @@ def test_large_hand_renders_in_smallest_panel() -> None:
     scene.render(pygame.Surface((1280, 900)))
 
 
+def type_text(scene: GameScene, text: str) -> None:
+    scene.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=text))
+
+
+def test_bug_report_dialog_saves_message_and_resumes_play(tmp_path: Path) -> None:
+    scene, table = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
+    press(scene, pygame.K_s)
+    press(scene, pygame.K_F1)
+    assert scene.dialog_open
+
+    scene.update(10_000)
+    assert table.game.current_player == 1  # bots wait while the dialog is open
+    type_text(scene, "Bot skippedd")
+    press(scene, pygame.K_BACKSPACE)
+    scene.handle_event(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=pygame.KMOD_LSHIFT)
+    )
+    type_text(scene, "its turn")
+    scene.render(pygame.Surface((1280, 900)))
+    press(scene, pygame.K_RETURN)
+
+    [report] = tmp_path.iterdir()
+    assert "Bot skipped\nits turn" in report.read_text()
+    assert not scene.dialog_open
+    assert scene.notice == f"Bug report saved to {report}"
+    scene.update(10_000)
+    assert table.game.current_player == 2
+
+
+def test_typing_in_the_dialog_does_not_trigger_game_shortcuts(tmp_path: Path) -> None:
+    scene, table = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
+    press(scene, pygame.K_F1)
+    press(scene, pygame.K_h)
+    type_text(scene, "h")
+    assert table.moves == ()
+
+
+def test_empty_bug_report_is_not_saved(tmp_path: Path) -> None:
+    scene, _ = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
+    press(scene, pygame.K_F1)
+    type_text(scene, "   ")
+    press(scene, pygame.K_RETURN)
+    assert scene.dialog_open
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_cancelling_the_dialog_saves_nothing(tmp_path: Path) -> None:
+    scene, table = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
+    click(scene, button(scene, "Report bug"))
+    type_text(scene, "never mind")
+    press(scene, pygame.K_ESCAPE)
+    assert not scene.dialog_open
+    assert not table.paused
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_save_failure_keeps_the_dialog_open(tmp_path: Path) -> None:
+    blocked = tmp_path / "file"
+    blocked.write_text("not a folder")
+    scene, _ = make_scene(numbers(3, 1, 2), report_dir=blocked)
+    press(scene, pygame.K_F1)
+    type_text(scene, "help")
+    press(scene, pygame.K_RETURN)
+    assert scene.dialog_open
+
+
+def test_long_report_messages_wrap_in_the_dialog() -> None:
+    scene, _ = make_scene(numbers(3, 1, 2))
+    press(scene, pygame.K_F1)
+    type_text(scene, "word " * 400 + "x" * 300)
+    scene.render(pygame.Surface((1280, 900)))
+
+
 @pytest.mark.parametrize(
     ("card", "label"),
     [
@@ -204,7 +280,7 @@ def test_large_hand_renders_in_smallest_panel() -> None:
     ],
 )
 def test_card_labels(card: Card, label: str) -> None:
-    assert _card_label(card) == label
+    assert card_label(card) == label
 
 
 @pytest.mark.parametrize(
@@ -223,4 +299,4 @@ def test_card_labels(card: Card, label: str) -> None:
     ],
 )
 def test_activity_messages(event: GameEvent, message: str) -> None:
-    assert _event_text(event, NAMES) == message
+    assert event_text(event, NAMES) == message

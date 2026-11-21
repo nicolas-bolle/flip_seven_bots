@@ -24,6 +24,22 @@ A table of only bots can be watched.
 uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25
 ```
 
+`--seed N` makes the decks repeatable; bots keep their own randomness.
+
+### Bug reports
+
+Press **Report bug** (or F1) to pause the game and describe a problem. Enter
+saves the message with the game's full state, including the hidden deck, to a
+timestamped Markdown file in `bug_reports/` (change it with `--bug-dir`).
+If the game crashes, a report with the error is written there automatically.
+Each report ends with replay data, so the game can be rebuilt in a test:
+
+```python
+from flip_seven_bots.ui.bug_report import replay
+
+game = replay("bug_reports/2026-11-21_16-30-05.md")
+```
+
 ## Headless base game
 
 The `game` package implements the original Flip 7 rules without Pygame. Player

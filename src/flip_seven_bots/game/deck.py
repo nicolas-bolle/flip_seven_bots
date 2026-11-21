@@ -28,6 +28,11 @@ class Deck:
     def discard_pile(self) -> tuple[Card, ...]:
         return tuple(self._discard)
 
+    @property
+    def remaining(self) -> tuple[Card, ...]:
+        """The hidden draw pile, next card first."""
+        return tuple(reversed(self._cards))
+
     def draw(self) -> tuple[Card, bool]:
         """Draw the top card, reshuffling the discard pile first if needed.
 

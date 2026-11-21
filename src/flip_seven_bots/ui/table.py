@@ -1,12 +1,23 @@
-"""Screen-independent state for one human playing against bots."""
+"""Screen-independent state for a game with human and bot players."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from random import Random
 
 from flip_seven_bots.bots import Bot
 from flip_seven_bots.game import Action, Game, Observation, RoundResult
 
 BOT_DELAY_MS = 700
+
+
+def seeded_game(player_count: int, seed: int) -> Game:
+    return Game(player_count, seed=seed)
+
+
+@dataclass(frozen=True)
+class Move:
+    player: int
+    action: Action
 
 
 @dataclass(frozen=True)
@@ -24,21 +35,32 @@ class Table:
 
     Times are in milliseconds from any monotonic clock; bots move once their
     delay has passed since the table first saw that it was their turn.
+
+    ``seed`` makes the sequence of game seeds, and so every deck, reproducible.
+    ``new_game(player_count, game_seed)`` creates each game; only the default
+    factory guarantees a game can be rebuilt from its seed and moves.
     """
 
     def __init__(
         self,
         seats: Sequence[Seat],
         *,
-        new_game: Callable[[int], Game] = Game,
+        seed: int | None = None,
+        new_game: Callable[[int, int], Game] = seeded_game,
         bot_delay_ms: int = BOT_DELAY_MS,
     ):
         if not seats:
             raise ValueError("a table needs at least one seat")
         self.seats = tuple(seats)
-        self.humans = tuple(index for index, seat in enumerate(seats) if seat.bot is None)
+        self.humans = tuple(
+            index for index, seat in enumerate(seats) if seat.bot is None
+        )
+        self.seed = seed
+        self.replayable = new_game is seeded_game
+        self._random = Random(seed)
         self._new_game = new_game
         self._bot_delay_ms = bot_delay_ms
+        self._paused = False
         self.restart()
 
     @property
@@ -60,15 +82,49 @@ class Table:
         return self._round_summary
 
     @property
+    def game_seed(self) -> int:
+        """The seed the current game was created with."""
+        return self._game_seed
+
+    @property
+    def starting_dealer(self) -> int:
+        return self._starting_dealer
+
+    @property
+    def moves(self) -> tuple[Move, ...]:
+        """Every decision made in the current game, in order."""
+        return tuple(self._moves)
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    @property
     def human_to_act(self) -> int | None:
         """The human seat whose decision play is waiting for, if any."""
         player = self._game.current_player
-        if self._round_summary is None and player is not None and player in self.humans:
+        if (
+            self._round_summary is None
+            and not self._paused
+            and player is not None
+            and player in self.humans
+        ):
             return player
         return None
 
+    def pause(self) -> None:
+        """Stop all play, e.g. while a dialog is open."""
+        self._paused = True
+
+    def resume(self) -> None:
+        self._paused = False
+        self._bot_due = None
+
     def restart(self) -> None:
-        self._game = self._new_game(len(self.seats))
+        self._game_seed = self._random.getrandbits(64)
+        self._game = self._new_game(len(self.seats), self._game_seed)
+        self._starting_dealer = self._game.observe(0).dealer
+        self._moves: list[Move] = []
         self._shown_round = 0
         self._round_summary: RoundResult | None = None
         self._bot_due: int | None = None
@@ -85,7 +141,12 @@ class Table:
     def update(self, now: int) -> None:
         """Let the current bot move if its delay has passed."""
         player = self._game.current_player
-        if self._round_summary is not None or player is None or player in self.humans:
+        if (
+            self._round_summary is not None
+            or self._paused
+            or player is None
+            or player in self.humans
+        ):
             return
         if self._bot_due is None:
             self._bot_due = now + self._bot_delay_ms
@@ -96,6 +157,10 @@ class Table:
         self._apply(bot.choose_action(self._game.observe(player)))
 
     def _apply(self, action: Action) -> None:
+        player = self._game.current_player
+        assert player is not None  # callers only apply actions on someone's turn
+        # Recorded first so a report written after a crash includes the failing move.
+        self._moves.append(Move(player, action))
         self._game.apply(action)
         self._bot_due = None
         self._check_round_summary()

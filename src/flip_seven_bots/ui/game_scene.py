@@ -3,28 +3,25 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
+from pathlib import Path
 
 import pygame
 
 from flip_seven_bots.game import (
     Action,
-    ActionChosen,
     ActionType,
     Card,
-    CardDrawn,
     CardType,
-    DiscardShuffled,
-    GameEvent,
     Observation,
     PlayerStatus,
     PlayerView,
-    RoundEnded,
     RoundResult,
-    RoundStarted,
 )
 
-from .players import default_seats
+from .bug_report import write_report
+from .options import default_seats
 from .table import Table
+from .text import card_label, event_text
 
 BACKGROUND = (15, 30, 35)
 PANEL = (28, 52, 55)
@@ -40,11 +37,18 @@ PLAYER_AREA = pygame.Rect(30, 112, 895, 570)
 PANEL_GAP = 12
 CONTROLS = pygame.Rect(30, 700, 1220, 170)
 OVERLAY = pygame.Rect(360, 240, 560, 400)
+DIALOG = pygame.Rect(240, 160, 800, 560)
+REPORT_BUTTON = pygame.Rect(1070, 24, 180, 40)
+MAX_REPORT_LENGTH = 4000
+NOTICE_MS = 6000
 
 
 class Command(Enum):
     CONTINUE = auto()
     RESTART = auto()
+    REPORT_BUG = auto()
+    SUBMIT_REPORT = auto()
+    CANCEL_REPORT = auto()
 
 
 @dataclass(frozen=True)
@@ -55,38 +59,27 @@ class Button:
     shortcut: int | None = None
 
 
-def _card_label(card: Card) -> str:
-    match card.kind:
-        case CardType.NUMBER:
-            return str(card.value)
-        case CardType.ADD:
-            return f"+{card.value}"
-        case CardType.MULTIPLY:
-            return f"x{card.value}"
-        case CardType.FREEZE:
-            return "FREEZE"
-        case CardType.FLIP_THREE:
-            return "FLIP 3"
-        case CardType.SECOND_CHANCE:
-            return "SECOND CHANCE"
-
-
-def _event_text(event: GameEvent, names: Sequence[str]) -> str:
-    match event:
-        case RoundStarted(round_number=round_number):
-            return f"Round {round_number} started"
-        case DiscardShuffled():
-            return "Discard pile reshuffled"
-        case RoundEnded(result=result):
-            if result.flip_seven_player is not None:
-                return f"{names[result.flip_seven_player]} got Flip 7!"
-            return f"Round {result.round_number} ended"
-        case CardDrawn(player=player, card=card):
-            return f"{names[player]} drew {_card_label(card)}"
-        case ActionChosen(player=player, action=action):
-            if action.target is not None:
-                return f"{names[player]} chose {names[action.target]}"
-            return f"{names[player]} chose {action.kind.name.lower()}"
+def _wrap(text: str, font: pygame.font.Font, width: int) -> list[str]:
+    """Split text into lines that fit ``width``, keeping explicit line breaks."""
+    lines = []
+    for paragraph in text.split("\n"):
+        line = ""
+        for word in paragraph.split(" "):
+            candidate = f"{line} {word}" if line else word
+            if font.size(candidate)[0] <= width:
+                line = candidate
+                continue
+            if line:
+                lines.append(line)
+            while len(word) > 1 and font.size(word)[0] > width:
+                cut = len(word) - 1
+                while cut > 1 and font.size(word[:cut])[0] > width:
+                    cut -= 1
+                lines.append(word[:cut])
+                word = word[cut:]
+            line = word
+        lines.append(line)
+    return lines
 
 
 def _player_rects(count: int) -> list[pygame.Rect]:
@@ -118,16 +111,55 @@ def _action_button(action: Action, names: Sequence[str], rect: pygame.Rect) -> B
 
 
 class GameScene:
-    def __init__(self, table: Table | None = None) -> None:
+    def __init__(
+        self, table: Table | None = None, *, report_dir: Path = Path("bug_reports")
+    ) -> None:
         self._table = table if table is not None else Table(default_seats())
+        self._report_dir = report_dir
+        self._report_text: str | None = None
+        self._report_hint: str | None = None
+        self._notice: str | None = None
+        self._notice_until = 0
+        self._now = 0
         self._title_font = pygame.font.Font(None, 42)
         self._heading_font = pygame.font.Font(None, 30)
         self._font = pygame.font.Font(None, 25)
         self._small_font = pygame.font.Font(None, 21)
         self._card_font = pygame.font.Font(None, 25)
 
+    @property
+    def dialog_open(self) -> bool:
+        """Whether the bug report dialog is capturing keyboard input, including Esc."""
+        return self._report_text is not None
+
+    @property
+    def notice(self) -> str | None:
+        return self._notice
+
     def buttons(self) -> tuple[Button, ...]:
-        """The buttons currently on screen, derived from the table's state."""
+        """The buttons currently on screen, derived from the scene's state."""
+        if self.dialog_open:
+            y = DIALOG.bottom - 76
+            return (
+                Button(
+                    pygame.Rect(DIALOG.x + 28, y, 195, 50),
+                    "Submit  [Enter]",
+                    Command.SUBMIT_REPORT,
+                    pygame.K_RETURN,
+                ),
+                Button(
+                    pygame.Rect(DIALOG.x + 238, y, 195, 50),
+                    "Cancel  [Esc]",
+                    Command.CANCEL_REPORT,
+                    pygame.K_ESCAPE,
+                ),
+            )
+        report = Button(
+            REPORT_BUTTON, "Report bug  [F1]", Command.REPORT_BUG, pygame.K_F1
+        )
+        return (*self._play_buttons(), report)
+
+    def _play_buttons(self) -> tuple[Button, ...]:
         table = self._table
         corner = pygame.Rect(OVERLAY.x + 28, OVERLAY.bottom - 76, 195, 50)
         if table.round_summary is not None:
@@ -155,6 +187,8 @@ class GameScene:
         )
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        if self.dialog_open and self._edit_report(event):
+            return
         buttons = self.buttons()
         button: Button | None = None
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -169,11 +203,62 @@ class GameScene:
                 self._table.dismiss_summary()
             case Button(action=Command.RESTART):
                 self._table.restart()
+            case Button(action=Command.REPORT_BUG):
+                self._report_text = ""
+                self._report_hint = None
+                self._table.pause()
+            case Button(action=Command.SUBMIT_REPORT):
+                self._submit_report()
+            case Button(action=Command.CANCEL_REPORT):
+                self._close_report()
             case Button(action=Action() as action):
                 self._table.choose(action)
 
     def update(self, now: int) -> None:
+        self._now = now
+        if self._notice is not None and now >= self._notice_until:
+            self._notice = None
         self._table.update(now)
+
+    def _edit_report(self, event: pygame.event.Event) -> bool:
+        """Apply typing to the report message; return whether the event was used."""
+        assert self._report_text is not None
+        if event.type == pygame.TEXTINPUT:
+            room = MAX_REPORT_LENGTH - len(self._report_text)
+            self._report_text += event.text[:room]
+            return True
+        if event.type != pygame.KEYDOWN:
+            return False
+        if event.key == pygame.K_BACKSPACE:
+            self._report_text = self._report_text[:-1]
+            return True
+        shift = getattr(event, "mod", 0) & pygame.KMOD_SHIFT
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and shift:
+            if len(self._report_text) < MAX_REPORT_LENGTH:
+                self._report_text += "\n"
+            return True
+        if event.key == pygame.K_KP_ENTER:
+            self._submit_report()
+            return True
+        return False
+
+    def _submit_report(self) -> None:
+        assert self._report_text is not None
+        if not self._report_text.strip():
+            self._report_hint = "Please describe the problem first."
+            return
+        try:
+            path = write_report(self._table, self._report_text, self._report_dir)
+        except OSError as error:
+            self._report_hint = f"Could not save the report: {error}"
+            return
+        self._close_report()
+        self._notice = f"Bug report saved to {path}"
+        self._notice_until = self._now + NOTICE_MS
+
+    def _close_report(self) -> None:
+        self._report_text = None
+        self._table.resume()
 
     def render(
         self, screen: pygame.Surface, mouse_pos: tuple[int, int] | None = None
@@ -202,6 +287,11 @@ class GameScene:
             self._draw_round_summary(screen, table.round_summary)
         elif table.game.is_finished:
             self._draw_game_over(screen, observation)
+
+        if self._report_text is not None:
+            self._draw_report_dialog(screen, self._report_text)
+        if self._notice is not None:
+            self._text(screen, self._small_font, self._notice, (35, 92), ACTIVE)
 
         for button in self.buttons():
             self._draw_button(screen, button, mouse_pos)
@@ -277,7 +367,7 @@ class GameScene:
                 screen.blit(label, label.get_rect(center=center))
         else:
             text = (
-                "2ND CH." if card.kind is CardType.SECOND_CHANCE else _card_label(card)
+                "2ND CH." if card.kind is CardType.SECOND_CHANCE else card_label(card)
             )
             label = self._card_font.render(text, True, (25, 45, 46))
             if label.get_width() > rect.width - 6:
@@ -295,7 +385,7 @@ class GameScene:
             self._text(
                 screen,
                 self._small_font,
-                _event_text(event, self._table.names),
+                event_text(event, self._table.names),
                 position,
                 MUTED,
             )
@@ -325,7 +415,7 @@ class GameScene:
                 else f"{table.names[player]}'s turn"
             )
             if observation.pending_card is not None:
-                card = _card_label(observation.pending_card)
+                card = card_label(observation.pending_card)
                 message = f"{turn}: choose a player for {card}"
             else:
                 message = f"{turn}: hit or stay"
@@ -383,6 +473,44 @@ class GameScene:
                 self._font,
                 f"{names[index]}: {player.total_score} points",
                 (rect.x + 28, rect.y + 145 + index * spacing),
+            )
+
+    def _draw_report_dialog(self, screen: pygame.Surface, message: str) -> None:
+        shade = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 180))
+        screen.blit(shade, (0, 0))
+        pygame.draw.rect(screen, PANEL_ALT, DIALOG, border_radius=15)
+        x = DIALOG.x + 28
+        self._text(screen, self._title_font, "Report a bug", (x, DIALOG.y + 25), ACCENT)
+        self._text(
+            screen,
+            self._small_font,
+            "Describe what went wrong. The game's full state is saved with your message.",
+            (x, DIALOG.y + 72),
+            MUTED,
+        )
+        self._text(
+            screen,
+            self._small_font,
+            "Enter submits, Shift+Enter starts a new line, Esc cancels.",
+            (x, DIALOG.y + 94),
+            MUTED,
+        )
+        box = pygame.Rect(x, DIALOG.y + 125, DIALOG.width - 56, 300)
+        pygame.draw.rect(screen, BACKGROUND, box, border_radius=8)
+        line_height = self._font.get_linesize()
+        visible = (box.height - 20) // line_height
+        lines = _wrap(message + "|", self._font, box.width - 24)
+        for index, line in enumerate(lines[-visible:]):
+            position = (box.x + 12, box.y + 10 + index * line_height)
+            self._text(screen, self._font, line, position)
+        if self._report_hint is not None:
+            self._text(
+                screen,
+                self._small_font,
+                self._report_hint,
+                (x, box.bottom + 10),
+                ACCENT,
             )
 
     def _draw_button(

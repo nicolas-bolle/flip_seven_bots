@@ -1,8 +1,10 @@
-"""Command-line selection of the players at the table."""
+"""Command-line options for the game window."""
 
 import argparse
 from collections import Counter
 from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 from flip_seven_bots.bots import FlipThreeMonteCarloBot, RandomBot, ThresholdBot
 
@@ -10,6 +12,13 @@ from .table import Seat
 
 MAX_PLAYERS = 6
 BOT_KINDS = ("random", "threshold[:SCORE]", "montecarlo[:SAMPLES]")
+
+
+@dataclass(frozen=True)
+class Options:
+    seats: list[Seat]
+    seed: int | None
+    bug_dir: Path
 
 
 def default_seats() -> list[Seat]:
@@ -65,8 +74,8 @@ def _number_duplicates(seats: list[Seat]) -> list[Seat]:
     return numbered
 
 
-def parse_seats(argv: Sequence[str] | None = None) -> list[Seat]:
-    """Seats in the order their options are given; defaults to you and two bots."""
+def parse_options(argv: Sequence[str] | None = None) -> Options:
+    """Seats are in the order their options are given; default: you and two bots."""
     parser = argparse.ArgumentParser(
         prog="python -m flip_seven_bots.ui",
         description=(
@@ -91,9 +100,22 @@ def parse_seats(argv: Sequence[str] | None = None) -> list[Seat]:
         metavar="KIND",
         help=f"add a bot: {', '.join(BOT_KINDS)}",
     )
-    seats: list[Seat] | None = parser.parse_args(argv).seats
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="seed for the decks, so games can be repeated (bots stay random)",
+    )
+    parser.add_argument(
+        "--bug-dir",
+        type=Path,
+        default=Path("bug_reports"),
+        metavar="PATH",
+        help="folder for bug and crash reports (default: %(default)s)",
+    )
+    args = parser.parse_args(argv)
+    seats: list[Seat] | None = args.seats
     if not seats:
-        return default_seats()
-    if len(seats) > MAX_PLAYERS:
+        seats = default_seats()
+    elif len(seats) > MAX_PLAYERS:
         parser.error(f"at most {MAX_PLAYERS} players fit on the screen")
-    return _number_duplicates(seats)
+    return Options(_number_duplicates(seats), args.seed, args.bug_dir)
