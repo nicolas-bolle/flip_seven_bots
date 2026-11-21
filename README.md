@@ -182,7 +182,8 @@ the example bot above uses it for Flip Three targets.
 
 `run_tournament` plays a series of games between named bots and tracks Elo
 ratings. Each game seats `players_per_game` bots (default: all), chosen and
-ordered at random; `seed` controls seating and decks.
+ordered at random; `seed` controls seating and decks. A progress bar shows the
+current leader; pass `progress=False` to hide it.
 
 ```python
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
@@ -202,6 +203,37 @@ place wins and tied scores draw. Each player's change is `k_factor / (n - 1)`
 times the sum of actual minus expected results, so two-player games use
 standard Elo and the total rating stays constant. Elo depends on game order
 and keeps drifting, so use enough games for ratings to settle.
+
+`play_tournament` takes the same settings but returns an iterator that plays
+one game per step and yields a `GameRecord`, for showing progress or stopping
+early; `TournamentResult.from_records` builds the tables from the records.
+
+From the command line, run a tournament with a progress bar, print the summary,
+and optionally save `games.csv` and `summary.csv`:
+
+```shell
+uv run python -m flip_seven_bots.tournament --bot random --bot careful=threshold:40 \
+    --bot expected --games 200 --players-per-game 3 --seed 1 --output results
+```
+
+`--bot [NAME=]KIND` accepts the same kinds as the game (`random`,
+`threshold[:SCORE]`, `expected`); duplicate names are numbered. Without `--bot`,
+a random, a threshold 30 and an expected value bot play. Other options are
+`--vengeance`, `--brutal`, `--k-factor` and `--initial-rating`; see `--help`.
+
+To watch a tournament in a window, run:
+
+```shell
+uv run python -m flip_seven_bots.ui.tournament
+```
+
+With no options, a setup screen lets you choose the mode, number of games,
+players per game, seed, and up to eight bots. Any of the command-line options
+above skip setup and start immediately. The tournament screen shows a progress
+bar, live standings and a rating chart; Stop ends it after the current game.
+Afterwards, Save results writes the CSV files (to `--output`, if given, which
+also saves them automatically, or otherwise to a timestamped folder in
+`tournament_results`), and New tournament returns to setup.
 
 Training integrations are not implemented yet.
 

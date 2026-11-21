@@ -10,6 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
     "pandas>=3.1.1",
     "pygame-ce>=2.5.8",
+    "tqdm>=4.70.1",
 ]
 
 [build-system]
@@ -21,6 +22,7 @@ unfixable = ['F401']
 
 [dependency-groups]
 dev = [
+    "ipywidgets>=8.1.9",
     "nbformat>=5.11.1",
     "plotly>=7.1.0",
     "pytest>=9.2.0",

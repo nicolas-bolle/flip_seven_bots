@@ -87,3 +87,10 @@ def test_invalid_tournaments_are_rejected(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         run_tournament(bots, **options)
+
+
+def test_progress_bar_can_be_disabled(capsys: pytest.CaptureFixture[str]) -> None:
+    run_tournament(threshold_bots(10, 20), games=2, seed=0)
+    assert "Tournament" in capsys.readouterr().err
+    run_tournament(threshold_bots(10, 20), games=2, seed=0, progress=False)
+    assert capsys.readouterr().err == ""

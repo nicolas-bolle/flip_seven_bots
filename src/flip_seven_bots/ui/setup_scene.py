@@ -7,16 +7,7 @@ import pygame
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 
-from .game_scene import (
-    ACCENT,
-    ACTIVE,
-    BACKGROUND,
-    BUTTON,
-    MUTED,
-    PANEL,
-    PANEL_ALT,
-    TEXT,
-)
+from .game_scene import ACCENT, BACKGROUND, MUTED, TEXT
 from .options import (
     MAX_PLAYERS,
     _bot_seat,
@@ -25,6 +16,7 @@ from .options import (
     default_seats,
 )
 from .table import Seat
+from .widgets import draw_button, draw_field, draw_text
 
 BASE_BUTTON = pygame.Rect(90, 150, 260, 52)
 VENGEANCE_BUTTON = pygame.Rect(365, 150, 330, 52)
@@ -231,22 +223,15 @@ class SetupScene:
         self, screen: pygame.Surface, font: pygame.font.Font, text: str,
         pos: tuple[int, int], color: tuple[int, int, int] = TEXT,
     ) -> None:
-        screen.blit(font.render(text, True, color), pos)
+        draw_text(screen, font, text, pos, color)
 
     def _button(
         self, screen: pygame.Surface, rect: pygame.Rect, label: str,
         selected: bool = False, *, disabled: bool = False,
     ) -> None:
-        pygame.draw.rect(screen, PANEL if disabled else BUTTON, rect, border_radius=8)
-        if selected:
-            pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=8)
-        text = self._font.render(label, True, MUTED if disabled else TEXT)
-        screen.blit(text, text.get_rect(center=rect.center))
+        draw_button(screen, self._font, rect, label, selected, disabled=disabled)
 
     def _field(
         self, screen: pygame.Surface, rect: pygame.Rect, value: str, focused: bool
     ) -> None:
-        pygame.draw.rect(screen, PANEL_ALT, rect, border_radius=8)
-        if focused:
-            pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=8)
-        self._text(screen, self._font, value + ("|" if focused else ""), (rect.x + 12, rect.y + 13))
+        draw_field(screen, self._font, rect, value, focused)

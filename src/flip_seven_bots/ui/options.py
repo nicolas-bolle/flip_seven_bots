@@ -2,17 +2,16 @@
 
 import argparse
 import sys
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
+from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
+from flip_seven_bots.bots.specs import BOT_KINDS, number_duplicates, parse_bot
 
 from .table import Seat
 
 MAX_PLAYERS = 6
-BOT_KINDS = ("random", "threshold[:SCORE]", "expected")
 
 
 @dataclass(frozen=True)
@@ -37,24 +36,11 @@ def default_seats() -> list[Seat]:
 
 
 def _bot_seat(spec: str) -> Seat:
-    kind, _, value = spec.partition(":")
     try:
-        number = int(value) if value else None
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"{value!r} is not a whole number") from None
-    match kind, number:
-        case "random", None:
-            return Seat("Random bot", RandomBot())
-        case "threshold", _:
-            threshold = 30 if number is None else number
-            if threshold < 0:
-                raise argparse.ArgumentTypeError("threshold must not be negative")
-            return Seat(f"Threshold {threshold}", ThresholdBot(threshold))
-        case "expected", None:
-            return Seat("Expected value bot", ExpectedValueBot())
-    raise argparse.ArgumentTypeError(
-        f"unknown bot {spec!r}; choose from {', '.join(BOT_KINDS)}"
-    )
+        name, bot = parse_bot(spec)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
+    return Seat(name, bot)
 
 
 def _human_seat(name: str) -> Seat:
@@ -64,15 +50,8 @@ def _human_seat(name: str) -> Seat:
 
 
 def _number_duplicates(seats: list[Seat]) -> list[Seat]:
-    counts = Counter(seat.name for seat in seats)
-    seen: Counter[str] = Counter()
-    numbered = []
-    for seat in seats:
-        if counts[seat.name] > 1:
-            seen[seat.name] += 1
-            seat = Seat(f"{seat.name} {seen[seat.name]}", seat.bot)
-        numbered.append(seat)
-    return numbered
+    names = number_duplicates([seat.name for seat in seats])
+    return [Seat(name, seat.bot) for name, seat in zip(names, seats)]
 
 
 def parse_options(argv: Sequence[str] | None = None) -> Options:
