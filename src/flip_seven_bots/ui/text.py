@@ -16,6 +16,7 @@ from flip_seven_bots.game import (
 
 
 def card_label(card: Card) -> str:
+    """Return the compact display label for a card."""
     match card.kind:
         case CardType.NUMBER:
             return str(card.value)
@@ -52,6 +53,7 @@ def card_label(card: Card) -> str:
 
 
 def event_text(event: GameEvent, names: Sequence[str]) -> str:
+    """Describe a public event using names indexed by player ID."""
     match event:
         case RoundStarted(round_number=round_number):
             return f"Round {round_number} started"

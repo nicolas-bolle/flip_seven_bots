@@ -36,6 +36,7 @@ class FlipThreeMonteCarloBot:
         self._random = Random(seed)
 
     def choose_action(self, observation: Observation) -> Action:
+        """Simulate Flip Three targets, or delegate other choices to ``fallback``."""
         actions = observation.legal_actions
         if observation.pending_card != _FLIP_THREE or len(actions) < 2:
             return self.fallback.choose_action(observation)

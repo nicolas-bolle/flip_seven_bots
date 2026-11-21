@@ -16,7 +16,12 @@ def run(
     stop: Callable[[Game], bool] | None = None,
     max_decisions: int = 100_000,
 ) -> None:
-    """Let ``bots`` (one per seat) make decisions until the game ends or ``stop`` is true."""
+    """Advance an existing game with one bot per seat, in seat order.
+
+    Stop when the game ends or ``stop(game)`` becomes true, checking the
+    predicate before each decision. Raise ``RuntimeError`` if the game still
+    needs a decision after ``max_decisions``; the limit must be positive.
+    """
     if max_decisions < 1:
         raise ValueError("max_decisions must be at least one")
     decisions = 0
@@ -40,6 +45,8 @@ def play_game(
     """Play one game and return the final public observation.
 
     The seed controls the deck; bots are responsible for their own randomness.
+    ``dealer`` is a zero-based seat ID. The returned observation is from seat
+    zero's perspective and contains the final scores and winners.
     """
     game = Game(len(bots), rules=rules, seed=seed, dealer=dealer)
     run(game, bots, max_decisions=max_decisions)

@@ -51,6 +51,8 @@ class _PlayerSetting:
 
 @dataclass(frozen=True)
 class SetupResult:
+    """Validated seats and game mode returned when the user starts a game."""
+
     seats: list[Seat]
     vengeance: bool
     brutal: bool
@@ -80,6 +82,12 @@ def _row_rects(index: int) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygam
 
 
 class SetupScene:
+    """Edit game mode and seats before constructing the table.
+
+    ``result`` remains ``None`` until Start validates the settings; invalid
+    input instead sets ``error`` for display.
+    """
+
     def __init__(self) -> None:
         self.players = [_initial_player(seat) for seat in default_seats()]
         self.vengeance = False
@@ -94,9 +102,11 @@ class SetupScene:
 
     @property
     def dialog_open(self) -> bool:
+        """Setup has no modal dialog, so Escape may quit the application."""
         return False
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Apply input to the selected field, settings, or Start action."""
         if event.type == pygame.TEXTINPUT and self._focus is not None:
             index, field = self._focus
             player = self.players[index]
@@ -180,11 +190,12 @@ class SetupScene:
         self.result = SetupResult(_number_duplicates(seats), self.vengeance, self.brutal)
 
     def update(self, _now: int) -> None:
-        pass
+        """Satisfy the scene interface; setup has no time-dependent updates."""
 
     def render(
         self, screen: pygame.Surface, _mouse_pos: tuple[int, int] | None = None
     ) -> None:
+        """Draw the current settings and any validation error."""
         screen.fill(BACKGROUND)
         self._text(screen, self._title_font, "GAME SETUP", (90, 45), ACCENT)
         self._text(screen, self._heading_font, "Game mode", (90, 110))

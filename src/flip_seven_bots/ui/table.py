@@ -11,17 +11,22 @@ MINIMUM_BOT_TIME_SECONDS = 1
 
 
 def seeded_game(player_count: int, seed: int, *, rules: Rules | None = None) -> Game:
+    """Construct the default replayable game using a deck seed."""
     return Game(player_count, seed=seed, rules=rules)
 
 
 @dataclass(frozen=True)
 class Move:
+    """A player's recorded decision, including choices made by bots."""
+
     player: int
     action: Action
 
 
 @dataclass(frozen=True)
 class Seat:
+    """A named human or bot seat; ``bot=None`` denotes a human."""
+
     name: str
     bot: Bot | None = None
     """The bot playing this seat, or ``None`` for the human player."""
@@ -38,7 +43,8 @@ class Table:
 
     ``seed`` makes the sequence of game seeds, and so every deck, reproducible.
     ``new_game(player_count, game_seed)`` creates each game; only the default
-    factory guarantees a game can be rebuilt from its seed and moves.
+    factory guarantees a game can be rebuilt from its seed and moves. Pass
+    ``rules`` only with that factory, or configure rules in a custom factory.
     """
 
     def __init__(
@@ -69,15 +75,21 @@ class Table:
 
     @property
     def names(self) -> tuple[str, ...]:
+        """Seat names in player-ID order."""
         return tuple(seat.name for seat in self.seats)
 
     @property
     def game(self) -> Game:
+        """The current underlying game."""
         return self._game
 
     @property
     def observation(self) -> Observation:
-        """The public view, including legal actions when a human is to act."""
+        """Public view from the current player's seat, or seat zero after game end.
+
+        Legal actions are present even when the current player is a bot; use
+        ``human_to_act`` to decide whether human input is allowed.
+        """
         return self._game.observe(self._game.current_player or 0)
 
     @property
@@ -92,6 +104,7 @@ class Table:
 
     @property
     def starting_dealer(self) -> int:
+        """Dealer seat at the start of the current game, for replay."""
         return self._starting_dealer
 
     @property
@@ -101,6 +114,7 @@ class Table:
 
     @property
     def paused(self) -> bool:
+        """Whether play is explicitly paused, independently of round summaries."""
         return self._paused
 
     @property
@@ -121,10 +135,12 @@ class Table:
         self._paused = True
 
     def resume(self) -> None:
+        """Resume play and restart the waiting period for the next bot move."""
         self._paused = False
         self._bot_due = None
 
     def restart(self) -> None:
+        """Start a new game with the next generated seed and clear its move history."""
         self._game_seed = self._random.getrandbits(64)
         if self._new_game is seeded_game:
             self._game = seeded_game(len(self.seats), self._game_seed, rules=self._rules)
@@ -138,11 +154,13 @@ class Table:
         self._check_round_summary()
 
     def choose(self, action: Action) -> None:
+        """Apply a human decision; raise ``ValueError`` if no human may act."""
         if self.human_to_act is None:
             raise ValueError("it is not a human player's turn")
         self._apply(action)
 
     def dismiss_summary(self) -> None:
+        """Dismiss the completed-round summary and allow play to continue."""
         self._round_summary = None
 
     def update(self, now: int) -> None:

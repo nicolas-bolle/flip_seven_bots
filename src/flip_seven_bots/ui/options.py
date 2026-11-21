@@ -17,6 +17,8 @@ BOT_KINDS = ("random", "threshold[:SCORE]", "montecarlo[:SAMPLES]")
 
 @dataclass(frozen=True)
 class Options:
+    """Parsed launch settings, including whether to show interactive setup."""
+
     seats: list[Seat]
     seed: int | None
     bug_dir: Path
@@ -26,6 +28,7 @@ class Options:
 
 
 def default_seats() -> list[Seat]:
+    """Create the default human, random-bot, and threshold-bot seats."""
     return [
         Seat("You"),
         Seat("Random bot", RandomBot()),
@@ -79,7 +82,12 @@ def _number_duplicates(seats: list[Seat]) -> list[Seat]:
 
 
 def parse_options(argv: Sequence[str] | None = None) -> Options:
-    """Seats are in the order their options are given; default: you and two bots."""
+    """Parse launch options; ``None`` reads the process command line.
+
+    Seats follow option order, defaulting to a human and two bots. No
+    arguments opens setup; any supplied options launch directly. ``--brutal``
+    implies With A Vengeance.
+    """
     parser = argparse.ArgumentParser(
         prog="python -m flip_seven_bots.ui",
         description=(

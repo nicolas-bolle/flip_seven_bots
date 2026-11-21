@@ -62,6 +62,8 @@ NON_NUMBER_ORDER = {
 
 
 class Command(Enum):
+    """UI-only actions that do not directly represent game decisions."""
+
     CONTINUE = auto()
     RESTART = auto()
     REPORT_BUG = auto()
@@ -71,6 +73,8 @@ class Command(Enum):
 
 @dataclass(frozen=True)
 class Button:
+    """Clickable region for a game action or UI command, with an optional key."""
+
     rect: pygame.Rect
     label: str
     action: Action | Command
@@ -79,6 +83,8 @@ class Button:
 
 @dataclass(frozen=True)
 class _AnimatedDraw:
+    """A draw to animate, noting whether the card remains in the current hand."""
+
     event: CardDrawn
     in_hand: bool
 
@@ -120,6 +126,11 @@ def _player_rects(count: int) -> list[pygame.Rect]:
 
 
 def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
+    """Lay out cards in sorted rows while returning rectangles in hand-index order.
+
+    Keeping the original indices lets a click map back to ``CHOOSE_CARD`` even
+    though the displayed cards are sorted.
+    """
     columns = 12
     groups = (
         sorted(
@@ -168,6 +179,13 @@ def _action_button(action: Action, names: Sequence[str], rect: pygame.Rect) -> B
 
 
 class GameScene:
+    """Render a table and translate human input into decisions and UI commands.
+
+    Draw animations run in sequence and block play until finished. Round
+    summaries and the bug-report dialog also pause decisions; the table
+    continues to own the authoritative game state.
+    """
+
     def __init__(
         self, table: Table | None = None, *, report_dir: Path = Path("bug_reports")
     ) -> None:
@@ -198,6 +216,7 @@ class GameScene:
 
     @property
     def notice(self) -> str | None:
+        """Temporary status message, such as a saved bug-report path."""
         return self._notice
 
     def buttons(self) -> tuple[Button, ...]:
@@ -224,6 +243,7 @@ class GameScene:
         return (*self._play_buttons(), report)
 
     def _play_buttons(self) -> tuple[Button, ...]:
+        """Build currently available controls, including clickable card regions."""
         table = self._table
         if self._animating:
             return ()
@@ -267,6 +287,7 @@ class GameScene:
         )
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        """Handle a click or shortcut, or route text input to the report dialog."""
         if self.dialog_open and self._edit_report(event):
             return
         buttons = self.buttons()
@@ -304,6 +325,10 @@ class GameScene:
                 self._queue_draws(before)
 
     def update(self, now: int) -> None:
+        """Advance animations and, when unblocked, let the table process a bot move.
+
+        ``now`` is a monotonic time in milliseconds.
+        """
         self._now = now
         if self._notice is not None and now >= self._notice_until:
             self._notice = None
@@ -326,6 +351,7 @@ class GameScene:
             self._queue_draws(before)
 
     def _track_swap(self, before: Observation, action: Action) -> None:
+        """Remember the first Swap card so it stays highlighted until the second."""
         after = self._table.observation
         if (
             self._swap_first is None
@@ -351,6 +377,12 @@ class GameScene:
         )
 
     def _queue_draws(self, before: Observation | None) -> None:
+        """Queue recent draws and identify cards still present in the new hand.
+
+        A draw can be resolved or discarded before animation starts. Comparing
+        hand counts with the previous observation distinguishes those cards
+        from draws that should remain visible after their animation.
+        """
         after = self._table.observation
         if before is not None and before.round_number != after.round_number:
             self._previous_round = before
@@ -420,6 +452,7 @@ class GameScene:
     def render(
         self, screen: pygame.Surface, mouse_pos: tuple[int, int] | None = None
     ) -> None:
+        """Draw the current table, pending animations, overlays, and controls."""
         table = self._table
         observation = table.observation
         if (

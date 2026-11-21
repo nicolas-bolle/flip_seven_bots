@@ -27,6 +27,7 @@ _REPLAY_BLOCK = re.compile(
 
 
 def describe_bot(bot: Bot | None) -> str:
+    """Return a readable seat controller and its relevant configuration."""
     match bot:
         case None:
             return "human"

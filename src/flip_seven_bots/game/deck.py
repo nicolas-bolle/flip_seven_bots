@@ -7,7 +7,11 @@ from .model import Card
 
 
 class Deck:
-    """Draw and discard piles; the draw pile's order is the game's only hidden information."""
+    """Manage draw and discard piles, with a supplied random generator.
+
+    Cards are shuffled on construction unless ``shuffle`` is false. The draw
+    pile's order is hidden from observations; the discard pile is public.
+    """
 
     def __init__(self, cards: Iterable[Card], rng: Random, *, shuffle: bool = True):
         self._random = rng
@@ -26,6 +30,7 @@ class Deck:
 
     @property
     def discard_pile(self) -> tuple[Card, ...]:
+        """Return a snapshot of the public discard pile."""
         return tuple(self._discard)
 
     @property
@@ -36,7 +41,8 @@ class Deck:
     def draw(self) -> tuple[Card, bool]:
         """Draw the top card, reshuffling the discard pile first if needed.
 
-        Returns the card and whether a reshuffle happened.
+        Returns the card and whether a reshuffle happened. Raises
+        ``RuntimeError`` if both piles are empty.
         """
         reshuffled = False
         if not self._cards:
@@ -48,6 +54,7 @@ class Deck:
         return self._cards.pop(), reshuffled
 
     def discard(self, cards: Iterable[Card]) -> None:
+        """Add cards to the discard pile for a future reshuffle."""
         self._discard.extend(cards)
 
     def resample(self, rng: Random) -> None:

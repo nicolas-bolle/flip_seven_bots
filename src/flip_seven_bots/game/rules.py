@@ -1,4 +1,4 @@
-"""Deck and scoring rules for the base game."""
+"""Deck construction and hand scoring for both game modes."""
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -11,6 +11,7 @@ FLIP_SEVEN_BONUS = 15
 
 
 def build_deck() -> list[Card]:
+    """Build the unshuffled base-game deck, including duplicate cards."""
     cards = [Card(CardType.NUMBER, 0)]
     cards.extend(
         Card(CardType.NUMBER, number) for number in range(1, 13) for _ in range(number)
@@ -23,6 +24,11 @@ def build_deck() -> list[Card]:
 
 
 def score_cards(cards: Iterable[Card]) -> int:
+    """Score a base-game hand: multiply the number sum, then add modifiers.
+
+    This function does not account for busts or the Flip 7 bonus; the engine
+    handles those separately.
+    """
     cards = tuple(cards)
     number_total = sum(card.value for card in cards if card.kind is CardType.NUMBER)
     multiplier = 2 if any(card.kind is CardType.MULTIPLY for card in cards) else 1
@@ -31,6 +37,7 @@ def score_cards(cards: Iterable[Card]) -> int:
 
 
 def build_vengeance_deck() -> list[Card]:
+    """Build the unshuffled With A Vengeance deck, including special cards."""
     cards = [
         Card(CardType.NUMBER, number)
         for number in range(1, 14)
@@ -52,6 +59,12 @@ def build_vengeance_deck() -> list[Card]:
 
 
 def score_vengeance_cards(cards: Iterable[Card], *, brutal: bool = False) -> int:
+    """Score a Vengeance hand before bust and Flip 7 adjustments.
+
+    Zero makes the hand worth zero. Otherwise, divide the number sum by two
+    when applicable, rounding down, then subtract modifiers. Normal mode
+    clamps the result at zero; Brutal Mode permits negative scores.
+    """
     cards = tuple(cards)
     if any(card.kind is CardType.ZERO for card in cards):
         return 0
@@ -64,7 +77,13 @@ def score_vengeance_cards(cards: Iterable[Card], *, brutal: bool = False) -> int
 
 @dataclass(frozen=True)
 class Rules:
-    """Settings for a match; the defaults are the base game."""
+    """Match settings, defaulting to the base game's deck and hand scoring.
+
+    ``target_score`` ends the match after a round reaches it, and
+    ``flip_seven_bonus`` is applied by the engine. ``build_deck`` returns a
+    fresh collection of cards; ``score_cards`` scores a hand before bust and
+    bonus adjustments.
+    """
 
     target_score: int = TARGET_SCORE
     flip_seven_bonus: int = FLIP_SEVEN_BONUS
@@ -77,7 +96,12 @@ class Rules:
 
 @dataclass(frozen=True)
 class VengeanceRules(Rules):
-    """Settings for With A Vengeance, including its optional Brutal Mode."""
+    """Use the Vengeance deck and scoring, optionally enabling Brutal Mode.
+
+    Brutal Mode allows negative scores, permits modifiers on busted players,
+    and lets a Flip 7 player choose an opponent to receive a bonus penalty.
+    A custom ``score_cards`` callable is left unchanged.
+    """
 
     build_deck: Callable[[], list[Card]] = build_vengeance_deck
     score_cards: Callable[[Iterable[Card]], int] = score_vengeance_cards

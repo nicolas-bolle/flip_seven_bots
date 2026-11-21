@@ -32,6 +32,11 @@ def _report_crash(table: Table, directory: Path) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """Run setup or a direct game, then process Pygame events until quit.
+
+    A crash after a table is created attempts to save a report before the
+    exception is reraised. After initialization, Pygame is shut down on exit.
+    """
     options = parse_options(argv)
     table: Table | None = None
     pygame.init()

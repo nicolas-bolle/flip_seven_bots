@@ -1,4 +1,8 @@
-"""A turn-based, headless implementation of the base game."""
+"""A turn-based, headless engine for the base and With A Vengeance games.
+
+Automatic effects are queued as tasks. The engine executes them until a player
+decision is needed, then resumes the queue when ``Game.apply`` is called.
+"""
 
 import copy
 from collections import deque
@@ -63,6 +67,8 @@ class _Player:
 
 @dataclass(eq=False)
 class _FlipSequence:
+    """Track a multi-card flip and effects deferred until its draws finish."""
+
     player: int
     card: Card
     deferred: list[_Resolve] = field(default_factory=list)
@@ -114,6 +120,8 @@ class _TargetDecision:
 
 @dataclass(frozen=True)
 class _CardDecision:
+    """Card choices, with the first selection retained while resolving a Swap."""
+
     player: int
     card: Card
     choices: tuple[tuple[int, int], ...]
@@ -132,7 +140,13 @@ class Game:
     """Run a match; player IDs are zero-based seat indices.
 
     The engine advances automatically until a player must make a decision.
-    ``observe`` exposes public information, never the shuffled deck.
+    ``observe`` exposes public information, never the shuffled deck. Use
+    ``VengeanceRules`` to select the alternate game.
+
+    ``player_count`` must be positive and ``dealer`` must identify a seat.
+    ``seed`` controls the shuffled deck; alternatively, pass a prepared
+    ``deck`` (but not both). Initial dealing occurs during construction and
+    may itself stop at an action-card decision.
     """
 
     def __init__(
@@ -168,18 +182,22 @@ class Game:
 
     @property
     def current_player(self) -> int | None:
+        """Seat whose decision is pending, or ``None`` after the game ends."""
         return self._pending.player if self._pending is not None else None
 
     @property
     def round_number(self) -> int:
+        """The current one-based round number."""
         return self._round_number
 
     @property
     def last_round(self) -> RoundResult | None:
+        """The latest completed round, or ``None`` before the first ends."""
         return self._last_round
 
     @property
     def rules(self) -> Rules:
+        """The rules used for this match."""
         return self._rules
 
     @property
@@ -193,13 +211,21 @@ class Game:
 
     @property
     def is_finished(self) -> bool:
+        """Whether the game has ended and winners have been determined."""
         return bool(self._winners)
 
     @property
     def winners(self) -> tuple[int, ...]:
+        """Winning seat IDs, including ties; empty until the game ends."""
         return self._winners
 
     def observe(self, player: int) -> Observation:
+        """Return a public snapshot from the requested seat's perspective.
+
+        ``player`` need not be the current player, but only the current
+        player receives legal actions. Raises ``ValueError`` for an invalid
+        seat. The returned snapshot can be sampled only until the game advances.
+        """
         if not 0 <= player < len(self._players):
             raise ValueError("player must be a valid player index")
         views = tuple(
@@ -243,7 +269,10 @@ class Game:
         return clone
 
     def apply(self, action: Action) -> None:
-        """Apply one legal decision and advance to the next decision or game end."""
+        """Apply a legal decision and advance to the next decision or game end.
+
+        Raises ``ValueError`` if the action is not currently legal.
+        """
         decision = self._pending
         if decision is None or action not in self._legal_actions(decision):
             raise ValueError(f"illegal action: {action!r}")
@@ -305,6 +334,7 @@ class Game:
         self._tasks.append(_FindTurn(first))
 
     def _advance(self) -> None:
+        """Process queued automatic effects until a decision or game end."""
         self._recent_draws.clear()
         while self._pending is None and not self.is_finished:
             if not isinstance(self._rules, VengeanceRules) and not any(
@@ -478,6 +508,7 @@ class Game:
     def _card_choices(
         self, player: int, action_card: Card, first: tuple[int, int] | None = None
     ) -> tuple[tuple[int, int], ...]:
+        """Find eligible (owner, hand index) pairs for a card-selection effect."""
         unresolved = {
             (task.player, task.card)
             for task in self._tasks
@@ -539,6 +570,7 @@ class Game:
         self._finish_round(flip_seven_player)
 
     def _round_score(self, player: _Player, *, flip_seven: bool = False) -> int:
+        """Score a hand before its Flip 7 bonus or penalty is applied."""
         if isinstance(self._rules, VengeanceRules):
             if player.is_busted:
                 if not self._rules.brutal:
