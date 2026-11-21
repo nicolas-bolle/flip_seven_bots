@@ -107,3 +107,71 @@ def test_illegal_decision_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     game = game_with_draws([number(2), number(4)], monkeypatch)
     with pytest.raises(ValueError):
         game.apply(Action(ActionType.CHOOSE_TARGET, 0))
+
+
+def test_second_chance_must_be_given_to_an_eligible_player(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chance = Card(CardType.SECOND_CHANCE)
+    game = game_with_draws([chance, number(4), chance], monkeypatch)
+
+    game.apply(Action(ActionType.HIT))
+    observation = game.observe(1)
+    assert observation.pending_card == chance
+    assert observation.legal_actions == (Action(ActionType.CHOOSE_TARGET, 0),)
+
+    game.apply(Action(ActionType.CHOOSE_TARGET, 0))
+    observation = game.observe(0)
+    assert observation.players[1].cards.count(chance) == 1
+    assert observation.players[0].cards.count(chance) == 1
+    assert game.current_player == 0
+
+
+def test_extra_second_chance_is_discarded_if_no_recipient(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chance = Card(CardType.SECOND_CHANCE)
+    game = game_with_draws([chance, chance], monkeypatch, player_count=1)
+
+    game.apply(Action(ActionType.HIT))
+    observation = game.observe(0)
+    assert observation.players[0].cards == (chance,)
+    assert observation.discard_count == 1
+    assert observation.pending_card is None
+    assert Action(ActionType.STAY) in observation.legal_actions
+
+
+def test_discard_is_reshuffled_for_next_round(monkeypatch: pytest.MonkeyPatch) -> None:
+    game = game_with_draws([number(2), number(4)], monkeypatch)
+    game.apply(Action(ActionType.STAY))
+    game.apply(Action(ActionType.STAY))
+
+    observation = game.observe(0)
+    assert observation.round_number == 2
+    assert observation.last_round is not None
+    assert observation.last_round.scores == (4, 2)
+    assert observation.discard_count == 0
+    assert {player.cards for player in observation.players} == {(number(2),), (number(4),)}
+    assert sum(event.kind is EventType.DISCARD_SHUFFLED for event in observation.events) == 1
+
+
+def test_match_ends_after_round_and_reports_tied_winners(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("flip_seven_bots.game.engine.TARGET_SCORE", 5)
+    game = game_with_draws([number(5), number(5)], monkeypatch)
+
+    game.apply(Action(ActionType.STAY))
+    assert not game.is_finished
+    game.apply(Action(ActionType.STAY))
+
+    observation = game.observe(0)
+    assert game.is_finished
+    assert game.winners == (0, 1)
+    assert observation.winners == (0, 1)
+    assert observation.last_round is not None
+    assert observation.last_round.totals == (5, 5)
+    assert observation.current_player is None
+    assert observation.legal_actions == ()
+    with pytest.raises(ValueError, match="illegal action"):
+        game.apply(Action(ActionType.HIT))
