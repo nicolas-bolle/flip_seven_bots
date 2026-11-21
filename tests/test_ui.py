@@ -14,16 +14,26 @@ from flip_seven_bots.game import (
     DiscardShuffled,
     Game,
     GameEvent,
+    Observation,
     PlayerStatus,
     RoundEnded,
     RoundResult,
     RoundStarted,
     Rules,
 )
-from flip_seven_bots.ui.game_scene import GameScene, _card_label, _event_text
+from flip_seven_bots.ui.game_scene import (
+    Button,
+    GameScene,
+    _card_label,
+    _event_text,
+)
+from flip_seven_bots.ui.table import Seat, Table
+
+NAMES = ("You", "Random bot", "Threshold bot")
+FREEZE = Card(CardType.FREEZE)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def pygame_fonts() -> Iterator[None]:
     was_initialized = pygame.font.get_init()
     pygame.font.init()
@@ -32,40 +42,127 @@ def pygame_fonts() -> Iterator[None]:
         pygame.font.quit()
 
 
-@pytest.mark.usefixtures("pygame_fonts")
-def test_human_target_and_bot_turn(monkeypatch: pytest.MonkeyPatch) -> None:
-    draws = [
-        Card(CardType.NUMBER, 3),
-        Card(CardType.NUMBER, 1),
-        Card(CardType.NUMBER, 2),
-        Card(CardType.FREEZE),
-    ]
-    game = Game(3, dealer=2, deck=Deck.stacked(draws))
+class StayBot:
+    def choose_action(self, observation: Observation) -> Action:
+        return Action(ActionType.STAY)
 
-    monkeypatch.setattr("flip_seven_bots.ui.game_scene.Game", lambda _player_count: game)
-    monkeypatch.setattr("pygame.mouse.get_pos", lambda: (0, 0))
-    scene = GameScene()
-    screen = pygame.Surface((1280, 900))
-    scene.render(screen)
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
-    assert game.observe(0).pending_card == Card(CardType.FREEZE)
 
-    scene.render(screen)
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_3))
-    assert game.observe(0).players[2].status == PlayerStatus.STAYED
-    assert game.current_player == 1
-
-    scene.render(screen)
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
-    assert game.current_player == 1
-
-    monkeypatch.setattr(
-        "flip_seven_bots.ui.game_scene.RandomBot.choose_action",
-        lambda _self, _observation: Action(ActionType.STAY),
+def make_scene(
+    draws: list[Card], player_count: int = 3, rules: Rules | None = None
+) -> tuple[GameScene, Table]:
+    """The human (seat 0) is dealt first and acts first; bots always stay."""
+    seats = [Seat("You")] + [Seat(f"Bot {i}", StayBot()) for i in range(1, player_count)]
+    table = Table(
+        seats,
+        new_game=lambda count: Game(
+            count, dealer=count - 1, deck=Deck.stacked(draws), rules=rules
+        ),
+        bot_delay_ms=0,
     )
-    scene.update(pygame.time.get_ticks() + 1_000)
-    assert game.current_player == 0
-    assert game.observe(0).players[1].status == PlayerStatus.STAYED
+    return GameScene(table), table
+
+
+def numbers(*values: int) -> list[Card]:
+    return [Card(CardType.NUMBER, value) for value in values]
+
+
+def button(scene: GameScene, label: str) -> Button:
+    return next(b for b in scene.buttons() if b.label.startswith(label))
+
+
+def click(scene: GameScene, target: Button) -> None:
+    scene.handle_event(
+        pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=target.rect.center)
+    )
+
+
+def press(scene: GameScene, key: int) -> None:
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
+
+
+def test_buttons_offer_the_legal_actions_with_seat_names() -> None:
+    scene, _ = make_scene(numbers(3, 1, 2) + [FREEZE])
+    assert [b.label for b in scene.buttons()] == ["Hit  [H]", "Stay  [S]"]
+
+    press(scene, pygame.K_h)
+    assert [(b.label, b.shortcut) for b in scene.buttons()] == [
+        ("You  [1]", pygame.K_1), ("Bot 1  [2]", pygame.K_2), ("Bot 2  [3]", pygame.K_3),
+    ]
+
+
+def test_clicking_buttons_hits_and_chooses_a_target() -> None:
+    scene, table = make_scene(numbers(3, 1, 2) + [FREEZE])
+    click(scene, button(scene, "Hit"))
+    assert table.observation.pending_card == FREEZE
+
+    click(scene, button(scene, "Bot 2"))
+    assert table.observation.players[2].status is PlayerStatus.STAYED
+    assert scene.buttons() == ()
+
+
+def test_shortcut_keys_hit_and_choose_a_target() -> None:
+    scene, table = make_scene(numbers(3, 1, 2) + [FREEZE])
+    press(scene, pygame.K_h)
+    press(scene, pygame.K_3)
+    assert table.observation.players[2].status is PlayerStatus.STAYED
+
+
+def test_input_away_from_buttons_is_ignored() -> None:
+    scene, table = make_scene(numbers(3, 1, 2))
+    scene.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(5, 5)))
+    press(scene, pygame.K_x)
+    assert table.awaiting_human
+    assert table.observation.events[-1] == CardDrawn(1, 2, Card(CardType.NUMBER, 2))
+
+
+def test_continue_dismisses_round_summary() -> None:
+    scene, table = make_scene(numbers(3, 1, 2, 7, 8, 9))
+    press(scene, pygame.K_s)
+    scene.update(0)
+    scene.update(0)
+    assert [b.label for b in scene.buttons()] == ["Continue  [Enter]"]
+    scene.render(pygame.Surface((1280, 900)))
+
+    press(scene, pygame.K_RETURN)
+    assert table.round_summary is None
+
+
+def test_play_again_restarts_finished_game() -> None:
+    scene, table = make_scene(numbers(3, 1, 2), rules=Rules(target_score=1))
+    press(scene, pygame.K_s)
+    scene.update(0)
+    scene.update(0)
+    press(scene, pygame.K_RETURN)
+    finished = table.game
+    assert [b.label for b in scene.buttons()] == ["Play again  [R]"]
+    scene.render(pygame.Surface((1280, 900)))
+
+    press(scene, pygame.K_r)
+    assert table.game is not finished
+
+
+@pytest.mark.parametrize("player_count", range(1, 7))
+def test_target_buttons_fit_on_screen_for_any_player_count(player_count: int) -> None:
+    scene, table = make_scene(numbers(*range(1, player_count + 1)) + [FREEZE], player_count)
+    press(scene, pygame.K_h)
+    assert table.observation.pending_card == FREEZE
+
+    scene.render(pygame.Surface((1280, 900)), mouse_pos=(0, 0))
+    screen = pygame.Rect(0, 0, 1280, 900)
+    assert len(scene.buttons()) == player_count
+    assert all(screen.contains(b.rect) for b in scene.buttons())
+
+
+def test_large_hand_renders_in_smallest_panel() -> None:
+    hand = numbers(*range(1, 7)) + [Card(CardType.SECOND_CHANCE), Card(CardType.ADD, 4)]
+    scene, table = make_scene(hand[:1] + numbers(*range(1, 6)) + hand[1:], player_count=6)
+    for _ in hand[1:]:
+        press(scene, pygame.K_h)
+        while not table.awaiting_human:
+            scene.update(0)
+
+    assert len(table.observation.players[0].cards) == len(hand)
+    scene.render(pygame.Surface((1280, 900)))
 
 
 @pytest.mark.parametrize(
@@ -74,7 +171,7 @@ def test_human_target_and_bot_turn(monkeypatch: pytest.MonkeyPatch) -> None:
         (Card(CardType.NUMBER, 12), "12"),
         (Card(CardType.ADD, 6), "+6"),
         (Card(CardType.MULTIPLY, 2), "x2"),
-        (Card(CardType.FREEZE), "FREEZE"),
+        (FREEZE, "FREEZE"),
         (Card(CardType.FLIP_THREE), "FLIP 3"),
         (Card(CardType.SECOND_CHANCE), "SECOND CHANCE"),
     ],
@@ -99,89 +196,4 @@ def test_card_labels(card: Card, label: str) -> None:
     ],
 )
 def test_activity_messages(event: GameEvent, message: str) -> None:
-    assert _event_text(event) == message
-
-
-@pytest.mark.usefixtures("pygame_fonts")
-def test_mouse_can_hit_and_choose_a_target(monkeypatch: pytest.MonkeyPatch) -> None:
-    draws = [
-        Card(CardType.NUMBER, 3), Card(CardType.NUMBER, 1),
-        Card(CardType.NUMBER, 2), Card(CardType.FREEZE),
-    ]
-    game = Game(3, dealer=2, deck=Deck.stacked(draws))
-
-    monkeypatch.setattr("flip_seven_bots.ui.game_scene.Game", lambda _count: game)
-    monkeypatch.setattr("pygame.mouse.get_pos", lambda: (0, 0))
-    scene = GameScene()
-    screen = pygame.Surface((1280, 900))
-    scene.render(screen)
-    scene.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(75, 810)))
-    assert game.observe(0).pending_card == Card(CardType.FREEZE)
-
-    scene.render(screen)
-    scene.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(490, 810)))
-    assert game.observe(0).players[2].status is PlayerStatus.STAYED
-
-
-def play_first_round(
-    monkeypatch: pytest.MonkeyPatch, rules: Rules
-) -> tuple[GameScene, Game, pygame.Surface, list[str]]:
-    """Everyone stays after the deal; returns the scene showing the round summary."""
-    draws = [Card(CardType.NUMBER, n) for n in (5, 4, 3, 7, 8, 9)]
-    game = Game(3, dealer=2, deck=Deck.stacked(draws), rules=rules)
-    games = [game]
-
-    def create_game(count: int) -> Game:
-        return games.pop() if games else Game(count, seed=10)
-
-    monkeypatch.setattr("flip_seven_bots.ui.game_scene.Game", create_game)
-    monkeypatch.setattr("pygame.mouse.get_pos", lambda: (0, 0))
-    for bot in ("RandomBot", "ThresholdBot"):
-        monkeypatch.setattr(
-            f"flip_seven_bots.ui.game_scene.{bot}.choose_action",
-            lambda _self, _observation: Action(ActionType.STAY),
-        )
-    texts: list[str] = []
-    monkeypatch.setattr(
-        GameScene, "_text",
-        staticmethod(lambda _screen, _font, text, _position, _color=None: texts.append(text)),
-    )
-    scene = GameScene()
-    screen = pygame.Surface((1280, 900))
-    scene.render(screen)
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_s))
-    scene.update(pygame.time.get_ticks() + 1000)
-    scene.update(pygame.time.get_ticks() + 1000)
-    texts.clear()
-    scene.render(screen)
-    assert "Round 1 complete" in texts
-    assert "You:  +5    total 5" in texts
-    texts.clear()
-    return scene, game, screen, texts
-
-
-@pytest.mark.usefixtures("pygame_fonts")
-def test_continuing_after_round_summary_resumes_play(monkeypatch: pytest.MonkeyPatch) -> None:
-    scene, game, screen, texts = play_first_round(monkeypatch, Rules())
-
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    scene.render(screen)
-    assert not game.is_finished
-    assert "Round 1 complete" not in texts
-
-
-@pytest.mark.usefixtures("pygame_fonts")
-def test_game_over_screen_and_restart(monkeypatch: pytest.MonkeyPatch) -> None:
-    scene, game, screen, texts = play_first_round(monkeypatch, Rules(target_score=1))
-
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
-    scene.render(screen)
-    assert game.is_finished
-    assert "Game over" in texts
-    assert "Winner: You" in texts
-
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_r))
-    texts.clear()
-    scene.render(screen)
-    assert "Round 1 complete" not in texts
-    assert "Game over" not in texts
+    assert _event_text(event, NAMES) == message

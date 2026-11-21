@@ -25,7 +25,7 @@ def main() -> None:
 
             if running:
                 scene.update(pygame.time.get_ticks())
-                scene.render(screen)
+                scene.render(screen, pygame.mouse.get_pos())
                 pygame.display.flip()
                 clock.tick(60)
     finally:

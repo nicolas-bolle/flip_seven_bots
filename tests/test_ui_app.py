@@ -28,13 +28,14 @@ def test_app_forwards_events_until_quit_and_cleans_up(
     monkeypatch.setattr(pygame.time, "Clock", lambda: clock)
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: 123)
     monkeypatch.setattr(pygame.event, "get", lambda: next(events))
+    monkeypatch.setattr(pygame.mouse, "get_pos", lambda: (4, 5))
     monkeypatch.setattr(app, "GameScene", lambda: scene)
 
     app.main()
 
     scene.handle_event.assert_called_once_with(forwarded)
     scene.update.assert_called_once_with(123)
-    scene.render.assert_called_once_with(screen)
+    scene.render.assert_called_once_with(screen, (4, 5))
     cleanup.assert_called_once_with()
 
 
