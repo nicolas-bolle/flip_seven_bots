@@ -11,8 +11,18 @@ uv run python -m flip_seven_bots.ui
 You play the base game against a random bot and a bot that stays at 30 points.
 Use the buttons or their displayed keyboard shortcuts to hit, stay, or choose
 a player when an action card requires a target. Press Escape or close the
-window to quit. The activity panel shows recent draws and decisions; a summary
-appears after each round.
+window to quit. The activity panel shows the current round's draws and
+decisions; a summary appears after each round.
+
+Choose the players with `--human NAME` and `--bot KIND` options; seats are
+filled in the order given, up to six players. Bot kinds are `random`,
+`threshold[:SCORE]` (default 30), and `montecarlo[:SAMPLES]` (default 50).
+Every card is public, so several humans can share the screen and take turns.
+A table of only bots can be watched.
+
+```shell
+uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25
+```
 
 ## Headless base game
 

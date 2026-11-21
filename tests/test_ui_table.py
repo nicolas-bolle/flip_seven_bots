@@ -52,8 +52,8 @@ def test_bot_moves_once_its_delay_has_passed() -> None:
 def test_human_cannot_act_on_a_bot_turn() -> None:
     table = make_table()
     table.choose(STAY)
-    assert not table.awaiting_human
-    with pytest.raises(ValueError, match="not the human player's turn"):
+    assert table.human_to_act is None
+    with pytest.raises(ValueError, match="not a human player's turn"):
         table.choose(HIT)
 
 
@@ -85,11 +85,33 @@ def test_restart_replaces_a_finished_game() -> None:
     assert table.observation.round_number == 1
 
 
-@pytest.mark.parametrize(
-    "seats",
-    [[Seat("A", StayBot())], [Seat("You"), Seat("Also you")]],
-    ids=["no-human", "two-humans"],
-)
-def test_table_needs_exactly_one_human(seats: list[Seat]) -> None:
-    with pytest.raises(ValueError, match="exactly one"):
-        Table(seats)
+def test_each_human_acts_on_their_own_turn() -> None:
+    draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2)]
+    table = Table(
+        [Seat("Ann"), Seat("Bot", StayBot()), Seat("Ben")],
+        new_game=lambda count: Game(count, dealer=2, deck=Deck.stacked(draws)),
+        bot_delay_ms=0,
+    )
+    assert table.human_to_act == 0
+    table.choose(STAY)
+    assert table.human_to_act is None
+    table.update(0)
+    assert table.human_to_act == 2
+    assert table.observation.legal_actions == (HIT, STAY)
+
+
+def test_bots_play_a_table_without_humans() -> None:
+    table = Table(
+        [Seat("A", StayBot()), Seat("B", StayBot())],
+        new_game=lambda count: Game(count, seed=1),
+        bot_delay_ms=0,
+    )
+    table.update(0)
+    table.update(0)
+    assert table.round_summary is not None
+    assert table.human_to_act is None
+
+
+def test_table_needs_a_seat() -> None:
+    with pytest.raises(ValueError, match="at least one seat"):
+        Table([])

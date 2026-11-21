@@ -48,10 +48,14 @@ class StayBot:
 
 
 def make_scene(
-    draws: list[Card], player_count: int = 3, rules: Rules | None = None
+    draws: list[Card],
+    player_count: int = 3,
+    rules: Rules | None = None,
+    seats: list[Seat] | None = None,
 ) -> tuple[GameScene, Table]:
-    """The human (seat 0) is dealt first and acts first; bots always stay."""
-    seats = [Seat("You")] + [Seat(f"Bot {i}", StayBot()) for i in range(1, player_count)]
+    """Seat 0 is dealt first and acts first; by default it is the only human and bots stay."""
+    if seats is None:
+        seats = [Seat("You")] + [Seat(f"Bot {i}", StayBot()) for i in range(1, player_count)]
     table = Table(
         seats,
         new_game=lambda count: Game(
@@ -111,7 +115,7 @@ def test_input_away_from_buttons_is_ignored() -> None:
     scene, table = make_scene(numbers(3, 1, 2))
     scene.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(5, 5)))
     press(scene, pygame.K_x)
-    assert table.awaiting_human
+    assert table.human_to_act == 0
     assert table.observation.events[-1] == CardDrawn(1, 2, Card(CardType.NUMBER, 2))
 
 
@@ -141,6 +145,29 @@ def test_play_again_restarts_finished_game() -> None:
     assert table.game is not finished
 
 
+def test_humans_take_turns_and_are_named_in_the_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seats = [Seat("Ann"), Seat("Ben"), Seat("Bot", StayBot())]
+    scene, table = make_scene(numbers(3, 1, 2), seats=seats)
+    texts: list[str] = []
+    monkeypatch.setattr(
+        scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
+    )
+
+    scene.render(pygame.Surface((1280, 900)))
+    assert "Ann's turn: hit or stay" in texts
+    press(scene, pygame.K_s)
+
+    texts.clear()
+    scene.render(pygame.Surface((1280, 900)))
+    assert table.human_to_act == 1
+    assert "Ben's turn: hit or stay" in texts
+    press(scene, pygame.K_s)
+    assert table.human_to_act is None
+    assert scene.buttons() == ()
+
+
 @pytest.mark.parametrize("player_count", range(1, 7))
 def test_target_buttons_fit_on_screen_for_any_player_count(player_count: int) -> None:
     scene, table = make_scene(numbers(*range(1, player_count + 1)) + [FREEZE], player_count)
@@ -158,7 +185,7 @@ def test_large_hand_renders_in_smallest_panel() -> None:
     scene, table = make_scene(hand[:1] + numbers(*range(1, 6)) + hand[1:], player_count=6)
     for _ in hand[1:]:
         press(scene, pygame.K_h)
-        while not table.awaiting_human:
+        while table.human_to_act is None:
             scene.update(0)
 
     assert len(table.observation.players[0].cards) == len(hand)

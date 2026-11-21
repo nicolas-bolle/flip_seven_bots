@@ -1,17 +1,22 @@
 """Pygame application loop."""
 
+from collections.abc import Sequence
+
 import pygame
 
 from .game_scene import GameScene
+from .players import parse_seats
+from .table import Table
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
+    seats = parse_seats(argv)
     pygame.init()
     try:
         screen = pygame.display.set_mode((1280, 900))
-        pygame.display.set_caption("Flip 7 - Bots")
+        pygame.display.set_caption("Flip 7")
         clock = pygame.time.Clock()
-        scene = GameScene()
+        scene = GameScene(Table(seats))
 
         running = True
         while running:

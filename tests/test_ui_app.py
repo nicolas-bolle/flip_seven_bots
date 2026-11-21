@@ -29,9 +29,9 @@ def test_app_forwards_events_until_quit_and_cleans_up(
     monkeypatch.setattr(pygame.time, "get_ticks", lambda: 123)
     monkeypatch.setattr(pygame.event, "get", lambda: next(events))
     monkeypatch.setattr(pygame.mouse, "get_pos", lambda: (4, 5))
-    monkeypatch.setattr(app, "GameScene", lambda: scene)
+    monkeypatch.setattr(app, "GameScene", lambda _table: scene)
 
-    app.main()
+    app.main([])
 
     scene.handle_event.assert_called_once_with(forwarded)
     scene.update.assert_called_once_with(123)
@@ -48,5 +48,5 @@ def test_app_cleans_up_when_scene_creation_fails(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(pygame.time, "Clock", Mock())
     monkeypatch.setattr(app, "GameScene", Mock(side_effect=RuntimeError("scene failed")))
     with pytest.raises(RuntimeError, match="scene failed"):
-        app.main()
+        app.main([])
     cleanup.assert_called_once_with()
