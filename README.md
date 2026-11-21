@@ -178,6 +178,31 @@ current score (`policies.expected_hit_score`). For any decision,
 and picks the action with the best average margin over the leading opponent;
 the example bot above uses it for Flip Three targets.
 
+### Tournaments
+
+`run_tournament` plays a series of games between named bots and tracks Elo
+ratings. Each game seats `players_per_game` bots (default: all), chosen and
+ordered at random; `seed` controls seating and decks.
+
+```python
+from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
+from flip_seven_bots.tournament import run_tournament
+
+result = run_tournament(
+    {"random": RandomBot(1), "t25": ThresholdBot(25), "ev": ExpectedValueBot()},
+    games=100,
+    seed=0,
+)
+print(result.summary)  # games, wins, win_rate, mean_place, mean_score, rating
+result.games           # per game and player: seat, score, place, won, ratings
+```
+
+Games with more than two players are rated as every pairwise match: the better
+place wins and tied scores draw. Each player's change is `k_factor / (n - 1)`
+times the sum of actual minus expected results, so two-player games use
+standard Elo and the total rating stays constant. Elo depends on game order
+and keeps drifting, so use enough games for ratings to settle.
+
 Training integrations are not implemented yet.
 
 ## Tests
