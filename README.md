@@ -21,6 +21,8 @@ Every card is public, so several humans can share the screen and take turns.
 A table of only bots can be watched.
 Bot decisions take at least one second each. Number cards appear below
 modifiers and other cards; resolved Freeze and Flip 3 cards are discarded.
+Cards flip over and move from the deck to each hand as they are dealt.
+Play waits for the animations to finish.
 
 ```shell
 uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25

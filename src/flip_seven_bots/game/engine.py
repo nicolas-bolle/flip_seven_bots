@@ -140,6 +140,7 @@ class Game:
         self._tasks: deque[_Task] = deque()
         self._pending: _Decision | None = None
         self._events: list[GameEvent] = []
+        self._recent_draws: list[CardDrawn] = []
         self._version = 0
         self._start_round()
         self._advance()
@@ -159,6 +160,11 @@ class Game:
     @property
     def rules(self) -> Rules:
         return self._rules
+
+    @property
+    def recent_draws(self) -> tuple[CardDrawn, ...]:
+        """Cards drawn during initialization or the most recent decision."""
+        return tuple(self._recent_draws)
 
     def hidden_deck(self) -> tuple[Card, ...]:
         """The undrawn cards, next card first. For debugging only; bots must not use it."""
@@ -262,6 +268,7 @@ class Game:
         self._tasks.append(_FindTurn(first))
 
     def _advance(self) -> None:
+        self._recent_draws.clear()
         while self._pending is None and not self.is_finished:
             if not any(player.is_active for player in self._players):
                 self._end_round(flip_seven_player=None)
@@ -298,7 +305,9 @@ class Game:
         card, reshuffled = self._deck.draw()
         if reshuffled:
             self._events.append(DiscardShuffled(self._round_number))
-        self._events.append(CardDrawn(self._round_number, player_index, card))
+        event = CardDrawn(self._round_number, player_index, card)
+        self._events.append(event)
+        self._recent_draws.append(event)
         match card.kind:
             case CardType.NUMBER:
                 self._receive_number(player_index, card)

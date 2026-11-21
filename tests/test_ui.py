@@ -23,7 +23,7 @@ from flip_seven_bots.game import (
     RoundStarted,
     Rules,
 )
-from flip_seven_bots.ui.game_scene import Button, Command, GameScene
+from flip_seven_bots.ui.game_scene import CARD_ANIMATION_MS, Button, Command, GameScene
 from flip_seven_bots.ui.table import Seat, Table
 from flip_seven_bots.ui.text import card_label, event_text
 
@@ -51,6 +51,7 @@ def make_scene(
     rules: Rules | None = None,
     seats: list[Seat] | None = None,
     report_dir: Path = Path("unused-bug-reports"),
+    animate_deal: bool = False,
 ) -> tuple[GameScene, Table]:
     """Seat 0 is dealt first and acts first; by default it is the only human and bots stay."""
     if seats is None:
@@ -62,7 +63,10 @@ def make_scene(
         ),
         bot_delay_ms=0,
     )
-    return GameScene(table, report_dir=report_dir), table
+    scene = GameScene(table, report_dir=report_dir)
+    if not animate_deal:
+        finish_animations(scene)
+    return scene, table
 
 
 def numbers(*values: int) -> list[Card]:
@@ -78,14 +82,23 @@ def button(scene: GameScene, label: str) -> Button:
     return next(b for b in scene.buttons() if b.label.startswith(label))
 
 
+def finish_animations(scene: GameScene) -> None:
+    if scene._animating:
+        scene.update(scene._now)
+        scene.update(scene._now + CARD_ANIMATION_MS * len(scene._draws))
+
+
 def click(scene: GameScene, target: Button) -> None:
     scene.handle_event(
         pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=target.rect.center)
     )
+    finish_animations(scene)
 
 
 def press(scene: GameScene, key: int) -> None:
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
+    if not scene.dialog_open:
+        finish_animations(scene)
 
 
 def test_buttons_offer_the_legal_actions_with_seat_names() -> None:
@@ -126,8 +139,8 @@ def test_input_away_from_buttons_is_ignored() -> None:
 def test_continue_dismisses_round_summary() -> None:
     scene, table = make_scene(numbers(3, 1, 2, 7, 8, 9))
     press(scene, pygame.K_s)
-    scene.update(0)
-    scene.update(0)
+    scene.update(scene._now)
+    scene.update(scene._now)
     assert [b.label for b in play_buttons(scene)] == ["Continue  [Enter]"]
     scene.render(pygame.Surface((1280, 900)))
 
@@ -138,8 +151,8 @@ def test_continue_dismisses_round_summary() -> None:
 def test_play_again_restarts_finished_game() -> None:
     scene, table = make_scene(numbers(3, 1, 2), rules=Rules(target_score=1))
     press(scene, pygame.K_s)
-    scene.update(0)
-    scene.update(0)
+    scene.update(scene._now)
+    scene.update(scene._now)
     press(scene, pygame.K_RETURN)
     finished = table.game
     assert [b.label for b in play_buttons(scene)] == ["Play again  [R]"]
@@ -190,7 +203,7 @@ def test_large_hand_renders_in_smallest_panel() -> None:
     for _ in hand[1:]:
         press(scene, pygame.K_h)
         while table.human_to_act is None:
-            scene.update(0)
+            scene.update(scene._now)
 
     assert len(table.observation.players[0].cards) == len(hand)
     scene.render(pygame.Surface((1280, 900)))
@@ -215,6 +228,139 @@ def test_non_number_cards_are_above_numbers(
     number_rects = [rect for card, rect in cards if card.kind is CardType.NUMBER]
     assert all(modifier.bottom <= rect.top for rect in number_rects)
     assert all(panel.contains(rect) for _, rect in cards)
+
+
+def test_deal_flips_and_moves_cards_before_revealing_their_hands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(numbers(3, 1, 2), animate_deal=True)
+    scene.update(0)
+    assert play_buttons(scene) == []
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
+    assert table.moves == ()
+    texts: list[str] = []
+    monkeypatch.setattr(
+        scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert "Round: ...    Total: 0" in texts
+    assert not any("drew" in text for text in texts)
+
+    def frame() -> pygame.Rect:
+        screen = pygame.Surface((1280, 900), pygame.SRCALPHA)
+        scene._draw_animation(screen, table.observation)
+        return screen.get_bounding_rect()
+
+    start = frame()
+    scene.update(150)
+    moving = frame()
+    assert moving.center != start.center
+    assert moving.width < start.width
+
+    drawn: list[Card] = []
+    monkeypatch.setattr(scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card))
+    scene.update(450)
+    scene.render(pygame.Surface((1280, 900)))
+    assert drawn == [Card(CardType.NUMBER, 3)]
+
+    drawn.clear()
+    scene.update(600)
+    scene.render(pygame.Surface((1280, 900)))
+    assert drawn == [Card(CardType.NUMBER, 3)]
+    finish_animations(scene)
+    assert [b.label for b in play_buttons(scene)] == ["Hit  [H]", "Stay  [S]"]
+
+
+def test_flip_three_animates_each_draw_in_order() -> None:
+    flip_three = Card(CardType.FLIP_THREE)
+    scene, table = make_scene(
+        numbers(1, 2) + [flip_three] + numbers(3, 4, 5),
+        seats=[Seat("Ann"), Seat("Ben")],
+    )
+    press(scene, pygame.K_h)
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_2))
+    assert [draw.event.card for draw in scene._draws] == numbers(3, 4, 5)
+    assert play_buttons(scene) == []
+    scene.update(scene._now)
+    scene.update(scene._now + CARD_ANIMATION_MS)
+    assert [draw.event.card for draw in scene._draws] == numbers(4, 5)
+    assert table.observation.players[1].cards == tuple(numbers(2, 3, 4, 5))
+    finish_animations(scene)
+    assert play_buttons(scene)
+
+
+def test_bot_delay_starts_after_deal_animation() -> None:
+    table = Table(
+        [Seat("Bot", StayBot())],
+        new_game=lambda count, _seed: Game(
+            count, deck=Deck.stacked(numbers(3, 4))
+        ),
+    )
+    scene = GameScene(table)
+    scene.update(0)
+    scene.update(CARD_ANIMATION_MS)
+    scene.update(CARD_ANIMATION_MS)
+    scene.update(CARD_ANIMATION_MS + 999)
+    assert table.moves == ()
+    scene.update(CARD_ANIMATION_MS + 1000)
+    assert len(table.moves) == 1
+
+
+def test_animations_do_not_hide_an_existing_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(numbers(3, 2, 3), seats=[Seat("Ann"), Seat("Ben")])
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
+    drawn: list[Card] = []
+    monkeypatch.setattr(scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card))
+    player = table.observation.players[0]
+    scene._draw_player(
+        pygame.Surface((1280, 900)), player, pygame.Rect(30, 112, 895, 279),
+        table.observation,
+    )
+    assert drawn == [Card(CardType.NUMBER, 3)]
+
+
+def test_round_summary_waits_for_last_draw_then_next_deal_waits_for_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, table = make_scene(numbers(0, 1, 2, 3, 4, 5, 6, 9), player_count=1)
+    for _ in range(5):
+        press(scene, pygame.K_h)
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
+    assert table.round_summary is not None
+    assert [(draw.event.round_number, draw.event.card.value) for draw in scene._draws] == [
+        (1, 6), (2, 9)
+    ]
+    assert play_buttons(scene) == []
+    texts: list[str] = []
+    monkeypatch.setattr(
+        scene, "_text", lambda _screen, _font, text, _position, _color=None: texts.append(text)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert any(text.startswith("Round 1  |") for text in texts)
+    scene.update(scene._now)
+    scene.update(scene._now + CARD_ANIMATION_MS)
+    assert [b.label for b in play_buttons(scene)] == ["Continue  [Enter]"]
+
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    assert table.round_summary is None
+    assert play_buttons(scene) == []
+    finish_animations(scene)
+    assert play_buttons(scene)
+
+
+def test_bug_report_pauses_animation_without_skipping_it() -> None:
+    scene, _ = make_scene(numbers(3), player_count=1, animate_deal=True)
+    scene.update(0)
+    scene.update(200)
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1))
+    scene.update(5_000)
+    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+    scene.update(5_399)
+    assert play_buttons(scene) == []
+    scene.update(5_400)
+    assert play_buttons(scene)
 
 
 def type_text(scene: GameScene, text: str) -> None:

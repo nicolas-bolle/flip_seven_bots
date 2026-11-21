@@ -1,5 +1,6 @@
 """A shared-screen table for any mix of human and bot players."""
 
+from collections import Counter, deque
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -11,6 +12,7 @@ from flip_seven_bots.game import (
     Action,
     ActionType,
     Card,
+    CardDrawn,
     CardType,
     Observation,
     PlayerStatus,
@@ -41,6 +43,8 @@ DIALOG = pygame.Rect(240, 160, 800, 560)
 REPORT_BUTTON = pygame.Rect(1070, 24, 180, 40)
 MAX_REPORT_LENGTH = 4000
 NOTICE_MS = 6000
+CARD_ANIMATION_MS = 600
+DECK_RECT = pygame.Rect(855, 22, 42, 60)
 
 
 class Command(Enum):
@@ -57,6 +61,12 @@ class Button:
     label: str
     action: Action | Command
     shortcut: int | None = None
+
+
+@dataclass(frozen=True)
+class _AnimatedDraw:
+    event: CardDrawn
+    in_hand: bool
 
 
 def _wrap(text: str, font: pygame.font.Font, width: int) -> list[str]:
@@ -95,6 +105,28 @@ def _player_rects(count: int) -> list[pygame.Rect]:
     ]
 
 
+def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
+    columns = 12
+    groups = (
+        [i for i, card in enumerate(cards) if card.kind is not CardType.NUMBER],
+        [i for i, card in enumerate(cards) if card.kind is CardType.NUMBER],
+    )
+    rows = sum((len(group) + columns - 1) // columns for group in groups)
+    if not rows:
+        return []
+    gap = 2
+    card_height = min(51, (rect.height - 47 - gap * (rows - 1)) // rows)
+    result = [pygame.Rect(0, 0, 0, 0) for _ in cards]
+    row = 0
+    for group in groups:
+        for index, card_index in enumerate(group):
+            x = rect.x + 16 + (index % columns) * 70
+            y = rect.y + 42 + (row + index // columns) * (card_height + gap)
+            result[card_index] = pygame.Rect(x, y, 62, card_height)
+        row += (len(group) + columns - 1) // columns
+    return result
+
+
 def _action_button(action: Action, names: Sequence[str], rect: pygame.Rect) -> Button:
     match action:
         case Action(kind=ActionType.HIT):
@@ -121,12 +153,17 @@ class GameScene:
         self._notice: str | None = None
         self._notice_until = 0
         self._now = 0
+        self._pause_started: int | None = None
+        self._draws: deque[_AnimatedDraw] = deque()
+        self._draw_started: int | None = None
+        self._previous_round: Observation | None = None
         self._title_font = pygame.font.Font(None, 42)
         self._heading_font = pygame.font.Font(None, 30)
         self._font = pygame.font.Font(None, 25)
         self._small_font = pygame.font.Font(None, 21)
         self._card_font = pygame.font.Font(None, 25)
         self._compact_card_font = pygame.font.Font(None, 16)
+        self._queue_draws(None)
 
     @property
     def dialog_open(self) -> bool:
@@ -162,6 +199,8 @@ class GameScene:
 
     def _play_buttons(self) -> tuple[Button, ...]:
         table = self._table
+        if self._animating:
+            return ()
         corner = pygame.Rect(OVERLAY.x + 28, OVERLAY.bottom - 76, 195, 50)
         if table.round_summary is not None:
             return (
@@ -204,22 +243,76 @@ class GameScene:
                 self._table.dismiss_summary()
             case Button(action=Command.RESTART):
                 self._table.restart()
+                self._draws.clear()
+                self._draw_started = None
+                self._previous_round = None
+                self._queue_draws(None)
             case Button(action=Command.REPORT_BUG):
                 self._report_text = ""
                 self._report_hint = None
+                self._pause_started = self._now
                 self._table.pause()
             case Button(action=Command.SUBMIT_REPORT):
                 self._submit_report()
             case Button(action=Command.CANCEL_REPORT):
                 self._close_report()
             case Button(action=Action() as action):
+                before = self._table.observation
                 self._table.choose(action)
+                self._queue_draws(before)
 
     def update(self, now: int) -> None:
         self._now = now
         if self._notice is not None and now >= self._notice_until:
             self._notice = None
+        if self.dialog_open:
+            return
+        if self._animating:
+            if self._draw_started is None:
+                self._draw_started = now
+            while self._animating and now - self._draw_started >= CARD_ANIMATION_MS:
+                self._draws.popleft()
+                self._draw_started += CARD_ANIMATION_MS
+            if not self._animating:
+                self._draw_started = None
+            return
+        before = self._table.observation
+        moves = len(self._table.moves)
         self._table.update(now)
+        if len(self._table.moves) != moves:
+            self._queue_draws(before)
+
+    @property
+    def _animating(self) -> bool:
+        summary = self._table.round_summary
+        return bool(
+            self._draws
+            and (summary is None or self._draws[0].event.round_number <= summary.round_number)
+        )
+
+    def _queue_draws(self, before: Observation | None) -> None:
+        after = self._table.observation
+        if before is not None and before.round_number != after.round_number:
+            self._previous_round = before
+        added = [
+            Counter(player.cards)
+            - (
+                Counter(before.players[player.player].cards)
+                if before is not None and before.round_number == after.round_number
+                else Counter()
+            )
+            for player in after.players
+        ]
+        queued: list[_AnimatedDraw] = []
+        for event in reversed(self._table.game.recent_draws):
+            in_hand = (
+                event.round_number == after.round_number
+                and added[event.player][event.card] > 0
+            )
+            if in_hand:
+                added[event.player][event.card] -= 1
+            queued.append(_AnimatedDraw(event, in_hand))
+        self._draws.extend(reversed(queued))
 
     def _edit_report(self, event: pygame.event.Event) -> bool:
         """Apply typing to the report message; return whether the event was used."""
@@ -259,6 +352,9 @@ class GameScene:
 
     def _close_report(self) -> None:
         self._report_text = None
+        if self._draw_started is not None and self._pause_started is not None:
+            self._draw_started += self._now - self._pause_started
+        self._pause_started = None
         self._table.resume()
 
     def render(
@@ -266,6 +362,12 @@ class GameScene:
     ) -> None:
         table = self._table
         observation = table.observation
+        if (
+            self._animating
+            and self._previous_round is not None
+            and self._draws[0].event.round_number == self._previous_round.round_number
+        ):
+            observation = self._previous_round
         screen.fill(BACKGROUND)
         self._text(screen, self._title_font, "FLIP 7", (35, 24), ACCENT)
         self._text(
@@ -276,6 +378,7 @@ class GameScene:
             (35, 69),
             MUTED,
         )
+        self._draw_deck(screen)
 
         for player, rect in zip(
             observation.players, _player_rects(len(observation.players))
@@ -283,10 +386,12 @@ class GameScene:
             self._draw_player(screen, player, rect, observation)
         self._draw_activity(screen, observation)
         self._draw_controls(screen, observation)
+        if self._animating:
+            self._draw_animation(screen, observation)
 
-        if table.round_summary is not None:
+        if table.round_summary is not None and not self._animating:
             self._draw_round_summary(screen, table.round_summary)
-        elif table.game.is_finished:
+        elif table.game.is_finished and not self._animating:
             self._draw_game_over(screen, observation)
 
         if self._report_text is not None:
@@ -324,12 +429,20 @@ class GameScene:
             PlayerStatus.STAYED: "STAYED",
             PlayerStatus.BUSTED: "BUSTED",
         }[player.status]
+        waiting = any(
+            draw.event.player == player.player
+            and draw.event.round_number == observation.round_number
+            for draw in self._draws
+        )
+        if waiting:
+            status = "..."
         name = self._table.names[player.player]
         self._text(screen, self._heading_font, name, (rect.x + 16, rect.y + 13))
         self._text(
             screen, self._small_font, status, (rect.x + 200, rect.y + 19), ACCENT
         )
-        score = f"Round: {player.round_score}    Total: {player.total_score}"
+        round_score = "..." if waiting else str(player.round_score)
+        score = f"Round: {round_score}    Total: {player.total_score}"
         self._text(screen, self._font, score, (rect.x + 570, rect.y + 16))
 
         if not player.cards:
@@ -342,21 +455,61 @@ class GameScene:
             )
             return
 
-        columns = 12
-        groups = (
-            [card for card in player.cards if card.kind is not CardType.NUMBER],
-            [card for card in player.cards if card.kind is CardType.NUMBER],
+        hidden = Counter(
+            draw.event.card
+            for draw in self._draws
+            if draw.in_hand
+            and draw.event.round_number == observation.round_number
+            and draw.event.player == player.player
         )
-        rows = sum((len(group) + columns - 1) // columns for group in groups)
-        gap = 2
-        card_height = min(51, (rect.height - 47 - gap * (rows - 1)) // rows)
-        row = 0
-        for group in groups:
-            for index, card in enumerate(group):
-                x = rect.x + 16 + (index % columns) * 70
-                y = rect.y + 42 + (row + index // columns) * (card_height + gap)
-                self._draw_card(screen, card, pygame.Rect(x, y, 62, card_height))
-            row += (len(group) + columns - 1) // columns
+        rects = _card_rects(player.cards, rect)
+        for card, card_rect in reversed(list(zip(player.cards, rects))):
+            if hidden[card]:
+                hidden[card] -= 1
+            else:
+                self._draw_card(screen, card, card_rect)
+
+    def _draw_deck(self, screen: pygame.Surface) -> None:
+        pygame.draw.rect(screen, BUTTON, DECK_RECT, border_radius=6)
+        pygame.draw.rect(screen, ACCENT, DECK_RECT, width=2, border_radius=6)
+        self._text(screen, self._compact_card_font, "DECK", (DECK_RECT.x + 6, DECK_RECT.y + 23), TEXT)
+
+    def _draw_animation(self, screen: pygame.Surface, observation: Observation) -> None:
+        draw = self._draws[0]
+        event = draw.event
+        player = observation.players[event.player]
+        panel = _player_rects(len(observation.players))[event.player]
+        cards = player.cards
+        if draw.in_hand:
+            hidden_count = sum(
+                queued.in_hand and queued.event.player == event.player
+                and queued.event.round_number == event.round_number
+                and queued.event.card == event.card
+                for queued in self._draws
+            )
+            indices = [i for i, card in enumerate(cards) if card == event.card]
+            destination = _card_rects(cards, panel)[indices[-hidden_count]]
+        else:
+            destination = _card_rects((*cards, event.card), panel)[-1]
+        progress = (
+            min(1.0, max(0.0, (self._now - self._draw_started) / CARD_ANIMATION_MS))
+            if self._draw_started is not None and CARD_ANIMATION_MS
+            else 0.0
+        )
+        eased = progress * progress * (3 - 2 * progress)
+        center = (
+            round(DECK_RECT.centerx + (destination.centerx - DECK_RECT.centerx) * eased),
+            round(DECK_RECT.centery + (destination.centery - DECK_RECT.centery) * eased),
+        )
+        width = max(1, round(destination.width * abs(1 - 2 * progress)))
+        card_surface = pygame.Surface(destination.size, pygame.SRCALPHA)
+        if progress < 0.5:
+            card_surface.fill(BUTTON)
+            pygame.draw.rect(card_surface, ACCENT, card_surface.get_rect(), width=2, border_radius=6)
+        else:
+            self._draw_card(card_surface, event.card, card_surface.get_rect())
+        flipped = pygame.transform.smoothscale(card_surface, (width, destination.height))
+        screen.blit(flipped, flipped.get_rect(center=center))
 
     def _draw_card(self, screen: pygame.Surface, card: Card, rect: pygame.Rect) -> None:
         if card.kind is CardType.NUMBER:
@@ -387,7 +540,17 @@ class GameScene:
         self._text(
             screen, self._heading_font, "Recent activity", (rect.x + 16, rect.y + 16)
         )
-        for index, event in enumerate(observation.events[-18:]):
+        pending = Counter(
+            draw.event for draw in self._draws
+            if observation is not self._previous_round
+        )
+        visible = []
+        for event in reversed(observation.events):
+            if isinstance(event, CardDrawn) and pending[event]:
+                pending[event] -= 1
+            else:
+                visible.append(event)
+        for index, event in enumerate(list(reversed(visible))[-18:]):
             position = (rect.x + 16, rect.y + 54 + index * 26)
             self._text(
                 screen,
@@ -409,7 +572,9 @@ class GameScene:
         pygame.draw.rect(screen, PANEL, CONTROLS, border_radius=12)
         table = self._table
         player = observation.current_player
-        if table.game.is_finished:
+        if self._animating:
+            message = "Dealing cards..."
+        elif table.game.is_finished:
             message = "Game over"
         elif player is None or player not in table.humans:
             assert player is not None  # unfinished games await a decision
