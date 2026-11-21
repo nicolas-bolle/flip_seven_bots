@@ -4,7 +4,6 @@ from random import Random
 import pytest
 
 from flip_seven_bots.bots import (
-    FlipThreeMonteCarloBot,
     RandomBot,
     ThresholdBot,
     rollouts,
@@ -93,7 +92,7 @@ def test_threshold_must_not_be_negative() -> None:
         ThresholdBot(-1)
 
 
-def test_monte_carlo_bot_targets_itself_when_the_remaining_cards_are_safe() -> None:
+def test_rollouts_target_self_with_flip_three_when_the_remaining_cards_are_safe() -> None:
     # Player 1 holds a 7 and the unseen cards are 8, 9 and 10 in some order, so
     # flipping three for itself is worth more than giving the cards to player 0.
     game = Game(2, deck=Deck.stacked([number(7), number(4), FLIP_THREE, number(8), number(9), number(10)]))
@@ -101,25 +100,18 @@ def test_monte_carlo_bot_targets_itself_when_the_remaining_cards_are_safe() -> N
     observation = game.observe(1)
     assert observation.decision == ChooseTarget(1, FLIP_THREE, (0, 1))
 
-    bot = FlipThreeMonteCarloBot(30, samples=5, rollout=ThresholdBot(0), seed=0)
     assert ThresholdBot(30).choose_action(observation) == Action(ActionType.CHOOSE_TARGET, 0)
-    assert bot.choose_action(observation) == Action(ActionType.CHOOSE_TARGET, 1)
+    best = rollouts.best_action(observation, ThresholdBot(0), samples=5, rng=Random(0))
+    assert best == Action(ActionType.CHOOSE_TARGET, 1)
 
 
-def test_monte_carlo_bot_targets_an_opponent_who_would_bust() -> None:
+def test_rollouts_target_an_opponent_who_would_bust() -> None:
     game = Game(2, deck=Deck.stacked([number(7), number(4), FLIP_THREE] + [number(4)] * 6))
     game.apply(HIT)
     observation = game.observe(1)
 
-    bot = FlipThreeMonteCarloBot(30, samples=5, rollout=ThresholdBot(0), seed=0)
-    assert bot.choose_action(observation) == Action(ActionType.CHOOSE_TARGET, 0)
-
-
-def test_monte_carlo_bot_uses_its_threshold_for_hit_or_stay() -> None:
-    observation = opening_observation()
-    observation = replace(observation, decision=HitOrStay(observation.player, True))
-    assert FlipThreeMonteCarloBot(30).choose_action(with_round_score(observation, 30)) == STAY
-    assert FlipThreeMonteCarloBot(31).choose_action(with_round_score(observation, 30)) == HIT
+    best = rollouts.best_action(observation, ThresholdBot(0), samples=5, rng=Random(0))
+    assert best == Action(ActionType.CHOOSE_TARGET, 0)
 
 
 def test_rollouts_evaluate_hit_or_stay_decisions() -> None:
@@ -131,6 +123,6 @@ def test_rollouts_evaluate_hit_or_stay_decisions() -> None:
     assert rollouts.best_action(observation, ThresholdBot(0), samples=3, rng=Random(0)) == STAY
 
 
-def test_monte_carlo_bot_needs_at_least_one_sample() -> None:
+def test_rollouts_need_at_least_one_sample() -> None:
     with pytest.raises(ValueError, match="samples"):
-        FlipThreeMonteCarloBot(samples=0)
+        rollouts.best_action(opening_observation(), ThresholdBot(0), samples=0, rng=Random(0))

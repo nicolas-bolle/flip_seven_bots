@@ -62,16 +62,12 @@ def test_setup_edits_mode_seats_and_parameters() -> None:
     assert scene.result.seats[1].bot.threshold == 25
 
 
-def test_setup_validates_names_parameters_and_player_limit() -> None:
+def test_setup_validates_names_and_player_limit() -> None:
     scene = SetupScene()
     replace_field(scene, _row_rects(0)[0], " ")
     click(scene, START_BUTTON)
     assert scene.result is None and scene.error
     replace_field(scene, _row_rects(0)[0], "You")
-    click(scene, _row_rects(2)[1])  # threshold -> Monte Carlo
-    replace_field(scene, _row_rects(2)[2], "0")
-    click(scene, START_BUTTON)
-    assert scene.result is None and scene.error == "samples must be at least one"
     for _ in range(MAX_PLAYERS):
         click(scene, ADD_BUTTON)
     assert len(scene.players) == MAX_PLAYERS

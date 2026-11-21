@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from flip_seven_bots.bots import FlipThreeMonteCarloBot, RandomBot, ThresholdBot
+from flip_seven_bots.bots import RandomBot, ThresholdBot
 
 from .game_scene import (
     ACCENT,
@@ -31,12 +31,11 @@ VENGEANCE_BUTTON = pygame.Rect(365, 150, 330, 52)
 BRUTAL_BUTTON = pygame.Rect(710, 150, 270, 52)
 ADD_BUTTON = pygame.Rect(90, 735, 220, 52)
 START_BUTTON = pygame.Rect(1000, 790, 190, 60)
-KINDS = ("human", "random", "threshold", "montecarlo")
+KINDS = ("human", "random", "threshold")
 KIND_LABELS = {
     "human": "Human",
     "random": "Random bot",
     "threshold": "Threshold bot",
-    "montecarlo": "Monte Carlo bot",
 }
 MAX_NAME_LENGTH = 24
 MAX_PARAMETER_LENGTH = 6
@@ -66,8 +65,6 @@ def _initial_player(seat: Seat) -> _PlayerSetting:
             return _PlayerSetting(seat.name, "random")
         case ThresholdBot(threshold=threshold):
             return _PlayerSetting(seat.name, "threshold", str(threshold))
-        case FlipThreeMonteCarloBot(samples=samples):
-            return _PlayerSetting(seat.name, "montecarlo", str(samples))
     raise ValueError(f"unsupported setup bot: {seat.bot!r}")
 
 
@@ -162,10 +159,8 @@ class SetupScene:
                     self._focus = (index, "name")
                 elif kind.collidepoint(pos):
                     player.kind = KINDS[(KINDS.index(player.kind) + 1) % len(KINDS)]
-                    player.parameter = {"threshold": "30", "montecarlo": "50"}.get(
-                        player.kind, ""
-                    )
-                elif parameter.collidepoint(pos) and player.kind in ("threshold", "montecarlo"):
+                    player.parameter = "30" if player.kind == "threshold" else ""
+                elif parameter.collidepoint(pos) and player.kind == "threshold":
                     self._focus = (index, "parameter")
                 elif remove.collidepoint(pos) and len(self.players) > 1:
                     self.players.pop(index)
@@ -180,7 +175,7 @@ class SetupScene:
             for player in self.players:
                 name = _human_seat(player.name).name
                 spec = player.kind
-                if player.parameter and player.kind in ("threshold", "montecarlo"):
+                if player.parameter and player.kind == "threshold":
                     spec += f":{player.parameter}"
                 bot = None if player.kind == "human" else _bot_seat(spec).bot
                 seats.append(Seat(name, bot))
@@ -208,12 +203,12 @@ class SetupScene:
         self._text(screen, self._heading_font, "Players", (90, 235))
         self._text(screen, self._small_font, "NAME", (90, 282), MUTED)
         self._text(screen, self._small_font, "TYPE (CLICK TO CHANGE)", (425, 282), MUTED)
-        self._text(screen, self._small_font, "SCORE / SAMPLES", (690, 282), MUTED)
+        self._text(screen, self._small_font, "SCORE", (690, 282), MUTED)
         for index, player in enumerate(self.players):
             name, kind, parameter, remove = _row_rects(index)
             self._field(screen, name, player.name, self._focus == (index, "name"))
             self._button(screen, kind, KIND_LABELS[player.kind])
-            if player.kind in ("threshold", "montecarlo"):
+            if player.kind == "threshold":
                 self._field(
                     screen, parameter, player.parameter, self._focus == (index, "parameter")
                 )

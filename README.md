@@ -25,8 +25,7 @@ round.
 
 Any command-line options skip setup and start immediately. Choose players with
 `--human NAME` and `--bot KIND`; seats are filled in the order given, up to six
-players. Bot kinds are `random`,
-`threshold[:SCORE]` (default 30), and `montecarlo[:SAMPLES]` (default 50).
+players. Bot kinds are `random` and `threshold[:SCORE]` (default 30).
 Every card is public, so several humans can share the screen and take turns. A
 table of only bots can be watched. Bot decisions take at least one second each.
 Number cards appear below modifiers and other cards and are sorted by value.
@@ -169,8 +168,7 @@ candidate actions to it and play it forward with
 `flip_seven_bots.simulation.run(game, bots, stop=...)`. An observation can only
 be sampled until the real game advances. `bots.rollouts.best_action` does this
 for any decision, scoring each legal action by the simulated round margin.
-`FlipThreeMonteCarloBot` uses it for Flip Three targets and threshold rules
-for everything else.
+The example bot above uses it for Flip Three targets.
 
 Training integrations are not implemented yet.
 

@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-from flip_seven_bots.bots import Bot, FlipThreeMonteCarloBot, ThresholdBot
+from flip_seven_bots.bots import Bot, ThresholdBot
 from flip_seven_bots.game import (
     Action,
     ActionType,
@@ -42,13 +42,6 @@ def describe_bot(bot: Bot | None) -> str:
             return "human"
         case ThresholdBot(threshold=threshold):
             return f"ThresholdBot({threshold})"
-        case FlipThreeMonteCarloBot(
-            threshold=threshold, rollout=rollout, samples=samples
-        ):
-            return (
-                f"FlipThreeMonteCarloBot(threshold={threshold}, "
-                f"rollout={describe_bot(rollout)}, samples={samples})"
-            )
         case _:
             return type(bot).__name__
 

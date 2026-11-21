@@ -7,12 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from flip_seven_bots.bots import FlipThreeMonteCarloBot, RandomBot, ThresholdBot
+from flip_seven_bots.bots import RandomBot, ThresholdBot
 
 from .table import Seat
 
 MAX_PLAYERS = 6
-BOT_KINDS = ("random", "threshold[:SCORE]", "montecarlo[:SAMPLES]")
+BOT_KINDS = ("random", "threshold[:SCORE]")
 
 
 @dataclass(frozen=True)
@@ -50,14 +50,6 @@ def _bot_seat(spec: str) -> Seat:
             if threshold < 0:
                 raise argparse.ArgumentTypeError("threshold must not be negative")
             return Seat(f"Threshold {threshold}", ThresholdBot(threshold))
-        case "montecarlo", _:
-            samples = 50 if number is None else number
-            if samples < 1:
-                raise argparse.ArgumentTypeError("samples must be at least one")
-            return Seat(
-                "Monte Carlo bot",
-                FlipThreeMonteCarloBot(samples=samples),
-            )
     raise argparse.ArgumentTypeError(
         f"unknown bot {spec!r}; choose from {', '.join(BOT_KINDS)}"
     )
