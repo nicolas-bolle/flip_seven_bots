@@ -22,7 +22,6 @@ A table of only bots can be watched.
 Bot decisions take at least one second each. Number cards appear below
 modifiers and other cards and are sorted by value. Other cards are ordered
 as additions (lowest first), multipliers, Second Chance, Freeze, and Flip 3;
-resolved Freeze and Flip 3 cards are discarded.
 Each player's total score appears beside their live round score, which is zero
 if they bust and excludes any Flip 7 bonus.
 Cards flip over and move from the deck to each hand as they are dealt.
@@ -83,10 +82,6 @@ the decision limit is reached, or if the deck is exhausted with no discarded
 cards available to reshuffle. Pass `rules=Rules(...)` to change the target
 score, bonus, deck, or scoring, and `deck=Deck.stacked(cards)` to `Game` to deal
 cards in a fixed order (useful in tests).
-
-The base rules were checked against the supplied rulebook. One intentional
-difference is that resolved Freeze and Flip 3 cards are discarded immediately,
-rather than remaining on the table until the round ends.
 
 ### With A Vengeance
 

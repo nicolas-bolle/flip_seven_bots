@@ -32,7 +32,8 @@ _VENGEANCE_ACTIONS = frozenset((
     CardType.STEAL, CardType.DISCARD,
 ))
 _VENGEANCE_MODIFIERS = frozenset((CardType.SUBTRACT, CardType.DIVIDE))
-_SINGLE_USE = _VENGEANCE_ACTIONS | {CardType.FREEZE, CardType.FLIP_THREE}
+_ROUND_ACTIONS = frozenset((CardType.FREEZE, CardType.FLIP_THREE))
+_SINGLE_USE = _VENGEANCE_ACTIONS | _ROUND_ACTIONS
 
 
 @dataclass
@@ -320,15 +321,17 @@ class Game:
                 case _Resolve(sequence=sequence) as effect:
                     if sequence is None or not self._players[sequence.player].is_busted:
                         self._resolve(effect)
-                    else:
+                    elif effect.card.kind not in _ROUND_ACTIONS:
                         self._discard_action(effect.player, effect.card)
                 case _FinishFlip(sequence=sequence):
-                    self._discard_action(sequence.player, sequence.card)
+                    if sequence.card.kind not in _ROUND_ACTIONS:
+                        self._discard_action(sequence.player, sequence.card)
                     if not self._players[sequence.player].is_busted:
                         self._tasks.extendleft(reversed(sequence.deferred))
                     else:
                         for effect in sequence.deferred:
-                            self._discard_action(effect.player, effect.card)
+                            if effect.card.kind not in _ROUND_ACTIONS:
+                                self._discard_action(effect.player, effect.card)
                 case _FindTurn(start=start):
                     if any(player.is_active for player in self._players):
                         self._find_turn(start)
@@ -452,7 +455,7 @@ class Game:
         recipient = self._players[target]
         if decision.card.kind is CardType.FREEZE:
             recipient.status = PlayerStatus.STAYED
-            self._deck.discard((decision.card,))
+            recipient.cards.append(decision.card)
         elif decision.card.kind is CardType.FLIP_THREE:
             recipient.cards.append(decision.card)
             sequence = _FlipSequence(target, decision.card)
@@ -552,16 +555,16 @@ class Game:
     def _finish_round(
         self, flip_seven_player: int | None, *, penalty_target: int | None = None
     ) -> None:
-        for index, player in enumerate(self._players):
-            for card in player.cards[:]:
-                if card.kind in _SINGLE_USE:
-                    self._discard_action(index, card)
         scores = tuple(
             self._round_score(player, flip_seven=index == flip_seven_player)
             + (self._rules.flip_seven_bonus if index == flip_seven_player and penalty_target is None else 0)
             - (self._rules.flip_seven_bonus if index == penalty_target else 0)
             for index, player in enumerate(self._players)
         )
+        for index, player in enumerate(self._players):
+            for card in player.cards[:]:
+                if card.kind in _SINGLE_USE:
+                    self._discard_action(index, card)
         for player, score in zip(self._players, scores):
             player.total_score += score
         totals = tuple(player.total_score for player in self._players)

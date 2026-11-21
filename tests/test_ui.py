@@ -118,6 +118,7 @@ def test_clicking_buttons_hits_and_chooses_a_target() -> None:
 
     click(scene, button(scene, "Bot 2"))
     assert table.observation.players[2].status is PlayerStatus.STAYED
+    assert FREEZE in table.observation.players[2].cards
     assert play_buttons(scene) == []
 
 
@@ -386,7 +387,9 @@ def test_flip_three_animates_each_draw_in_order() -> None:
     scene.update(scene._now)
     scene.update(scene._now + CARD_ANIMATION_MS)
     assert [draw.event.card for draw in scene._draws] == numbers(4, 5)
-    assert table.observation.players[1].cards == tuple(numbers(2, 3, 4, 5))
+    assert table.observation.players[1].cards == (
+        *numbers(2), flip_three, *numbers(3, 4, 5)
+    )
     finish_animations(scene)
     assert play_buttons(scene)
 
