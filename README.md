@@ -1,4 +1,6 @@
-Implementing the board games Flip 7 and Flip 7: With A Vengeance and making bots for them. Keeping this project private without a license to dodge any Flip 7 copyright issues.
+Implementing the board games Flip 7 and Flip 7: With A Vengeance and making
+bots for them. Keeping this project private without a license to dodge any
+Flip 7 copyright issues.
 
 ## Play against bots
 
@@ -8,11 +10,55 @@ Run the Pygame interface with:
 uv run python -m flip_seven_bots.ui
 ```
 
-You play the base game against a random bot and a bot that stays at 30 points.
+The Game setup screen defaults to the base game against a random bot and a bot
+that stays at 30 points. Choose With A Vengeance and optionally Brutal Mode,
+edit player names and types, add or remove seats, then press Start. Click a
+name or value to edit it; Ctrl+A clears the field.
+
 Use the buttons or their displayed keyboard shortcuts to hit, stay, or choose
-a player when an action card requires a target. Press Escape or close the
-window to quit. The activity panel shows recent draws and decisions; a summary
-appears after each round.
+a player when an action card requires a target. For Swap, Steal, and Discard,
+click a highlighted card; Swap requires two cards from different players. In
+Brutal Mode, a player who gets Flip 7 can take the bonus or subtract it from
+another player. Press Escape or close the window to quit. The activity panel
+shows the current round's draws and decisions; a summary appears after each
+round.
+
+Any command-line options skip setup and start immediately. Choose players with
+`--human NAME` and `--bot KIND`; seats are filled in the order given, up to six
+players. Bot kinds are `random`,
+`threshold[:SCORE]` (default 30), and `montecarlo[:SAMPLES]` (default 50).
+Every card is public, so several humans can share the screen and take turns. A
+table of only bots can be watched. Bot decisions take at least one second each.
+Number cards appear below modifiers and other cards and are sorted by value.
+Other cards are ordered by modifier and action type; modifiers of the same type
+are ordered by value. Each player's total score appears beside their live round
+score, which excludes any Flip 7 bonus. Busted players normally score zero,
+but can score negatively in Brutal Mode. Cards flip over and move from the deck
+to each hand as they are dealt. Play waits for the animations to finish.
+
+```shell
+uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25
+uv run python -m flip_seven_bots.ui --vengeance --human Ann --bot random
+uv run python -m flip_seven_bots.ui --brutal
+```
+
+`--vengeance` selects With A Vengeance; `--brutal` selects it with Brutal Mode.
+Either flag alone uses the default players. `--seed N` makes the decks
+repeatable; bots keep their own randomness.
+
+### Bug reports
+
+Press **Report bug** (or F1) to pause the game and describe a problem. Enter
+saves the message with the game's full state, including the hidden deck, to a
+timestamped Markdown file in `bug_reports/` (change it with `--bug-dir`).
+If the game crashes, a report with the error is written there automatically.
+Each report ends with replay data, so the game can be rebuilt in a test:
+
+```python
+from flip_seven_bots.ui.bug_report import replay
+
+game = replay("bug_reports/2026-11-21_16-30-05.md")
+```
 
 ## Headless base game
 
@@ -36,20 +82,60 @@ print([player.total_score for player in result.players])
 To implement a bot, provide `choose_action(observation)` and return one of
 `observation.legal_actions`. The engine pauses both for hit/stay decisions and
 for selecting targets for action cards. Observations contain immutable
-snapshots of public cards and scores, not the shuffled deck. Cards are included
-after a player stays or busts because they were revealed earlier in the round.
-Only the current player receives legal actions. `last_round` contains the
-most recently completed round's scores. `events` retains public draws,
-decisions, round results, and discard reshuffles, including events that happen
-between decisions. This allows bots to remember revealed cards. A player's
-`round_score` is a current score preview; the Flip 7 bonus is reflected in the
-completed round's result.
+snapshots of public cards, scores, and the discard pile, but not the shuffled
+deck. Cards still held after a player stays or busts remain visible because
+they were revealed earlier in the round. Only the current player receives legal
+actions. `last_round` contains the most recently completed round's scores,
+including any Flip 7 bonus; a player's `round_score` is the in-progress score
+without it. `events` contains the current round's public draws, decisions,
+discard reshuffles, and (once the game ends) the final round result.
 
 The deck seed and a bot's seed are independent. `play_game` raises an error if
 the decision limit is reached, or if the deck is exhausted with no discarded
-cards available to reshuffle.
+cards available to reshuffle. Pass `rules=Rules(...)` to change the target
+score, bonus, deck, or scoring, and `deck=Deck.stacked(cards)` to `Game` to deal
+cards in a fixed order (useful in tests).
 
-With A Vengeance and training integrations are not implemented yet.
+### With A Vengeance
+
+The headless engine also supports With A Vengeance.
+
+```python
+from flip_seven_bots.bots import ThresholdBot
+from flip_seven_bots.game import VengeanceRules
+from flip_seven_bots.simulation import play_game
+
+result = play_game(
+    [ThresholdBot(25), ThresholdBot(25), ThresholdBot(25)],
+    seed=42,
+    rules=VengeanceRules(),  # Use VengeanceRules(brutal=True) for Brutal Mode.
+)
+print(result.winners)
+print([player.total_score for player in result.players])
+```
+
+In addition to target decisions, a Vengeance bot may receive `CHOOSE_CARD`
+actions. Their `target` identifies the card owner and `card_index` indexes
+that player's `cards` in the current observation. Swap uses two such decisions.
+In Brutal Mode a Flip 7 bonus decision offers `TAKE_BONUS` or a
+`CHOOSE_TARGET` action to subtract the bonus from another player. Existing
+random and threshold bots support these choices.
+
+The Zero affects the round score, not accumulated points. A duplicate number
+received through a swap or steal causes a bust, and Brutal Mode modifiers can
+give a busted player a negative round score.
+
+### Looking ahead
+
+The deck order is the only hidden information, so
+`observation.sample_game(rng)` returns an independent `Game` that matches the
+observation with the remaining deck reshuffled by `rng`. Bots can apply
+candidate actions to it and play it forward with
+`flip_seven_bots.simulation.run(game, bots, stop=...)`. An observation can only
+be sampled until the real game advances. `FlipThreeMonteCarloBot` uses this to
+choose Flip Three targets and delegates other decisions to a fallback bot.
+
+Training integrations are not implemented yet.
 
 ## Tests
 
