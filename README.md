@@ -1,5 +1,19 @@
 Implementing the board games Flip 7 and Flip 7: With A Vengeance and making bots for them. Keeping this project private without a license to dodge any Flip 7 copyright issues.
 
+## Play against bots
+
+Run the Pygame interface with:
+
+```shell
+uv run python -m flip_seven_bots.ui
+```
+
+You play the base game against a random bot and a bot that stays at 30 points.
+Use the buttons or their displayed keyboard shortcuts to hit, stay, or choose
+a player when an action card requires a target. Press Escape or close the
+window to quit. The activity panel shows recent draws and decisions; a summary
+appears after each round.
+
 ## Headless base game
 
 The `game` package implements the original Flip 7 rules without Pygame. Player
@@ -35,5 +49,4 @@ The deck seed and a bot's seed are independent. `play_game` raises an error if
 the decision limit is reached, or if the deck is exhausted with no discarded
 cards available to reshuffle.
 
-The `ui` package is reserved for a future Pygame interface. With A Vengeance
-and training integrations are not implemented yet.
+With A Vengeance and training integrations are not implemented yet.

@@ -1,1 +1,1 @@
-"""Reserved for the future Pygame interface."""
+"""Pygame interface for playing against bots."""

@@ -7,8 +7,13 @@ authors = [
     { name = "nicolas-bolle", email = "nicolasbolle@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pygame-ce>=2.5.8",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.8,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.ruff.lint]
+unfixable = ['F401']
