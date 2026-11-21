@@ -56,7 +56,7 @@ def _bot_seat(spec: str) -> Seat:
                 raise argparse.ArgumentTypeError("samples must be at least one")
             return Seat(
                 "Monte Carlo bot",
-                FlipThreeMonteCarloBot(ThresholdBot(25), samples=samples),
+                FlipThreeMonteCarloBot(samples=samples),
             )
     raise argparse.ArgumentTypeError(
         f"unknown bot {spec!r}; choose from {', '.join(BOT_KINDS)}"

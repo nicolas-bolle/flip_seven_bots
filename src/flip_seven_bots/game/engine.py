@@ -19,8 +19,13 @@ from .model import (
     Card,
     CardDrawn,
     CardType,
+    ChooseCard,
+    ChooseTarget,
+    Decision,
     DiscardShuffled,
+    FlipSevenBonus,
     GameEvent,
+    HitOrStay,
     Observation,
     PlayerStatus,
     PlayerView,
@@ -106,36 +111,6 @@ class _EndRound:
 _Task = _Draw | _Resolve | _FinishFlip | _FindTurn | _EndRound
 
 
-@dataclass(frozen=True)
-class _HitOrStay:
-    player: int
-
-
-@dataclass(frozen=True)
-class _TargetDecision:
-    player: int
-    card: Card
-    targets: tuple[int, ...]
-
-
-@dataclass(frozen=True)
-class _CardDecision:
-    """Card choices, with the first selection retained while resolving a Swap."""
-
-    player: int
-    card: Card
-    choices: tuple[tuple[int, int], ...]
-    first: tuple[int, int] | None = None
-
-
-@dataclass(frozen=True)
-class _BonusDecision:
-    player: int
-
-
-_Decision = _HitOrStay | _TargetDecision | _CardDecision | _BonusDecision
-
-
 class Game:
     """Run a match; player IDs are zero-based seat indices.
 
@@ -173,7 +148,7 @@ class Game:
         self._last_round: RoundResult | None = None
         self._winners: tuple[int, ...] = ()
         self._tasks: deque[_Task] = deque()
-        self._pending: _Decision | None = None
+        self._pending: Decision | None = None
         self._events: list[GameEvent] = []
         self._recent_draws: list[CardDrawn] = []
         self._version = 0
@@ -238,7 +213,6 @@ class Game:
             )
             for index, state in enumerate(self._players)
         )
-        pending = self._pending
         return Observation(
             player=player,
             current_player=self.current_player,
@@ -247,14 +221,7 @@ class Game:
             players=views,
             cards_remaining=len(self._deck),
             discard=self._deck.discard_pile,
-            legal_actions=(
-                self._legal_actions(pending)
-                if pending is not None and pending.player == player
-                else ()
-            ),
-            pending_card=(
-                pending.card if isinstance(pending, (_TargetDecision, _CardDecision)) else None
-            ),
+            decision=self._pending,
             last_round=self._last_round,
             winners=self._winners,
             events=tuple(self._events),
@@ -274,22 +241,22 @@ class Game:
         Raises ``ValueError`` if the action is not currently legal.
         """
         decision = self._pending
-        if decision is None or action not in self._legal_actions(decision):
+        if decision is None or action not in decision.actions:
             raise ValueError(f"illegal action: {action!r}")
         self._pending = None
         self._version += 1
         self._events.append(ActionChosen(self._round_number, decision.player, action))
 
         match decision:
-            case _TargetDecision():
+            case ChooseTarget():
                 assert action.target is not None  # guaranteed by Action validation
                 self._apply_target(decision, action.target)
-            case _CardDecision():
+            case ChooseCard():
                 assert action.target is not None and action.card_index is not None
                 self._apply_card_choice(decision, action.target, action.card_index)
-            case _BonusDecision(player=player):
+            case FlipSevenBonus(player=player):
                 self._finish_round(player, penalty_target=action.target)
-            case _HitOrStay(player=player):
+            case HitOrStay(player=player):
                 self._tasks.appendleft(_FindTurn((player + 1) % len(self._players)))
                 if action.kind is ActionType.STAY:
                     self._players[player].status = PlayerStatus.STAYED
@@ -301,24 +268,6 @@ class Game:
         if version != self._version:
             raise RuntimeError("observation is out of date; the game has advanced")
         return self.determinize(rng)
-
-    def _legal_actions(self, decision: _Decision) -> tuple[Action, ...]:
-        match decision:
-            case _TargetDecision(targets=targets):
-                return tuple(Action(ActionType.CHOOSE_TARGET, target) for target in targets)
-            case _CardDecision(choices=choices):
-                return tuple(Action(ActionType.CHOOSE_CARD, player, index) for player, index in choices)
-            case _BonusDecision(player=player):
-                return (Action(ActionType.TAKE_BONUS),) + tuple(
-                    Action(ActionType.CHOOSE_TARGET, target)
-                    for target in range(len(self._players)) if target != player
-                )
-            case _HitOrStay(player=player):
-                if any(card.kind is CardType.ZERO for card in self._players[player].cards):
-                    return (Action(ActionType.HIT),)
-                if isinstance(self._rules, VengeanceRules) or self._players[player].cards:
-                    return (Action(ActionType.HIT), Action(ActionType.STAY))
-                return (Action(ActionType.HIT),)
 
     def _start_round(self) -> None:
         self._round_number += 1
@@ -374,8 +323,14 @@ class Game:
         for offset in range(len(self._players)):
             candidate = (start + offset) % len(self._players)
             if self._players[candidate].is_active:
-                self._pending = _HitOrStay(candidate)
+                self._pending = HitOrStay(candidate, self._can_stay(candidate))
                 return
+
+    def _can_stay(self, player_index: int) -> bool:
+        cards = self._players[player_index].cards
+        if any(card.kind is CardType.ZERO for card in cards):
+            return False
+        return isinstance(self._rules, VengeanceRules) or bool(cards)
 
     def _draw(self, player_index: int, sequence: _FlipSequence | None) -> None:
         card, reshuffled = self._deck.draw()
@@ -454,7 +409,7 @@ class Game:
         )
         if targets:
             player.cards.append(card)
-            self._pending = _TargetDecision(player_index, card, targets)
+            self._pending = ChooseTarget(player_index, card, targets)
         else:
             self._deck.discard((card,))
 
@@ -462,7 +417,7 @@ class Game:
         if effect.card.kind in (CardType.SWAP, CardType.STEAL, CardType.DISCARD):
             choices = self._card_choices(effect.player, effect.card)
             if choices:
-                self._pending = _CardDecision(effect.player, effect.card, choices)
+                self._pending = ChooseCard(effect.player, effect.card, choices)
             else:
                 self._discard_action(effect.player, effect.card)
             return
@@ -478,9 +433,9 @@ class Game:
                 )
             )
         )
-        self._pending = _TargetDecision(effect.player, effect.card, targets)
+        self._pending = ChooseTarget(effect.player, effect.card, targets)
 
-    def _apply_target(self, decision: _TargetDecision, target: int) -> None:
+    def _apply_target(self, decision: ChooseTarget, target: int) -> None:
         self._players[decision.player].cards.remove(decision.card)
         recipient = self._players[target]
         if decision.card.kind is CardType.FREEZE:
@@ -529,11 +484,11 @@ class Game:
                 return ()
         return choices
 
-    def _apply_card_choice(self, decision: _CardDecision, owner: int, index: int) -> None:
+    def _apply_card_choice(self, decision: ChooseCard, owner: int, index: int) -> None:
         if decision.card.kind is CardType.SWAP and decision.first is None:
             first = (owner, index)
             choices = self._card_choices(decision.player, decision.card, first)
-            self._pending = _CardDecision(decision.player, decision.card, choices, first)
+            self._pending = ChooseCard(decision.player, decision.card, choices, first)
             return
         card = self._players[owner].cards.pop(index)
         if decision.card.kind is CardType.DISCARD:
@@ -565,7 +520,10 @@ class Game:
             and self._rules.brutal
             and len(self._players) > 1
         ):
-            self._pending = _BonusDecision(flip_seven_player)
+            self._pending = FlipSevenBonus(
+                flip_seven_player,
+                tuple(p for p in range(len(self._players)) if p != flip_seven_player),
+            )
             return
         self._finish_round(flip_seven_player)
 

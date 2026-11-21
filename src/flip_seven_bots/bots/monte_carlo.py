@@ -1,60 +1,66 @@
 """A bot that simulates the rest of the round to choose Flip Three targets."""
 
 from random import Random
+from typing import TYPE_CHECKING, assert_never
 
-from flip_seven_bots.game import Action, Card, CardType, Observation
-from flip_seven_bots.simulation import run
+from flip_seven_bots.game import (
+    Action,
+    Card,
+    CardType,
+    ChooseCard,
+    ChooseTarget,
+    FlipSevenBonus,
+    HitOrStay,
+    Observation,
+)
 
-from .base import Bot
+from . import rollouts
+from .policies import acting_decision, first_legal, prefer_opponent, stay_at_threshold
 from .simple import ThresholdBot
 
-_FLIP_THREE = Card(CardType.FLIP_THREE)
+if TYPE_CHECKING:
+    from .base import Bot
 
 
 class FlipThreeMonteCarloBot:
-    """Pick the Flip Three target with the best simulated round outcome.
+    """Pick Flip Three targets by simulation and play like a threshold bot otherwise.
 
-    Each target is scored by sampling the hidden deck order, applying the choice,
-    and playing out the round with ``rollout`` controlling every seat. The value of
-    a sample is this player's round score minus the best opponent's. All other
-    decisions are delegated to ``fallback``.
+    Flip Three targets are chosen with ``rollouts.best_action`` using ``samples``
+    sampled decks, with ``rollout`` controlling every seat during simulation.
+    Hit/stay uses ``threshold``; other targets prefer an opponent, and card and
+    bonus choices take the first legal action.
     """
 
     def __init__(
         self,
-        fallback: Bot,
+        threshold: int = 25,
         *,
         samples: int = 100,
         rollout: Bot | None = None,
         seed: int | None = None,
     ):
+        if threshold < 0:
+            raise ValueError("threshold must not be negative")
         if samples < 1:
             raise ValueError("samples must be at least one")
-        self.fallback = fallback
+        self.threshold = threshold
         self.samples = samples
         self.rollout = rollout if rollout is not None else ThresholdBot(25)
         self._random = Random(seed)
 
     def choose_action(self, observation: Observation) -> Action:
-        """Simulate Flip Three targets, or delegate other choices to ``fallback``."""
-        actions = observation.legal_actions
-        if observation.pending_card != _FLIP_THREE or len(actions) < 2:
-            return self.fallback.choose_action(observation)
-        # Common random numbers: every target is evaluated on the same sampled decks.
-        seeds = [self._random.getrandbits(64) for _ in range(self.samples)]
-        return max(actions, key=lambda action: self._estimate(observation, action, seeds))
-
-    def _estimate(self, observation: Observation, action: Action, seeds: list[int]) -> float:
-        me = observation.player
-        bots = [self.rollout] * len(observation.players)
-        total = 0
-        for seed in seeds:
-            game = observation.sample_game(Random(seed))
-            round_number = game.round_number
-            game.apply(action)
-            run(game, bots, stop=lambda g, start=round_number: g.round_number != start)
-            result = game.last_round
-            assert result is not None and result.round_number == round_number
-            opponents = (score for player, score in enumerate(result.scores) if player != me)
-            total += result.scores[me] - max(opponents, default=0)
-        return total / len(seeds)
+        """Simulate Flip Three targets; use simple rules for everything else."""
+        decision = acting_decision(observation)
+        match decision:
+            case ChooseTarget(card=Card(kind=CardType.FLIP_THREE)):
+                return rollouts.best_action(
+                    observation, self.rollout, samples=self.samples, rng=self._random
+                )
+            case ChooseTarget():
+                return prefer_opponent(decision)
+            case HitOrStay():
+                return stay_at_threshold(observation, decision, self.threshold)
+            case ChooseCard() | FlipSevenBonus():
+                return first_legal(observation)
+            case _:
+                assert_never(decision)

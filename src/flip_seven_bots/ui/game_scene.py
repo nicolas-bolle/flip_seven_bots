@@ -14,6 +14,10 @@ from flip_seven_bots.game import (
     Card,
     CardDrawn,
     CardType,
+    ChooseCard,
+    ChooseTarget,
+    FlipSevenBonus,
+    HitOrStay,
     Observation,
     PlayerStatus,
     PlayerView,
@@ -200,7 +204,6 @@ class GameScene:
         self._draws: deque[_AnimatedDraw] = deque()
         self._draw_started: int | None = None
         self._previous_round: Observation | None = None
-        self._swap_first: tuple[int, int] | None = None
         self._title_font = pygame.font.Font(None, 42)
         self._heading_font = pygame.font.Font(None, 30)
         self._font = pygame.font.Font(None, 25)
@@ -307,7 +310,6 @@ class GameScene:
                 self._draws.clear()
                 self._draw_started = None
                 self._previous_round = None
-                self._swap_first = None
                 self._queue_draws(None)
             case Button(action=Command.REPORT_BUG):
                 self._report_text = ""
@@ -321,7 +323,6 @@ class GameScene:
             case Button(action=Action() as action):
                 before = self._table.observation
                 self._table.choose(action)
-                self._track_swap(before, action)
                 self._queue_draws(before)
 
     def update(self, now: int) -> None:
@@ -347,26 +348,15 @@ class GameScene:
         moves = len(self._table.moves)
         self._table.update(now)
         if len(self._table.moves) != moves:
-            self._track_swap(before, self._table.moves[-1].action)
             self._queue_draws(before)
 
-    def _track_swap(self, before: Observation, action: Action) -> None:
-        """Remember the first Swap card so it stays highlighted until the second."""
-        after = self._table.observation
-        if (
-            self._swap_first is None
-            and before.pending_card is not None
-            and before.pending_card.kind is CardType.SWAP
-            and action.kind is ActionType.CHOOSE_CARD
-            and action.target is not None
-            and action.card_index is not None
-            and after.pending_card == before.pending_card
-            and after.current_player == before.current_player
-            and any(a.kind is ActionType.CHOOSE_CARD for a in after.legal_actions)
-        ):
-            self._swap_first = (action.target, action.card_index)
-        else:
-            self._swap_first = None
+    @property
+    def _swap_first(self) -> tuple[int, int] | None:
+        """The first card chosen for a pending Swap, kept highlighted until the second."""
+        match self._table.observation.decision:
+            case ChooseCard(first=first):
+                return first
+        return None
 
     @property
     def _animating(self) -> bool:
@@ -684,21 +674,19 @@ class GameScene:
                 if len(table.humans) == 1
                 else f"{table.names[player]}'s turn"
             )
-            actions = observation.legal_actions
-            if any(action.kind is ActionType.CHOOSE_CARD for action in actions):
-                card = card_label(observation.pending_card) if observation.pending_card else "card"
-                step = "second" if self._swap_first is not None else "first"
-                choice = f"the {step} card" if observation.pending_card and observation.pending_card.kind is CardType.SWAP else "a card"
-                message = f"{turn}: choose {choice} for {card}"
-            elif any(action.kind is ActionType.TAKE_BONUS for action in actions):
-                message = f"{turn}: take the bonus or subtract it from a player"
-            elif observation.pending_card is not None:
-                card = card_label(observation.pending_card)
-                message = f"{turn}: choose a player for {card}"
-            elif len(actions) == 1 and actions[0].kind is ActionType.HIT:
-                message = f"{turn}: you must hit"
-            else:
-                message = f"{turn}: hit or stay"
+            match observation.decision:
+                case ChooseCard(card=card, first=first):
+                    step = "second" if first is not None else "first"
+                    choice = f"the {step} card" if card.kind is CardType.SWAP else "a card"
+                    message = f"{turn}: choose {choice} for {card_label(card)}"
+                case FlipSevenBonus():
+                    message = f"{turn}: take the bonus or subtract it from a player"
+                case ChooseTarget(card=card):
+                    message = f"{turn}: choose a player for {card_label(card)}"
+                case HitOrStay(can_stay=False):
+                    message = f"{turn}: you must hit"
+                case _:
+                    message = f"{turn}: hit or stay"
         self._text(
             screen, self._heading_font, message, (CONTROLS.x + 20, CONTROLS.y + 18)
         )

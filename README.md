@@ -80,12 +80,46 @@ print([player.total_score for player in result.players])
 ```
 
 To implement a bot, provide `choose_action(observation)` and return one of
-`observation.legal_actions`. The engine pauses both for hit/stay decisions and
-for selecting targets for action cards. Observations contain immutable
+`observation.legal_actions`. `observation.decision` says what is being decided:
+`HitOrStay`, `ChooseTarget` (with the action `card` and eligible `targets`),
+`ChooseCard`, or `FlipSevenBonus`. Each has an `actions` tuple and helpers such
+as `hit()`, `stay()` and `choose(target)`. The decision is public, so every
+seat can see it, but only the deciding player receives legal actions.
+
+The intended way to build a bot is to match on the decision and hand each case
+to a reusable function from `bots.policies` (simple rules) or `bots.rollouts`
+(simulation). These functions take any randomness as an explicit `rng`.
+
+```python
+from random import Random
+
+from flip_seven_bots.bots import policies, rollouts, ThresholdBot
+from flip_seven_bots.game import Card, CardType, ChooseTarget, HitOrStay
+
+
+class MyBot:
+    def __init__(self, seed=None):
+        self.rng = Random(seed)
+
+    def choose_action(self, observation):
+        decision = policies.acting_decision(observation)
+        match decision:
+            case HitOrStay():
+                return policies.stay_at_threshold(observation, decision, 25)
+            case ChooseTarget(card=Card(kind=CardType.FLIP_THREE)):
+                return rollouts.best_action(
+                    observation, ThresholdBot(25), samples=50, rng=self.rng
+                )
+            case ChooseTarget():
+                return policies.prefer_opponent(decision)
+            case _:
+                return policies.first_legal(observation)
+```
+
+Observations contain immutable
 snapshots of public cards, scores, and the discard pile, but not the shuffled
 deck. Cards still held after a player stays or busts remain visible because
-they were revealed earlier in the round. Only the current player receives legal
-actions. `last_round` contains the most recently completed round's scores,
+they were revealed earlier in the round. `last_round` contains the most recently completed round's scores,
 including any Flip 7 bonus; a player's `round_score` is the in-progress score
 without it. `events` contains the current round's public draws, decisions,
 discard reshuffles, and (once the game ends) the final round result.
@@ -114,11 +148,12 @@ print(result.winners)
 print([player.total_score for player in result.players])
 ```
 
-In addition to target decisions, a Vengeance bot may receive `CHOOSE_CARD`
-actions. Their `target` identifies the card owner and `card_index` indexes
-that player's `cards` in the current observation. Swap uses two such decisions.
-In Brutal Mode a Flip 7 bonus decision offers `TAKE_BONUS` or a
-`CHOOSE_TARGET` action to subtract the bonus from another player. Existing
+In addition to target decisions, a Vengeance bot may receive `ChooseCard`
+decisions, whose `CHOOSE_CARD` actions use `target` for the card owner and
+`card_index` to index that player's `cards` in the current observation. Swap
+uses two such decisions; during the second, `decision.first` is the card
+already picked. In Brutal Mode a `FlipSevenBonus` decision offers `TAKE_BONUS`
+or a `CHOOSE_TARGET` action to subtract the bonus from another player. Existing
 random and threshold bots support these choices.
 
 The Zero affects the round score, not accumulated points. A duplicate number
@@ -132,8 +167,10 @@ The deck order is the only hidden information, so
 observation with the remaining deck reshuffled by `rng`. Bots can apply
 candidate actions to it and play it forward with
 `flip_seven_bots.simulation.run(game, bots, stop=...)`. An observation can only
-be sampled until the real game advances. `FlipThreeMonteCarloBot` uses this to
-choose Flip Three targets and delegates other decisions to a fallback bot.
+be sampled until the real game advances. `bots.rollouts.best_action` does this
+for any decision, scoring each legal action by the simulated round margin.
+`FlipThreeMonteCarloBot` uses it for Flip Three targets and threshold rules
+for everything else.
 
 Training integrations are not implemented yet.
 

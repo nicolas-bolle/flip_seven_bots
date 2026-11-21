@@ -103,6 +103,114 @@ class Action:
 
 
 @dataclass(frozen=True)
+class HitOrStay:
+    """The acting player's turn: draw a card, or stay when ``can_stay``.
+
+    Staying is unavailable with an empty hand in the base game, or while holding
+    a Vengeance Zero.
+    """
+
+    player: int
+    """Seat that must decide."""
+
+    can_stay: bool
+    """Whether ``STAY`` is legal in addition to ``HIT``."""
+
+    @property
+    def actions(self) -> tuple[Action, ...]:
+        """Legal actions, in a stable order."""
+        return (self.hit(), self.stay()) if self.can_stay else (self.hit(),)
+
+    def hit(self) -> Action:
+        return Action(ActionType.HIT)
+
+    def stay(self) -> Action:
+        return Action(ActionType.STAY)
+
+
+@dataclass(frozen=True)
+class ChooseTarget:
+    """Choose the player who receives ``card``.
+
+    Used for Freeze, Flip Three, giving away a duplicate Second Chance, and
+    the targeted Vengeance cards. ``targets`` may include ``player`` itself.
+    """
+
+    player: int
+    """Seat that must decide."""
+
+    card: Card
+    """Card being resolved."""
+
+    targets: tuple[int, ...]
+    """Eligible seats, in seat order."""
+
+    @property
+    def actions(self) -> tuple[Action, ...]:
+        """Legal actions, in the order of ``targets``."""
+        return tuple(self.choose(target) for target in self.targets)
+
+    def choose(self, target: int) -> Action:
+        return Action(ActionType.CHOOSE_TARGET, target)
+
+
+@dataclass(frozen=True)
+class ChooseCard:
+    """Choose a card in someone's hand for a Vengeance Swap, Steal or Discard.
+
+    ``choices`` holds ``(owner, card_index)`` pairs indexing ``PlayerView.cards``.
+    A Swap takes two such decisions; during the second, ``first`` is the card
+    picked in the first step, otherwise it is ``None``.
+    """
+
+    player: int
+    """Seat that must decide."""
+
+    card: Card
+    """Card being resolved."""
+
+    choices: tuple[tuple[int, int], ...]
+    """Eligible ``(owner, card_index)`` pairs."""
+
+    first: tuple[int, int] | None = None
+    """Card already chosen as the first half of a Swap."""
+
+    @property
+    def actions(self) -> tuple[Action, ...]:
+        """Legal actions, in the order of ``choices``."""
+        return tuple(self.choose(owner, index) for owner, index in self.choices)
+
+    def choose(self, owner: int, card_index: int) -> Action:
+        return Action(ActionType.CHOOSE_CARD, owner, card_index)
+
+
+@dataclass(frozen=True)
+class FlipSevenBonus:
+    """Brutal Mode: take the Flip 7 bonus or subtract it from one of ``targets``."""
+
+    player: int
+    """Seat that achieved Flip 7 and must decide."""
+
+    targets: tuple[int, ...]
+    """Opponents who can receive the penalty."""
+
+    @property
+    def actions(self) -> tuple[Action, ...]:
+        """Taking the bonus, followed by each penalty target."""
+        return (self.take(),) + tuple(self.penalize(target) for target in self.targets)
+
+    def take(self) -> Action:
+        return Action(ActionType.TAKE_BONUS)
+
+    def penalize(self, target: int) -> Action:
+        return Action(ActionType.CHOOSE_TARGET, target)
+
+
+Decision = HitOrStay | ChooseTarget | ChooseCard | FlipSevenBonus
+"""A pending choice; ``player`` is the seat that must make it."""
+
+
+@dataclass(frozen=True)
 class PlayerView:
     """Public snapshot of one seat's cards, status, and scores.
 
@@ -196,7 +304,8 @@ class Observation:
     ``Game.observe(player)`` was called; ``current_player`` is the player
     whose decision the game is waiting for. They can differ. For example,
     observing seat 0 while seat 1 is deciding gives ``player == 0`` and
-    ``current_player == 1``, with no legal actions in that observation.
+    ``current_player == 1``, with no legal actions in that observation. The
+    pending ``decision`` is public, so it is visible from every seat.
 
     All revealed hands and the discard pile are public; the draw pile's order
     is hidden. The tuples are snapshots and do not change as the game advances.
@@ -223,14 +332,8 @@ class Observation:
     discard: tuple[Card, ...]
     """Cards currently in the public discard pile."""
 
-    legal_actions: tuple[Action, ...]
-    """Legal decisions for ``player``, empty unless that player must act."""
-
-    pending_card: Card | None
-    """Card awaiting a target or card choice, regardless of observer; otherwise ``None``.
-
-    A Brutal Flip 7 bonus decision has no pending card.
-    """
+    decision: Decision | None
+    """Choice the game is waiting for, regardless of observer; ``None`` once finished."""
 
     last_round: RoundResult | None
     """Most recently completed round's result, or ``None`` before the first ends."""
@@ -244,6 +347,14 @@ class Observation:
     _sampler: Callable[[Random], Game] | None = field(
         default=None, repr=False, compare=False
     )
+
+    @property
+    def legal_actions(self) -> tuple[Action, ...]:
+        """Legal actions for ``player``, empty unless that player must act."""
+        decision = self.decision
+        if decision is None or decision.player != self.player:
+            return ()
+        return decision.actions
 
     def sample_game(self, rng: Random) -> Game:
         """Return an independent game consistent with this observation.

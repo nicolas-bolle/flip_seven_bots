@@ -8,8 +8,10 @@ from flip_seven_bots.game import (
     ActionType,
     Card,
     CardType,
+    ChooseCard,
     Deck,
     Game,
+    HitOrStay,
     PlayerStatus,
     VengeanceRules,
 )
@@ -160,10 +162,10 @@ def test_flip_four_defers_modifiers_and_actions_until_all_draws() -> None:
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(0)
-    assert observation.pending_card == subtract(2)
+    assert observation.decision.card == subtract(2)
     assert {number(3), number(4), number(5)} <= set(observation.players[0].cards)
     game.apply(target(1))
-    assert game.observe(0).pending_card == STEAL
+    assert game.observe(0).decision.card == STEAL
     choose_card(game, 1, number(2))
     assert number(2) in game.observe(0).players[0].cards
 
@@ -175,7 +177,7 @@ def test_unlucky_seven_during_flip_four_keeps_unresolved_modifier() -> None:
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(0)
-    assert observation.pending_card == subtract(2)
+    assert observation.decision.card == subtract(2)
     assert number(3) in observation.discard
     game.apply(target(1))
     assert subtract(2) in game.observe(0).players[1].cards
@@ -187,7 +189,7 @@ def test_flip_four_stops_on_bust_and_discards_deferred_effects() -> None:
     game.apply(target(0))
     observation = game.observe(1)
     assert observation.players[0].status is PlayerStatus.BUSTED
-    assert observation.pending_card is None
+    assert isinstance(observation.decision, HitOrStay)
     assert FLIP_FOUR in observation.discard
     assert subtract(2) in observation.discard
     assert game.hidden_deck() == (number(9),)
@@ -199,11 +201,17 @@ def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
     ])
     game.apply(HIT)
     game.apply(target(0))
-    assert game.observe(0).pending_card == SWAP
+    assert game.observe(0).decision.card == SWAP
+    first = (1, game.observe(0).players[1].cards.index(UNLUCKY))
     choose_card(game, 1, UNLUCKY)
+    # The pending second Swap choice is public, but only the chooser may act on it.
+    bystander = game.observe(1)
+    assert isinstance(bystander.decision, ChooseCard)
+    assert (bystander.decision.player, bystander.decision.first) == (0, first)
+    assert bystander.legal_actions == ()
     choose_card(game, 0, number(4))
     observation = game.observe(0)
-    assert observation.pending_card == subtract(2)
+    assert observation.decision.card == subtract(2)
     assert number(3) in observation.discard
     assert number(5) in observation.discard
     game.apply(target(1))
@@ -272,7 +280,7 @@ def test_discard_selects_a_face_up_card_and_changes_score() -> None:
 def test_untargetable_action_is_discarded(card: Card) -> None:
     game = game_with([card, number(2)], players=1)
     observation = game.observe(0)
-    assert observation.pending_card is None
+    assert isinstance(observation.decision, HitOrStay)
     assert card in observation.discard
 
 
