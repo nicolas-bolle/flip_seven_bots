@@ -17,3 +17,8 @@ build-backend = "uv_build"
 
 [tool.ruff.lint]
 unfixable = ['F401']
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

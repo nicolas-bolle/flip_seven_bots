@@ -50,3 +50,7 @@ the decision limit is reached, or if the deck is exhausted with no discarded
 cards available to reshuffle.
 
 With A Vengeance and training integrations are not implemented yet.
+
+## Tests
+
+Run the pytest suite with `uv run pytest`.
