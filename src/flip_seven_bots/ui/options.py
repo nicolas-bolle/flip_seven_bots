@@ -28,11 +28,11 @@ class Options:
 
 
 def default_seats() -> list[Seat]:
-    """Create the default human, random-bot, and threshold-bot seats."""
+    """Create the default human, threshold-bot, and expected-value-bot seats."""
     return [
-        Seat("You"),
-        Seat("Random bot", RandomBot()),
-        Seat("Threshold bot", ThresholdBot(30)),
+        Seat("Me"),
+        Seat("Threshold 30", ThresholdBot(30)),
+        Seat("Expected value", ExpectedValueBot()),
     ]
 
 
@@ -132,6 +132,10 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
         parser.error(f"at most {MAX_PLAYERS} players fit on the screen")
     show_setup = not (sys.argv[1:] if argv is None else argv)
     return Options(
-        _number_duplicates(seats), args.seed, args.bug_dir,
-        args.vengeance or args.brutal, args.brutal, show_setup,
+        _number_duplicates(seats),
+        args.seed,
+        args.bug_dir,
+        args.vengeance or args.brutal,
+        args.brutal,
+        show_setup,
     )
