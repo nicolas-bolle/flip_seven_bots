@@ -84,6 +84,40 @@ cards available to reshuffle. Pass `rules=Rules(...)` to change the target
 score, bonus, deck, or scoring, and `deck=Deck.stacked(cards)` to `Game` to deal
 cards in a fixed order (useful in tests).
 
+The base rules were checked against the supplied rulebook. One intentional
+difference is that resolved Freeze and Flip 3 cards are discarded immediately,
+rather than remaining on the table until the round ends.
+
+### With A Vengeance
+
+The headless engine also supports With A Vengeance; the Pygame interface still
+uses the base game.
+
+```python
+from flip_seven_bots.bots import ThresholdBot
+from flip_seven_bots.game import VengeanceRules
+from flip_seven_bots.simulation import play_game
+
+result = play_game(
+    [ThresholdBot(25), ThresholdBot(25), ThresholdBot(25)],
+    seed=42,
+    rules=VengeanceRules(),  # Use VengeanceRules(brutal=True) for Brutal Mode.
+)
+print(result.winners)
+print([player.total_score for player in result.players])
+```
+
+In addition to target decisions, a Vengeance bot may receive `CHOOSE_CARD`
+actions. Their `target` identifies the card owner and `card_index` indexes
+that player's `cards` in the current observation. Swap uses two such decisions.
+In Brutal Mode a Flip 7 bonus decision offers `TAKE_BONUS` or a
+`CHOOSE_TARGET` action to subtract the bonus from another player. Existing
+random and threshold bots support these choices.
+
+The Zero affects the round score, not accumulated points. A duplicate number
+received through a swap or steal causes a bust, and Brutal Mode modifiers can
+give a busted player a negative round score.
+
 ### Looking ahead
 
 The deck order is the only hidden information, so
@@ -94,7 +128,7 @@ candidate actions to it and play it forward with
 be sampled until the real game advances. `FlipThreeMonteCarloBot` uses this to
 choose Flip Three targets and delegates other decisions to a fallback bot.
 
-With A Vengeance and training integrations are not implemented yet.
+Training integrations are not implemented yet.
 
 ## Tests
 

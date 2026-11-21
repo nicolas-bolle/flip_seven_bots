@@ -32,6 +32,8 @@ class ThresholdBot:
                 (action for action in actions if action.target != observation.player),
                 actions[0],
             )
+        if actions[0].kind is not ActionType.HIT:
+            return actions[0]
         stay = Action(ActionType.STAY)
         if (
             stay in actions

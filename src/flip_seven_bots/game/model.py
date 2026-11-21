@@ -17,12 +17,29 @@ class CardType(Enum):
     FREEZE = auto()
     FLIP_THREE = auto()
     SECOND_CHANCE = auto()
+    ZERO = auto()
+    UNLUCKY_SEVEN = auto()
+    LUCKY_THIRTEEN = auto()
+    SUBTRACT = auto()
+    DIVIDE = auto()
+    JUST_ONE_MORE = auto()
+    FLIP_FOUR = auto()
+    SWAP = auto()
+    STEAL = auto()
+    DISCARD = auto()
 
 
 @dataclass(frozen=True)
 class Card:
     kind: CardType
     value: int = 0
+
+    @property
+    def is_number(self) -> bool:
+        return self.kind in (
+            CardType.NUMBER, CardType.ZERO, CardType.UNLUCKY_SEVEN,
+            CardType.LUCKY_THIRTEEN,
+        )
 
     def __deepcopy__(self, memo: dict) -> Card:
         return self
@@ -38,16 +55,23 @@ class ActionType(Enum):
     HIT = auto()
     STAY = auto()
     CHOOSE_TARGET = auto()
+    CHOOSE_CARD = auto()
+    TAKE_BONUS = auto()
 
 
 @dataclass(frozen=True)
 class Action:
     kind: ActionType
     target: int | None = None
+    card_index: int | None = None
 
     def __post_init__(self) -> None:
-        if (self.kind is ActionType.CHOOSE_TARGET) != (self.target is not None):
-            raise ValueError("an action has a target exactly when it chooses a target")
+        if (self.kind in (ActionType.CHOOSE_TARGET, ActionType.CHOOSE_CARD)) != (
+            self.target is not None
+        ):
+            raise ValueError("an action has a target exactly when it chooses a target or card")
+        if (self.kind is ActionType.CHOOSE_CARD) != (self.card_index is not None):
+            raise ValueError("an action has a card index exactly when it chooses a card")
 
 
 @dataclass(frozen=True)

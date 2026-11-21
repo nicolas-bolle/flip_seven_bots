@@ -18,7 +18,7 @@ from .model import (
     RoundResult,
     RoundStarted,
 )
-from .rules import Rules
+from .rules import Rules, VengeanceRules
 
 __all__ = [
     "Action",
@@ -38,4 +38,5 @@ __all__ = [
     "RoundResult",
     "RoundStarted",
     "Rules",
+    "VengeanceRules",
 ]
