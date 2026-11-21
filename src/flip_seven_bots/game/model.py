@@ -33,14 +33,13 @@ class CardType(Enum):
 
 @dataclass(frozen=True)
 class Card:
-    """An immutable card identified by its kind and, when applicable, value.
-
-    Number and modifier cards carry their printed number in ``value``; action
-    cards generally use the default of zero. Equal cards are interchangeable.
-    """
+    """An immutable card; equal cards are interchangeable."""
 
     kind: CardType
+    """Kind of card."""
+
     value: int = 0
+    """Printed number for number and modifier cards; generally zero for action cards."""
 
     @property
     def is_number(self) -> bool:
@@ -76,10 +75,6 @@ class ActionType(Enum):
 class Action:
     """A decision made by the current player.
 
-    ``CHOOSE_TARGET`` uses ``target`` as a zero-based player ID. For
-    ``CHOOSE_CARD``, ``target`` is the card owner's player ID and
-    ``card_index`` indexes that owner's ``PlayerView.cards`` in the current
-    observation, not the visually sorted UI. Other actions use neither field.
     Constructing an action with fields inappropriate for its kind raises
     ``ValueError``; the engine separately checks whether it is legal.
     """
@@ -88,10 +83,13 @@ class Action:
     """Type of decision."""
 
     target: int | None = None
-    """Selected player or card owner, for target and card choices."""
+    """Chosen player for ``CHOOSE_TARGET``, card owner for ``CHOOSE_CARD``, else ``None``."""
 
     card_index: int | None = None
-    """Index into the selected owner's current ``PlayerView.cards``."""
+    """For ``CHOOSE_CARD``, index into the owner's ``PlayerView.cards``; otherwise ``None``.
+
+    Indexes the current observation's hand order, not the visually sorted UI.
+    """
 
     def __post_init__(self) -> None:
         if (self.kind in (ActionType.CHOOSE_TARGET, ActionType.CHOOSE_CARD)) != (
@@ -104,17 +102,17 @@ class Action:
 
 @dataclass(frozen=True)
 class HitOrStay:
-    """The acting player's turn: draw a card, or stay when ``can_stay``.
-
-    Staying is unavailable with an empty hand in the base game, or while holding
-    a Vengeance Zero.
-    """
+    """The acting player's turn: draw a card or stay."""
 
     player: int
     """Seat that must decide."""
 
     can_stay: bool
-    """Whether ``STAY`` is legal in addition to ``HIT``."""
+    """Whether ``STAY`` is legal in addition to ``HIT``.
+
+    Staying is unavailable with an empty hand in the base game, or while holding
+    a Vengeance Zero.
+    """
 
     @property
     def actions(self) -> tuple[Action, ...]:
@@ -133,7 +131,7 @@ class ChooseTarget:
     """Choose the player who receives ``card``.
 
     Used for Freeze, Flip Three, giving away a duplicate Second Chance, and
-    the targeted Vengeance cards. ``targets`` may include ``player`` itself.
+    the targeted Vengeance cards.
     """
 
     player: int
@@ -143,7 +141,7 @@ class ChooseTarget:
     """Card being resolved."""
 
     targets: tuple[int, ...]
-    """Eligible seats, in seat order."""
+    """Eligible seats in seat order; may include ``player`` itself."""
 
     @property
     def actions(self) -> tuple[Action, ...]:
@@ -158,9 +156,7 @@ class ChooseTarget:
 class ChooseCard:
     """Choose a card in someone's hand for a Vengeance Swap, Steal or Discard.
 
-    ``choices`` holds ``(owner, card_index)`` pairs indexing ``PlayerView.cards``.
-    A Swap takes two such decisions; during the second, ``first`` is the card
-    picked in the first step, otherwise it is ``None``.
+    A Swap takes two such decisions, one per card.
     """
 
     player: int
@@ -170,10 +166,10 @@ class ChooseCard:
     """Card being resolved."""
 
     choices: tuple[tuple[int, int], ...]
-    """Eligible ``(owner, card_index)`` pairs."""
+    """Eligible ``(owner, card_index)`` pairs, indexing ``PlayerView.cards``."""
 
     first: tuple[int, int] | None = None
-    """Card already chosen as the first half of a Swap."""
+    """In a Swap's second decision, the ``(owner, card_index)`` picked first; else ``None``."""
 
     @property
     def actions(self) -> tuple[Action, ...]:
@@ -212,15 +208,7 @@ Decision = HitOrStay | ChooseTarget | ChooseCard | FlipSevenBonus
 
 @dataclass(frozen=True)
 class PlayerView:
-    """Public snapshot of one seat's cards, status, and scores.
-
-    ``player`` is the zero-based seat ID. ``total_score`` is the score from
-    completed rounds. ``cards`` is in the engine's hand order, not UI display
-    order; it can include cards held by a player who stayed or busted.
-    ``round_score`` is the score the current hand would receive without a
-    Flip 7 bonus or penalty; a busted player's score may be negative in Brutal
-    Mode. The score awarded at round end can differ.
-    """
+    """Public snapshot of one seat's cards, status, and scores."""
 
     player: int
     """Zero-based seat ID."""
@@ -232,41 +220,60 @@ class PlayerView:
     """Whether this player is active, stayed, or busted in the current round."""
 
     cards: tuple[Card, ...]
-    """Revealed cards in engine hand order, including unresolved cards."""
+    """Revealed cards in engine hand order, not UI display order.
+
+    Includes unresolved cards, and cards kept after staying or busting.
+    """
+
     round_score: int
-    """In-progress score, excluding any Flip 7 bonus or penalty."""
+    """Score the current hand would receive, excluding any Flip 7 bonus or penalty.
+
+    A busted player's score may be negative in Brutal Mode. The score awarded
+    at round end can differ.
+    """
 
 
 @dataclass(frozen=True)
 class RoundResult:
-    """Scores awarded at the end of one round, in seat order.
-
-    ``scores`` includes any bonus or penalty; ``totals`` contains the updated
-    cumulative scores. ``flip_seven_player`` identifies the seat that achieved
-    Flip 7, or is ``None`` if nobody did. In Brutal Mode that player may have
-    chosen to apply the bonus as a penalty instead of receiving it.
-    """
+    """Scores awarded at the end of one round."""
 
     round_number: int
+    """Round that ended, numbered from one."""
+
     scores: tuple[int, ...]
+    """Round scores in seat order, including any Flip 7 bonus or penalty."""
+
     totals: tuple[int, ...]
+    """Updated cumulative scores in seat order."""
+
     flip_seven_player: int | None
+    """Seat that achieved Flip 7, or ``None`` if nobody did.
+
+    In Brutal Mode that player may have applied the bonus as a penalty to
+    another player instead of receiving it.
+    """
 
 
 @dataclass(frozen=True)
 class RoundStarted:
-    """The numbered round has begun, before its initial cards are dealt."""
+    """A round has begun, before its initial cards are dealt."""
 
     round_number: int
+    """Round that began, numbered from one."""
 
 
 @dataclass(frozen=True)
 class CardDrawn:
-    """A card was drawn for ``player`` in the indicated round."""
+    """A card was drawn from the deck for a player."""
 
     round_number: int
+    """Round in which the card was drawn."""
+
     player: int
+    """Seat that received the card."""
+
     card: Card
+    """Card drawn."""
 
 
 @dataclass(frozen=True)
@@ -274,8 +281,13 @@ class ActionChosen:
     """A player made a decision; automatic card effects are not decisions."""
 
     round_number: int
+    """Round in which the decision was made."""
+
     player: int
+    """Seat that decided."""
+
     action: Action
+    """Decision made."""
 
 
 @dataclass(frozen=True)
@@ -283,14 +295,18 @@ class DiscardShuffled:
     """The discard pile was shuffled into an empty draw pile."""
 
     round_number: int
+    """Round in which the reshuffle happened."""
 
 
 @dataclass(frozen=True)
 class RoundEnded:
-    """A round finished with the given scores and cumulative totals."""
+    """A round finished."""
 
     round_number: int
+    """Round that ended."""
+
     result: RoundResult
+    """Scores and cumulative totals for the round."""
 
 
 GameEvent = RoundStarted | CardDrawn | ActionChosen | DiscardShuffled | RoundEnded
