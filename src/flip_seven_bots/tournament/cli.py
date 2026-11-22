@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 DEFAULT_BOTS = ("random", "threshold:30", "expected")
 DEFAULT_GAMES = 100
+DEFAULT_K_HALF_LIFE = 50.0
+DEFAULT_BOOTSTRAP = 200
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,13 @@ class TournamentOptions:
     output: Path | None
     """Folder to save ``games.csv`` and ``summary.csv`` in, if any."""
 
+    rotate_seats: bool = False
+    k_half_life: float | None = DEFAULT_K_HALF_LIFE
+    """Games after which the Elo K-factor halves, or ``None`` for a constant K."""
+
+    bootstrap: int = DEFAULT_BOOTSTRAP
+    """Resamples for the rating confidence interval; ``0`` skips it."""
+
     @property
     def rules(self) -> Rules | None:
         return VengeanceRules(brutal=self.brutal) if self.vengeance else None
@@ -52,7 +61,16 @@ class TournamentOptions:
 
     def run(self, *, progress: bool = True) -> TournamentResult:
         """Play the whole tournament, optionally showing a terminal progress bar."""
-        return run_tournament(self.bots, **self._settings(), progress=progress)
+        return run_tournament(
+            self.bots, **self._settings(), bootstrap=self.bootstrap, progress=progress
+        )
+
+    def result(self, records: Sequence[GameRecord]) -> TournamentResult:
+        """Build the result tables for games played with ``start``."""
+        return TournamentResult.from_records(
+            records, list(self.bots), initial_rating=self.initial_rating,
+            bootstrap=self.bootstrap, seed=self.seed,
+        )
 
     def describe(self) -> str:
         """A one-line description of the settings."""
@@ -60,15 +78,18 @@ class TournamentOptions:
         if self.vengeance:
             mode = "With A Vengeance (Brutal)" if self.brutal else "With A Vengeance"
         table = self.players_per_game or len(self.bots)
-        return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
+        seats = ", rotated seats" if self.rotate_seats else ""
+        return f"{len(self.bots)} bots, {self.games} games of {table} players{seats}, {mode}"
 
     def _settings(self) -> dict:
         return {
             "games": self.games,
             "players_per_game": self.players_per_game,
+            "rotate_seats": self.rotate_seats,
             "rules": self.rules,
             "seed": self.seed,
             "k_factor": self.k_factor,
+            "k_half_life": self.k_half_life,
             "initial_rating": self.initial_rating,
         }
 
@@ -137,14 +158,34 @@ def parse_options(
         "--players-per-game", type=_positive_int, metavar="N",
         help="bots seated in each game, chosen at random (default: all)",
     )
-    parser.add_argument("--seed", type=int, help="seed for seating and decks")
+    parser.add_argument(
+        "--rotate-seats", action="store_true",
+        help=(
+            "replay each deal with the same deck once per seat rotation to cancel "
+            "out card luck; --games must be a multiple of the players per game"
+        ),
+    )
+    parser.add_argument("--seed", type=int, help="seed for seating, decks and resampling")
     parser.add_argument("--vengeance", action="store_true", help="play With A Vengeance")
     parser.add_argument(
         "--brutal", action="store_true", help="play With A Vengeance in Brutal Mode"
     )
     parser.add_argument(
         "--k-factor", type=_positive_float, default=32.0, metavar="K",
-        help="Elo K-factor (default: %(default)s)",
+        help="starting Elo K-factor (default: %(default)s)",
+    )
+    k_schedule = parser.add_mutually_exclusive_group()
+    k_schedule.add_argument(
+        "--k-half-life", type=_positive_float, default=DEFAULT_K_HALF_LIFE, metavar="N",
+        help="games after which a bot's Elo K-factor halves (default: %(default)s)",
+    )
+    k_schedule.add_argument(
+        "--constant-k", action="store_true", help="keep the Elo K-factor constant"
+    )
+    parser.add_argument(
+        "--bootstrap", type=int, default=DEFAULT_BOOTSTRAP, metavar="N",
+        help="resamples for the rating's 95%% confidence interval; 0 skips it "
+        "(default: %(default)s)",
     )
     parser.add_argument(
         "--initial-rating", type=float, default=1500.0, metavar="R",
@@ -163,6 +204,11 @@ def parse_options(
     bots = {name: bot for name, (_, bot) in zip(names, named)}
     if args.players_per_game is not None and not 2 <= args.players_per_game <= len(bots):
         parser.error(f"--players-per-game must be between 2 and {len(bots)}")
+    table = args.players_per_game or len(bots)
+    if args.rotate_seats and args.games % table:
+        parser.error(f"with --rotate-seats, --games must be a multiple of {table}")
+    if args.bootstrap < 0:
+        parser.error("--bootstrap must not be negative")
     return TournamentOptions(
         bots=bots,
         games=args.games,
@@ -173,17 +219,33 @@ def parse_options(
         k_factor=args.k_factor,
         initial_rating=args.initial_rating,
         output=args.output,
+        rotate_seats=args.rotate_seats,
+        k_half_life=None if args.constant_k else args.k_half_life,
+        bootstrap=args.bootstrap,
     )
 
 
 def format_summary(summary: pd.DataFrame) -> str:
-    """Render a tournament summary as an aligned text table."""
-    return summary.to_string(formatters={
-        "win_rate": "{:.0%}".format,
-        "mean_place": "{:.2f}".format,
-        "mean_score": "{:.1f}".format,
-        "rating": "{:.0f}".format,
-    })
+    """Render a tournament summary as an aligned text table, with intervals as ranges."""
+    table = summary.drop(columns=["rating_low", "rating_high"])
+    table.insert(
+        table.columns.get_loc("rating") + 1,
+        "95% interval",
+        [
+            "-" if pd.isna(low) else f"{low:.0f}-{high:.0f}"
+            for low, high in zip(summary["rating_low"], summary["rating_high"])
+        ],
+    )
+    return table.to_string(
+        formatters={
+            "win_rate": "{:.0%}".format,
+            "mean_place": "{:.2f}".format,
+            "mean_score": "{:.1f}".format,
+            "rating": "{:.0f}".format,
+            "elo": "{:.0f}".format,
+        },
+        na_rep="-",
+    )
 
 
 def save_results(result: TournamentResult, directory: Path) -> tuple[Path, Path]:

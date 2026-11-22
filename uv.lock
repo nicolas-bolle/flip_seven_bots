@@ -143,6 +143,7 @@ name = "flip-seven-bots"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "numpy" },
     { name = "pandas" },
     { name = "pygame-ce" },
     { name = "tqdm" },
@@ -160,6 +161,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "numpy", specifier = ">=2.5.5" },
     { name = "pandas", specifier = ">=3.1.1" },
     { name = "pygame-ce", specifier = ">=2.5.8" },
     { name = "tqdm", specifier = ">=4.70.1" },

@@ -1,5 +1,6 @@
 """Run a tournament in the background and show live progress, standings and ratings."""
 
+import math
 import queue
 import threading
 import time
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import pygame
 
 from flip_seven_bots.tournament import GameRecord, TournamentResult
@@ -41,14 +43,17 @@ LINE_COLORS = (
 class _Standing:
     name: str
     color: tuple[int, int, int]
-    rating: float
+    elo: float
     games: int = 0
     wins: int = 0
     place_total: int = 0
 
 
+@dataclass(frozen=True)
 class _Finished:
-    """Queue marker: the worker played every game or was stopped."""
+    """Queue marker: the worker played every game or was stopped, and rated them."""
+
+    result: TournamentResult | None
 
 
 class TournamentScene:
@@ -65,6 +70,8 @@ class TournamentScene:
         self.error: str | None = None
         self.restart = False
         self.saved: tuple[Path, Path] | None = None
+        self.result: TournamentResult | None = None
+        """Final tables, available once ``finished`` if any game was played."""
         self._save_dir = options.output or save_dir / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self._standings = {
             name: _Standing(name, LINE_COLORS[index % len(LINE_COLORS)], options.initial_rating)
@@ -88,20 +95,16 @@ class TournamentScene:
         """The tournament screen has no modal dialog, so Escape may quit."""
         return False
 
-    @property
-    def result(self) -> TournamentResult:
-        """Tables for the games played so far."""
-        return TournamentResult.from_records(
-            self.records, list(self.options.bots), initial_rating=self.options.initial_rating
-        )
-
     def _play(self, games) -> None:
         try:
+            played = []
             for record in games:
+                played.append(record)
                 self._queue.put(record)
                 if self._stop.is_set():
                     break
-            self._queue.put(_Finished())
+            # Fitting with confidence intervals can take a moment, so do it off the UI thread.
+            self._queue.put(_Finished(self.options.result(played) if played else None))
         except BaseException as error:  # noqa: BLE001 - reported on screen instead
             self._queue.put(error)
 
@@ -118,7 +121,7 @@ class TournamentScene:
                 self.close()
         elif NEW_BUTTON.collidepoint(event.pos):
             self.restart = True
-        elif SAVE_BUTTON.collidepoint(event.pos) and self.records and self.saved is None:
+        elif SAVE_BUTTON.collidepoint(event.pos) and self.result and self.saved is None:
             self.saved = save_results(self.result, self._save_dir)
 
     def update(self, _now: int) -> None:
@@ -131,29 +134,29 @@ class TournamentScene:
             match item:
                 case GameRecord():
                     self._record(item)
-                case _Finished():
-                    self._finish()
+                case _Finished(result=result):
+                    self._finish(result)
                 case BaseException():
                     self.error = f"{type(item).__name__}: {item}"
-                    self._finish()
-        if not self.finished:
+                    self._finish(None)
+        if not self.finished and len(self.records) < self.options.games:
             self._elapsed = time.monotonic() - self._started
 
     def _record(self, record: GameRecord) -> None:
         self.records.append(record)
-        for name, place, rating in zip(record.players, record.places, record.ratings):
+        for name, place, elo in zip(record.players, record.places, record.elo):
             standing = self._standings[name]
-            standing.rating = rating
+            standing.elo = elo
             standing.games += 1
             standing.wins += place == 1
             standing.place_total += place
-        self._history.append(tuple(s.rating for s in self._standings.values()))
+        self._history.append(tuple(s.elo for s in self._standings.values()))
 
-    def _finish(self) -> None:
+    def _finish(self, result: TournamentResult | None) -> None:
         self.finished = True
-        self._elapsed = time.monotonic() - self._started
-        if self.options.output is not None and self.records:
-            self.saved = save_results(self.result, self.options.output)
+        self.result = result
+        if self.options.output is not None and result is not None:
+            self.saved = save_results(result, self.options.output)
 
     def render(
         self, screen: pygame.Surface, _mouse_pos: tuple[int, int] | None = None
@@ -169,7 +172,8 @@ class TournamentScene:
             draw_button(screen, self._font, STOP_BUTTON, "Stop", disabled=self._stop.is_set())
         else:
             label = "Saved" if self.saved else "Save results"
-            draw_button(screen, self._font, SAVE_BUTTON, label, disabled=bool(self.saved or not self.records))
+            disabled = bool(self.saved or self.result is None)
+            draw_button(screen, self._font, SAVE_BUTTON, label, disabled=disabled)
             draw_button(screen, self._font, NEW_BUTTON, "New tournament", selected=True)
         if self.saved is not None:
             draw_text(screen, self._small_font, f"Saved to {self.saved[0].parent}", (600, 810), MUTED)
@@ -191,8 +195,10 @@ class TournamentScene:
         elif not self.finished:
             remaining = f", about {(total - played) / rate:.0f} s left" if rate else ""
             status = f"Running: {rate:.1f} games/s{remaining}"
-            if self._stop.is_set():
-                status = "Stopping after the current game..."
+            if played == total:
+                status = "Computing ratings..."
+            elif self._stop.is_set():
+                status = "Stopping after the current game, then computing ratings..."
         elif played < total:
             status = f"Stopped after {played} games in {self._elapsed:.1f} s"
         else:
@@ -203,24 +209,47 @@ class TournamentScene:
     def _draw_standings(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(screen, PANEL, STANDINGS, border_radius=10)
         x, y = STANDINGS.x + 18, STANDINGS.y + 16
-        draw_text(screen, self._heading_font, "Standings", (x, y))
-        columns = (("BOT", 18), ("RATING", 210), ("GAMES", 285), ("WINS", 350), ("AVG PLACE", 455))
+        summary = self.result.summary if self.result is not None else None
+        title = "Final standings" if summary is not None else "Standings (live Elo)"
+        draw_text(screen, self._heading_font, title, (x, y))
+        rating_label = "RATING (95%)" if summary is not None else "ELO"
+        columns = (
+            ("BOT", 18), (rating_label, 190), ("GAMES", 300), ("WINS", 360), ("AVG PLACE", 455),
+        )
         for label, offset in columns:
             draw_text(screen, self._small_font, label, (x + offset, y + 44), MUTED)
-        ranked = sorted(self._standings.values(), key=lambda s: s.rating, reverse=True)
-        for rank, standing in enumerate(ranked, start=1):
-            row_y = y + 70 + (rank - 1) * 46
-            if rank % 2:
-                pygame.draw.rect(screen, PANEL_ALT, (STANDINGS.x + 8, row_y - 8, STANDINGS.width - 16, 40), border_radius=6)
+        if summary is not None:
+            ranked = [self._standings[name] for name in summary.index]
+        else:
+            ranked = sorted(self._standings.values(), key=lambda s: s.elo, reverse=True)
+        for row, standing in enumerate(ranked):
+            row_y = y + 70 + row * 46
+            if row % 2 == 0:
+                stripe = (STANDINGS.x + 8, row_y - 8, STANDINGS.width - 16, 40)
+                pygame.draw.rect(screen, PANEL_ALT, stripe, border_radius=6)
             pygame.draw.rect(screen, standing.color, (x, row_y + 3, 10, 14))
             win_rate = f" ({standing.wins / standing.games:.0%})" if standing.games else ""
             average = f"{standing.place_total / standing.games:.2f}" if standing.games else "-"
             cells = (
-                (self._fit(standing.name, 180), 18), (f"{standing.rating:.0f}", 210),
-                (str(standing.games), 285), (f"{standing.wins}{win_rate}", 350), (average, 455),
+                (self._fit(standing.name, 165), 18),
+                (self._rating_text(standing, summary), 190),
+                (str(standing.games), 300),
+                (f"{standing.wins}{win_rate}", 360),
+                (average, 455),
             )
             for text, offset in cells:
                 draw_text(screen, self._font, text, (x + offset, row_y), TEXT)
+
+    @staticmethod
+    def _rating_text(standing: _Standing, summary: pd.DataFrame | None) -> str:
+        if summary is None:
+            return f"{standing.elo:.0f}"
+        rating, low, high = summary.loc[standing.name, ["rating", "rating_low", "rating_high"]]
+        if math.isnan(rating):  # never played
+            return "-"
+        if math.isnan(low):  # no bootstrap
+            return f"{rating:.0f}"
+        return f"{rating:.0f} \u00b1{(high - low) / 2:.0f}"
 
     def _fit(self, text: str, width: int) -> str:
         """Shorten ``text`` with an ellipsis until it fits in ``width`` pixels."""
@@ -232,7 +261,7 @@ class TournamentScene:
 
     def _draw_chart(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(screen, PANEL, CHART, border_radius=10)
-        draw_text(screen, self._heading_font, "Rating by game", (CHART.x + 18, CHART.y + 16))
+        draw_text(screen, self._heading_font, "Elo by game", (CHART.x + 18, CHART.y + 16))
         plot = pygame.Rect(CHART.x + 60, CHART.y + 64, CHART.width - 84, CHART.height - 110)
         low = min(min(ratings) for ratings in self._history)
         high = max(max(ratings) for ratings in self._history)

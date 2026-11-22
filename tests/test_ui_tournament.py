@@ -21,6 +21,7 @@ from flip_seven_bots.ui.tournament.setup_scene import (
     ADD_BUTTON,
     GAMES_FIELD,
     MAX_BOTS,
+    SEATS_BUTTON,
     SEED_FIELD,
     START_BUTTON,
     TABLE_FIELD,
@@ -76,6 +77,7 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     replace_field(scene, GAMES_FIELD, "12")
     replace_field(scene, TABLE_FIELD, "2")
     replace_field(scene, SEED_FIELD, "7x")  # non-digits are ignored
+    click(scene, SEATS_BUTTON)
     click(scene, _row_rects(0)[1])  # random -> threshold
     replace_field(scene, _row_rects(0)[2], "15")
     replace_field(scene, _row_rects(2)[0], "Threshold 30")
@@ -90,6 +92,7 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     assert isinstance(result.bots["Threshold 30 2"], ExpectedValueBot)
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
     assert result.vengeance and not result.brutal and result.k_factor == 16
+    assert result.rotate_seats
 
 
 def test_setup_limits_bot_count() -> None:
@@ -108,11 +111,14 @@ def test_setup_limits_bot_count() -> None:
         (GAMES_FIELD, "0", "play at least one game"),
         (TABLE_FIELD, "4", "players per game must be between 2 and 3"),
         (_row_rects(1)[0], " ", "every bot needs a name"),
+        (GAMES_FIELD, "10", "with rotated seats, games must be a multiple of 3"),
     ],
-    ids=["no-games", "table-too-big", "blank-name"],
+    ids=["no-games", "table-too-big", "blank-name", "rotation"],
 )
 def test_setup_rejects_invalid_settings(field: pygame.Rect, value: str, error: str) -> None:
     scene = TournamentSetupScene(parse_options([]))
+    if error.startswith("with rotated seats"):
+        click(scene, SEATS_BUTTON)
     replace_field(scene, field, value)
     click(scene, START_BUTTON)
     assert scene.result is None and scene.error == error
@@ -126,8 +132,10 @@ def test_tournament_runs_in_the_background_and_shows_results(tmp_path: Path) -> 
     scene.render(surface)
 
     assert scene.error is None and len(scene.records) == 5
+    assert scene.result is not None
     summary = scene.result.summary
     assert summary["games"].sum() == 10
+    assert summary["rating_low"].notna().all()
     click(scene, SAVE_BUTTON)
     assert scene.saved is not None
     games_csv, summary_csv = scene.saved
@@ -161,6 +169,7 @@ def test_bot_errors_are_shown_instead_of_crashing() -> None:
     wait_until(scene, lambda: scene.finished)
     scene.render(pygame.Surface((1280, 900)))
     assert scene.error == "RuntimeError: boom" and scene.records == []
+    assert scene.result is None
 
 
 def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(

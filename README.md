@@ -180,10 +180,10 @@ the example bot above uses it for Flip Three targets.
 
 ### Tournaments
 
-`run_tournament` plays a series of games between named bots and tracks Elo
-ratings. Each game seats `players_per_game` bots (default: all), chosen and
-ordered at random; `seed` controls seating and decks. A progress bar shows the
-current leader; pass `progress=False` to hide it.
+`run_tournament` plays a series of games between named bots and rates them.
+Each game seats `players_per_game` bots (default: all), chosen and ordered at
+random; `seed` controls seating, decks and the confidence intervals. A progress
+bar shows the current leader; pass `progress=False` to hide it.
 
 ```python
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
@@ -194,15 +194,38 @@ result = run_tournament(
     games=100,
     seed=0,
 )
-print(result.summary)  # games, wins, win_rate, mean_place, mean_score, rating
-result.games           # per game and player: seat, score, place, won, ratings
+print(result.summary)  # games, wins, win_rate, mean_place, mean_score,
+                       # rating, rating_low, rating_high, elo
+result.games           # per game and player: deal, seat, score, place, won, Elo
 ```
 
-Games with more than two players are rated as every pairwise match: the better
-place wins and tied scores draw. Each player's change is `k_factor / (n - 1)`
-times the sum of actual minus expected results, so two-player games use
-standard Elo and the total rating stays constant. Elo depends on game order
-and keeps drifting, so use enough games for ratings to settle.
+Every game is scored as all of its pairwise matches: the better place wins and
+tied scores draw. Two ratings are computed from them, on the same Elo scale:
+
+- `rating` (the summary's ranking) is a Bradley-Terry fit to all games at once:
+  the model Elo assumes, fitted by maximum likelihood. It does not depend on
+  game order and becomes more precise as games are added, which suits bots
+  that never change. The bots that played average `initial_rating`, and each
+  pair gets one virtual drawn game so ratings stay finite. `rating_low` and
+  `rating_high` bound a `confidence` (default 95%) interval from `bootstrap`
+  (default 200) refits on resampled games; pass `bootstrap=0` to skip it. Treat
+  bots whose intervals overlap as indistinguishable.
+- `elo` is an online Elo rating updated after every game, shown in
+  `result.games` and the tournament window's chart. Each player's change is
+  their K-factor divided by `n - 1` times the sum of actual minus expected
+  results, so two-player games use standard Elo. The K-factor starts at
+  `k_factor` and shrinks to `k_factor * h / (h + games played)`, where `h` is
+  `k_half_life` (default 50), so ratings settle instead of drifting; pass
+  `k_half_life=None` for a constant K.
+
+Most of the noise in a game is the cards. With `rotate_seats=True`, each deal
+is replayed with the same deck once per seat rotation, so every seated bot
+gets the same cards from every seat; the `deal` column groups these games, and
+`games` must be a multiple of the players per game.
+
+Ratings assume a bot's strength does not depend on its opponents or the table
+size, which may not hold in Flip 7, so compare ratings between tournaments
+only when they use the same `players_per_game`.
 
 `play_tournament` takes the same settings but returns an iterator that plays
 one game per step and yields a `GameRecord`, for showing progress or stopping
@@ -218,8 +241,10 @@ uv run python -m flip_seven_bots.tournament --bot random --bot careful=threshold
 
 `--bot [NAME=]KIND` accepts the same kinds as the game (`random`,
 `threshold[:SCORE]`, `expected`); duplicate names are numbered. Without `--bot`,
-a random, a threshold 30 and an expected value bot play. Other options are
-`--vengeance`, `--brutal`, `--k-factor` and `--initial-rating`; see `--help`.
+a random, a threshold 30 and an expected value bot play. The summary shows each
+rating with its 95% interval. Other options are `--rotate-seats`,
+`--bootstrap`, `--k-factor`, `--k-half-life` or `--constant-k`,
+`--initial-rating`, `--vengeance` and `--brutal`; see `--help`.
 
 To watch a tournament in a window, run:
 
@@ -228,9 +253,11 @@ uv run python -m flip_seven_bots.ui.tournament
 ```
 
 With no options, a setup screen lets you choose the mode, number of games,
-players per game, seed, and up to eight bots. Any of the command-line options
-above skip setup and start immediately. The tournament screen shows a progress
-bar, live standings and a rating chart; Stop ends it after the current game.
+players per game, seed, seat rotation, and up to eight bots. Any of the
+command-line options above skip setup and start immediately. The tournament
+screen shows a progress bar, live standings by Elo and an Elo chart; Stop ends
+it after the current game. The final standings rank bots by `rating` with its
+95% interval.
 Afterwards, Save results writes the CSV files (to `--output`, if given, which
 also saves them automatically, or otherwise to a timestamped folder in
 `tournament_results`), and New tournament returns to setup.

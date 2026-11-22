@@ -16,6 +16,7 @@ BRUTAL_BUTTON = pygame.Rect(710, 150, 270, 52)
 GAMES_FIELD = pygame.Rect(90, 268, 180, 48)
 TABLE_FIELD = pygame.Rect(300, 268, 180, 48)
 SEED_FIELD = pygame.Rect(510, 268, 180, 48)
+SEATS_BUTTON = pygame.Rect(720, 268, 260, 48)
 ADD_BUTTON = pygame.Rect(90, 800, 220, 48)
 START_BUTTON = pygame.Rect(1000, 795, 190, 56)
 KINDS = ("random", "threshold", "expected")
@@ -68,6 +69,7 @@ class TournamentSetupScene:
             self.bots.append(_BotSetting(name, kind, parameter))
         self.vengeance = defaults.vengeance
         self.brutal = defaults.brutal
+        self.rotate_seats = defaults.rotate_seats
         self.numbers = {
             "games": str(defaults.games),
             "table": "" if defaults.players_per_game is None else str(defaults.players_per_game),
@@ -136,6 +138,8 @@ class TournamentSetupScene:
             self.vengeance = True
         elif BRUTAL_BUTTON.collidepoint(pos) and self.vengeance:
             self.brutal = not self.brutal
+        elif SEATS_BUTTON.collidepoint(pos):
+            self.rotate_seats = not self.rotate_seats
         elif ADD_BUTTON.collidepoint(pos) and len(self.bots) < MAX_BOTS:
             self.bots.append(_BotSetting("Threshold 30", "threshold", "30"))
         elif START_BUTTON.collidepoint(pos):
@@ -173,6 +177,8 @@ class TournamentSetupScene:
         table = int(self.numbers["table"]) if self.numbers["table"] else None
         if table is not None and not 2 <= table <= len(bots):
             raise ValueError(f"players per game must be between 2 and {len(bots)}")
+        if self.rotate_seats and games % (table or len(bots)):
+            raise ValueError(f"with rotated seats, games must be a multiple of {table or len(bots)}")
         return replace(
             self._defaults,
             bots=bots,
@@ -181,6 +187,7 @@ class TournamentSetupScene:
             seed=int(self.numbers["seed"]) if self.numbers["seed"] else None,
             vengeance=self.vengeance,
             brutal=self.vengeance and self.brutal,
+            rotate_seats=self.rotate_seats,
         )
 
     def update(self, _now: int) -> None:
@@ -208,6 +215,9 @@ class TournamentSetupScene:
         for field, rect, label in labels:
             draw_text(screen, small, label, (rect.x, 245), MUTED)
             draw_field(screen, font, rect, self.numbers[field], self._focus == (field, 0))
+        draw_text(screen, small, "SEATING (ROTATED = SAME CARDS)", (SEATS_BUTTON.x, 245), MUTED)
+        seats = "Seats: rotated" if self.rotate_seats else "Seats: random"
+        draw_button(screen, font, SEATS_BUTTON, seats, self.rotate_seats)
 
         draw_text(screen, self._heading_font, "Bots", (90, 340))
         draw_text(screen, small, "NAME", (90, 378), MUTED)
