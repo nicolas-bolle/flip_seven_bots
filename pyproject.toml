@@ -8,7 +8,11 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "numpy>=2.5.5",
+    "pandas>=3.1.1",
+    "plotly>=7.1.0",
     "pygame-ce>=2.5.8",
+    "tqdm>=4.70.1",
 ]
 
 [build-system]
@@ -20,6 +24,9 @@ unfixable = ['F401']
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.4.0",
+    "ipywidgets>=8.1.9",
+    "nbformat>=5.11.1",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.6",

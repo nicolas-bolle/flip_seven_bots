@@ -8,8 +8,11 @@ from flip_seven_bots.game import (
     ActionType,
     Card,
     CardType,
+    ChooseCard,
+    ChooseTarget,
     Deck,
     Game,
+    HitOrStay,
     PlayerStatus,
     VengeanceRules,
 )
@@ -43,7 +46,8 @@ def target(player: int) -> Action:
 
 def game_with(draws: list[Card], *, players: int = 2, brutal: bool = False) -> Game:
     return Game(
-        players, deck=Deck.stacked(draws),
+        players,
+        deck=Deck.stacked(draws),
         rules=VengeanceRules(brutal=brutal, target_score=1_000),
     )
 
@@ -63,7 +67,9 @@ def test_vengeance_deck_composition() -> None:
     assert counts[ZERO] == counts[UNLUCKY] == counts[LUCKY] == 1
     assert all(counts[subtract(n)] == 1 for n in (2, 4, 6, 8, 10))
     assert counts[DIVIDE] == 1
-    assert all(counts[card] == 2 for card in (ONE_MORE, FLIP_FOUR, SWAP, STEAL, DISCARD))
+    assert all(
+        counts[card] == 2 for card in (ONE_MORE, FLIP_FOUR, SWAP, STEAL, DISCARD)
+    )
 
 
 def test_vengeance_scoring_applies_division_then_subtractions_and_clamps() -> None:
@@ -85,7 +91,8 @@ def test_zero_forces_hit_and_only_zeroes_the_round_score() -> None:
 def test_zero_holder_who_flips_seven_scores_the_hand_and_bonus() -> None:
     draws = [ZERO] + [number(n) for n in range(1, 7)]
     game = Game(
-        1, deck=Deck.stacked(draws),
+        1,
+        deck=Deck.stacked(draws),
         rules=VengeanceRules(target_score=1),
     )
     for _ in range(6):
@@ -96,7 +103,9 @@ def test_zero_holder_who_flips_seven_scores_the_hand_and_bonus() -> None:
     assert game.last_round.scores == (21 + 15,)
 
 
-def test_unlucky_seven_discards_existing_numbers_and_modifiers_without_busting() -> None:
+def test_unlucky_seven_discards_existing_numbers_and_modifiers_without_busting() -> (
+    None
+):
     game = game_with([number(7), number(4), UNLUCKY])
     game.apply(HIT)
     observation = game.observe(0)
@@ -154,56 +163,69 @@ def test_just_one_more_resolves_drawn_action_even_if_everyone_has_stayed() -> No
 
 
 def test_flip_four_defers_modifiers_and_actions_until_all_draws() -> None:
-    game = game_with([
-        number(2), number(3), FLIP_FOUR, subtract(2), STEAL, number(4), number(5)
-    ])
+    game = game_with(
+        [number(2), number(3), FLIP_FOUR, subtract(2), STEAL, number(4), number(5)]
+    )
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(0)
-    assert observation.pending_card == subtract(2)
+    assert isinstance(observation.decision, ChooseTarget)
+    assert observation.decision.card == subtract(2)
     assert {number(3), number(4), number(5)} <= set(observation.players[0].cards)
     game.apply(target(1))
-    assert game.observe(0).pending_card == STEAL
+    decision = game.observe(0).decision
+    assert isinstance(decision, ChooseCard) and decision.card == STEAL
     choose_card(game, 1, number(2))
     assert number(2) in game.observe(0).players[0].cards
 
 
 def test_unlucky_seven_during_flip_four_keeps_unresolved_modifier() -> None:
-    game = game_with([
-        number(2), number(3), FLIP_FOUR, subtract(2), UNLUCKY, number(4), number(5)
-    ])
+    game = game_with(
+        [number(2), number(3), FLIP_FOUR, subtract(2), UNLUCKY, number(4), number(5)]
+    )
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(0)
-    assert observation.pending_card == subtract(2)
+    assert isinstance(observation.decision, ChooseTarget)
+    assert observation.decision.card == subtract(2)
     assert number(3) in observation.discard
     game.apply(target(1))
     assert subtract(2) in game.observe(0).players[1].cards
 
 
 def test_flip_four_stops_on_bust_and_discards_deferred_effects() -> None:
-    game = game_with([number(2), number(3), FLIP_FOUR, subtract(2), number(3), number(9)])
+    game = game_with(
+        [number(2), number(3), FLIP_FOUR, subtract(2), number(3), number(9)]
+    )
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(1)
     assert observation.players[0].status is PlayerStatus.BUSTED
-    assert observation.pending_card is None
+    assert isinstance(observation.decision, HitOrStay)
     assert FLIP_FOUR in observation.discard
     assert subtract(2) in observation.discard
     assert game.hidden_deck() == (number(9),)
 
 
 def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
-    game = game_with([
-        UNLUCKY, number(3), FLIP_FOUR, SWAP, subtract(2), number(4), number(5)
-    ])
+    game = game_with(
+        [UNLUCKY, number(3), FLIP_FOUR, SWAP, subtract(2), number(4), number(5)]
+    )
     game.apply(HIT)
     game.apply(target(0))
-    assert game.observe(0).pending_card == SWAP
+    decision = game.observe(0).decision
+    assert isinstance(decision, ChooseCard) and decision.card == SWAP
+    first = (1, game.observe(0).players[1].cards.index(UNLUCKY))
     choose_card(game, 1, UNLUCKY)
+    # The pending second Swap choice is public, but only the chooser may act on it.
+    bystander = game.observe(1)
+    assert isinstance(bystander.decision, ChooseCard)
+    assert (bystander.decision.player, bystander.decision.first) == (0, first)
+    assert bystander.legal_actions == ()
     choose_card(game, 0, number(4))
     observation = game.observe(0)
-    assert observation.pending_card == subtract(2)
+    assert isinstance(observation.decision, ChooseTarget)
+    assert observation.decision.card == subtract(2)
     assert number(3) in observation.discard
     assert number(5) in observation.discard
     game.apply(target(1))
@@ -272,7 +294,7 @@ def test_discard_selects_a_face_up_card_and_changes_score() -> None:
 def test_untargetable_action_is_discarded(card: Card) -> None:
     game = game_with([card, number(2)], players=1)
     observation = game.observe(0)
-    assert observation.pending_card is None
+    assert isinstance(observation.decision, HitOrStay)
     assert card in observation.discard
 
 
@@ -289,7 +311,9 @@ def test_brutal_mode_modifier_can_give_busted_player_negative_score() -> None:
 
 def test_brutal_mode_can_subtract_flip_seven_bonus_from_another_player() -> None:
     draws = [number(0), number(9)] + [number(n) for n in range(1, 7)]
-    game = Game(2, deck=Deck.stacked(draws), rules=VengeanceRules(brutal=True, target_score=1))
+    game = Game(
+        2, deck=Deck.stacked(draws), rules=VengeanceRules(brutal=True, target_score=1)
+    )
     game.apply(HIT)
     game.apply(STAY)
     for _ in range(5):
@@ -303,7 +327,9 @@ def test_brutal_mode_can_subtract_flip_seven_bonus_from_another_player() -> None
 
 def test_brutal_mode_can_keep_flip_seven_bonus() -> None:
     draws = [number(0), number(9)] + [number(n) for n in range(1, 7)]
-    game = Game(2, deck=Deck.stacked(draws), rules=VengeanceRules(brutal=True, target_score=1))
+    game = Game(
+        2, deck=Deck.stacked(draws), rules=VengeanceRules(brutal=True, target_score=1)
+    )
     game.apply(HIT)
     game.apply(STAY)
     for _ in range(5):
@@ -317,7 +343,8 @@ def test_brutal_mode_can_keep_flip_seven_bonus() -> None:
 def test_complete_seeded_vengeance_game(brutal: bool) -> None:
     result = play_game(
         [ThresholdBot(25), ThresholdBot(25), ThresholdBot(25)],
-        seed=42, rules=VengeanceRules(brutal=brutal),
+        seed=42,
+        rules=VengeanceRules(brutal=brutal),
     )
     assert result.winners
     assert result.current_player is None

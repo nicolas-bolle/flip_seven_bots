@@ -27,7 +27,9 @@ def make_table(rules: Rules | None = None, bot_delay_ms: int = 0) -> Table:
     draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2, 7, 8, 9)]
     return Table(
         [Seat("You"), Seat("A", StayBot()), Seat("B", StayBot())],
-        new_game=lambda count, _seed: Game(count, dealer=2, deck=Deck.stacked(draws), rules=rules),
+        new_game=lambda count, _seed: Game(
+            count, dealer=2, deck=Deck.stacked(draws), rules=rules
+        ),
         bot_delay_ms=bot_delay_ms,
     )
 
@@ -151,7 +153,10 @@ def test_moves_are_recorded_and_reset_on_restart() -> None:
     table = make_table()
     table.choose(STAY)
     table.update(0)
-    assert [(move.player, move.action) for move in table.moves] == [(0, STAY), (1, STAY)]
+    assert [(move.player, move.action) for move in table.moves] == [
+        (0, STAY),
+        (1, STAY),
+    ]
 
     table.restart()
     assert table.moves == ()

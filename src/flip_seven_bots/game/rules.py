@@ -43,16 +43,21 @@ def build_vengeance_deck() -> list[Card]:
         for number in range(1, 14)
         for _ in range(number - 1 if number in (7, 13) else number)
     ]
-    cards.extend((
-        Card(CardType.ZERO, 0),
-        Card(CardType.UNLUCKY_SEVEN, 7),
-        Card(CardType.LUCKY_THIRTEEN, 13),
-    ))
+    cards.extend(
+        (
+            Card(CardType.ZERO, 0),
+            Card(CardType.UNLUCKY_SEVEN, 7),
+            Card(CardType.LUCKY_THIRTEEN, 13),
+        )
+    )
     cards.extend(Card(CardType.SUBTRACT, value) for value in (2, 4, 6, 8, 10))
     cards.append(Card(CardType.DIVIDE, 2))
     for kind in (
-        CardType.JUST_ONE_MORE, CardType.FLIP_FOUR, CardType.SWAP,
-        CardType.STEAL, CardType.DISCARD,
+        CardType.JUST_ONE_MORE,
+        CardType.FLIP_FOUR,
+        CardType.SWAP,
+        CardType.STEAL,
+        CardType.DISCARD,
     ):
         cards.extend(Card(kind) for _ in range(2))
     return cards
@@ -109,4 +114,6 @@ class VengeanceRules(Rules):
 
     def __post_init__(self) -> None:
         if self.brutal and self.score_cards is score_vengeance_cards:
-            object.__setattr__(self, "score_cards", partial(score_vengeance_cards, brutal=True))
+            object.__setattr__(
+                self, "score_cards", partial(score_vengeance_cards, brutal=True)
+            )

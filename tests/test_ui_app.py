@@ -10,11 +10,16 @@ from flip_seven_bots.ui import app
 
 @pytest.mark.parametrize(
     "quit_event",
-    [pygame.event.Event(pygame.QUIT), pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)],
+    [
+        pygame.event.Event(pygame.QUIT),
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE),
+    ],
     ids=["window-close", "escape"],
 )
 def test_app_forwards_events_until_quit_and_cleans_up(
-    monkeypatch: pytest.MonkeyPatch, quit_event: pygame.event.Event, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    quit_event: pygame.event.Event,
+    tmp_path: Path,
 ) -> None:
     scene = Mock(dialog_open=False)
     screen = pygame.Surface((1280, 900))
@@ -50,7 +55,9 @@ def test_app_cleans_up_when_scene_creation_fails(
     monkeypatch.setattr(pygame.display, "set_mode", Mock())
     monkeypatch.setattr(pygame.display, "set_caption", Mock())
     monkeypatch.setattr(pygame.time, "Clock", Mock())
-    monkeypatch.setattr(app, "GameScene", Mock(side_effect=RuntimeError("scene failed")))
+    monkeypatch.setattr(
+        app, "GameScene", Mock(side_effect=RuntimeError("scene failed"))
+    )
     with pytest.raises(RuntimeError, match="scene failed"):
         app.main(["--bug-dir", str(tmp_path)])
     cleanup.assert_called_once_with()
@@ -112,7 +119,9 @@ def test_crash_is_reraised_even_if_the_report_cannot_be_written(
     assert "Could not save a crash report" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize(("flag", "brutal"), [("--vengeance", False), ("--brutal", True)])
+@pytest.mark.parametrize(
+    ("flag", "brutal"), [("--vengeance", False), ("--brutal", True)]
+)
 def test_mode_flags_create_vengeance_game_directly(
     monkeypatch: pytest.MonkeyPatch, flag: str, brutal: bool
 ) -> None:
@@ -139,15 +148,19 @@ def test_setup_transitions_to_selected_game(monkeypatch: pytest.MonkeyPatch) -> 
         def click(rect: pygame.Rect) -> pygame.event.Event:
             return pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center)
 
-        run_app(monkeypatch, scene, [
-            [click(VENGEANCE_BUTTON), click(BRUTAL_BUTTON), click(START_BUTTON)],
-            [pygame.event.Event(pygame.QUIT)],
-        ])
+        run_app(
+            monkeypatch,
+            scene,
+            [
+                [click(VENGEANCE_BUTTON), click(BRUTAL_BUTTON), click(START_BUTTON)],
+                [pygame.event.Event(pygame.QUIT)],
+            ],
+        )
         constructor = Mock(return_value=scene)
         monkeypatch.setattr(app, "GameScene", constructor)
         app.main([])
         table = constructor.call_args.args[0]
         assert isinstance(table.game.rules, VengeanceRules) and table.game.rules.brutal
-        assert table.names == ("You", "Random bot", "Threshold bot")
+        assert table.names == ("Me", "Threshold 30", "Expected value")
     finally:
         pygame.font.quit()

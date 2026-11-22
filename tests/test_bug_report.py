@@ -22,7 +22,11 @@ NOW = datetime(2026, 11, 21, 16, 30, 5)
 
 def played_table(moves: int = 25) -> Table:
     table = Table(
-        [Seat("Ann"), Seat("Rando", RandomBot(seed=3)), Seat("Thresh", ThresholdBot(20))],
+        [
+            Seat("Ann"),
+            Seat("Rando", RandomBot(seed=3)),
+            Seat("Thresh", ThresholdBot(20)),
+        ],
         seed=11,
         bot_delay_ms=0,
     )
@@ -57,7 +61,10 @@ def test_replay_rebuilds_the_reported_game(tmp_path: Path) -> None:
     game = replay(path)
     assert game.observe(0) == table.game.observe(0)
     assert game.hidden_deck() == table.game.hidden_deck()
-    assert replay(path, moves=0).observe(0).events == Game(3, seed=table.game_seed).observe(0).events
+    assert (
+        replay(path, moves=0).observe(0).events
+        == Game(3, seed=table.game_seed).observe(0).events
+    )
 
 
 def test_replaying_a_crash_report_reproduces_the_crash(tmp_path: Path) -> None:
@@ -80,14 +87,17 @@ def test_reports_written_in_the_same_second_get_distinct_names(tmp_path: Path) -
     table = played_table(moves=0)
     paths = [write_report(table, f"report {n}", tmp_path, now=NOW) for n in range(3)]
     assert [p.name for p in paths] == [
-        "2026-11-21_16-30-05.md", "2026-11-21_16-30-05-2.md", "2026-11-21_16-30-05-3.md",
+        "2026-11-21_16-30-05.md",
+        "2026-11-21_16-30-05-2.md",
+        "2026-11-21_16-30-05-3.md",
     ]
 
 
 def test_custom_games_are_reported_without_replay_data(tmp_path: Path) -> None:
     draws = [Card(CardType.NUMBER, 4)] * 3
     table = Table(
-        [Seat("You")], new_game=lambda count, _seed: Game(count, deck=Deck.stacked(draws))
+        [Seat("You")],
+        new_game=lambda count, _seed: Game(count, deck=Deck.stacked(draws)),
     )
     path = write_report(table, "stacked", tmp_path, now=NOW)
 
@@ -104,7 +114,9 @@ def test_replay_ignores_replay_data_typed_into_the_message(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize("brutal", [False, True])
-def test_vengeance_report_replays_card_choices_and_rules(tmp_path: Path, brutal: bool) -> None:
+def test_vengeance_report_replays_card_choices_and_rules(
+    tmp_path: Path, brutal: bool
+) -> None:
     table = Table(
         [Seat("Ann"), Seat("Ben"), Seat("Cam")],
         seed=4,
@@ -117,7 +129,9 @@ def test_vengeance_report_replays_card_choices_and_rules(tmp_path: Path, brutal:
         if table.game.is_finished:
             break
         choices = table.observation.legal_actions
-        card_choices = [action for action in choices if action.kind is ActionType.CHOOSE_CARD]
+        card_choices = [
+            action for action in choices if action.kind is ActionType.CHOOSE_CARD
+        ]
         action = card_choices[-1] if card_choices else choices[0]
         chosen_card |= action.kind is ActionType.CHOOSE_CARD
         table.choose(action)

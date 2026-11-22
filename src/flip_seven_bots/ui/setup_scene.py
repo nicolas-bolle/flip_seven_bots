@@ -5,18 +5,9 @@ from dataclasses import dataclass
 
 import pygame
 
-from flip_seven_bots.bots import FlipThreeMonteCarloBot, RandomBot, ThresholdBot
+from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 
-from .game_scene import (
-    ACCENT,
-    ACTIVE,
-    BACKGROUND,
-    BUTTON,
-    MUTED,
-    PANEL,
-    PANEL_ALT,
-    TEXT,
-)
+from .game_scene import ACCENT, BACKGROUND, MUTED, TEXT
 from .options import (
     MAX_PLAYERS,
     _bot_seat,
@@ -25,18 +16,19 @@ from .options import (
     default_seats,
 )
 from .table import Seat
+from .widgets import draw_button, draw_field, draw_text
 
 BASE_BUTTON = pygame.Rect(90, 150, 260, 52)
 VENGEANCE_BUTTON = pygame.Rect(365, 150, 330, 52)
 BRUTAL_BUTTON = pygame.Rect(710, 150, 270, 52)
 ADD_BUTTON = pygame.Rect(90, 735, 220, 52)
 START_BUTTON = pygame.Rect(1000, 790, 190, 60)
-KINDS = ("human", "random", "threshold", "montecarlo")
+KINDS = ("human", "random", "threshold", "expected")
 KIND_LABELS = {
     "human": "Human",
     "random": "Random bot",
     "threshold": "Threshold bot",
-    "montecarlo": "Monte Carlo bot",
+    "expected": "Expected value bot",
 }
 MAX_NAME_LENGTH = 24
 MAX_PARAMETER_LENGTH = 6
@@ -66,8 +58,8 @@ def _initial_player(seat: Seat) -> _PlayerSetting:
             return _PlayerSetting(seat.name, "random")
         case ThresholdBot(threshold=threshold):
             return _PlayerSetting(seat.name, "threshold", str(threshold))
-        case FlipThreeMonteCarloBot(samples=samples):
-            return _PlayerSetting(seat.name, "montecarlo", str(samples))
+        case ExpectedValueBot():
+            return _PlayerSetting(seat.name, "expected")
     raise ValueError(f"unsupported setup bot: {seat.bot!r}")
 
 
@@ -114,7 +106,8 @@ class SetupScene:
                 player.name = (player.name + event.text)[:MAX_NAME_LENGTH]
             else:
                 player.parameter = (
-                    player.parameter + "".join(char for char in event.text if char.isdigit())
+                    player.parameter
+                    + "".join(char for char in event.text if char.isdigit())
                 )[:MAX_PARAMETER_LENGTH]
             self.error = None
             return
@@ -152,7 +145,9 @@ class SetupScene:
         elif BRUTAL_BUTTON.collidepoint(pos) and self.vengeance:
             self.brutal = not self.brutal
         elif ADD_BUTTON.collidepoint(pos) and len(self.players) < MAX_PLAYERS:
-            self.players.append(_PlayerSetting(f"Player {len(self.players) + 1}", "human"))
+            self.players.append(
+                _PlayerSetting(f"Player {len(self.players) + 1}", "human")
+            )
         elif START_BUTTON.collidepoint(pos):
             self._start()
         else:
@@ -162,10 +157,8 @@ class SetupScene:
                     self._focus = (index, "name")
                 elif kind.collidepoint(pos):
                     player.kind = KINDS[(KINDS.index(player.kind) + 1) % len(KINDS)]
-                    player.parameter = {"threshold": "30", "montecarlo": "50"}.get(
-                        player.kind, ""
-                    )
-                elif parameter.collidepoint(pos) and player.kind in ("threshold", "montecarlo"):
+                    player.parameter = "30" if player.kind == "threshold" else ""
+                elif parameter.collidepoint(pos) and player.kind == "threshold":
                     self._focus = (index, "parameter")
                 elif remove.collidepoint(pos) and len(self.players) > 1:
                     self.players.pop(index)
@@ -180,14 +173,16 @@ class SetupScene:
             for player in self.players:
                 name = _human_seat(player.name).name
                 spec = player.kind
-                if player.parameter and player.kind in ("threshold", "montecarlo"):
+                if player.parameter and player.kind == "threshold":
                     spec += f":{player.parameter}"
                 bot = None if player.kind == "human" else _bot_seat(spec).bot
                 seats.append(Seat(name, bot))
         except argparse.ArgumentTypeError as error:
             self.error = str(error)
             return
-        self.result = SetupResult(_number_duplicates(seats), self.vengeance, self.brutal)
+        self.result = SetupResult(
+            _number_duplicates(seats), self.vengeance, self.brutal
+        )
 
     def update(self, _now: int) -> None:
         """Satisfy the scene interface; setup has no time-dependent updates."""
@@ -202,53 +197,70 @@ class SetupScene:
         self._button(screen, BASE_BUTTON, "Flip 7", self.vengeance is False)
         self._button(screen, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
         self._button(
-            screen, BRUTAL_BUTTON, f"Brutal: {'on' if self.brutal else 'off'}",
-            self.brutal, disabled=not self.vengeance,
+            screen,
+            BRUTAL_BUTTON,
+            f"Brutal: {'on' if self.brutal else 'off'}",
+            self.brutal,
+            disabled=not self.vengeance,
         )
         self._text(screen, self._heading_font, "Players", (90, 235))
         self._text(screen, self._small_font, "NAME", (90, 282), MUTED)
-        self._text(screen, self._small_font, "TYPE (CLICK TO CHANGE)", (425, 282), MUTED)
-        self._text(screen, self._small_font, "SCORE / SAMPLES", (690, 282), MUTED)
+        self._text(
+            screen, self._small_font, "TYPE (CLICK TO CHANGE)", (425, 282), MUTED
+        )
+        self._text(screen, self._small_font, "SCORE", (690, 282), MUTED)
         for index, player in enumerate(self.players):
             name, kind, parameter, remove = _row_rects(index)
             self._field(screen, name, player.name, self._focus == (index, "name"))
             self._button(screen, kind, KIND_LABELS[player.kind])
-            if player.kind in ("threshold", "montecarlo"):
+            if player.kind == "threshold":
                 self._field(
-                    screen, parameter, player.parameter, self._focus == (index, "parameter")
+                    screen,
+                    parameter,
+                    player.parameter,
+                    self._focus == (index, "parameter"),
                 )
             else:
-                self._text(screen, self._font, "-", (parameter.x + 12, parameter.y + 13), MUTED)
+                self._text(
+                    screen, self._font, "-", (parameter.x + 12, parameter.y + 13), MUTED
+                )
             self._button(screen, remove, "Remove", disabled=len(self.players) == 1)
-        self._button(screen, ADD_BUTTON, "Add player", disabled=len(self.players) >= MAX_PLAYERS)
+        self._button(
+            screen, ADD_BUTTON, "Add player", disabled=len(self.players) >= MAX_PLAYERS
+        )
         self._button(screen, START_BUTTON, "Start  [Enter]", selected=True)
         self._text(
-            screen, self._small_font, "Click a name or value to edit. Esc quits.",
-            (90, 805), MUTED,
+            screen,
+            self._small_font,
+            "Click a name or value to edit. Esc quits.",
+            (90, 805),
+            MUTED,
         )
         if self.error is not None:
             self._text(screen, self._font, self.error, (90, 850), ACCENT)
 
     def _text(
-        self, screen: pygame.Surface, font: pygame.font.Font, text: str,
-        pos: tuple[int, int], color: tuple[int, int, int] = TEXT,
+        self,
+        screen: pygame.Surface,
+        font: pygame.font.Font,
+        text: str,
+        pos: tuple[int, int],
+        color: tuple[int, int, int] = TEXT,
     ) -> None:
-        screen.blit(font.render(text, True, color), pos)
+        draw_text(screen, font, text, pos, color)
 
     def _button(
-        self, screen: pygame.Surface, rect: pygame.Rect, label: str,
-        selected: bool = False, *, disabled: bool = False,
+        self,
+        screen: pygame.Surface,
+        rect: pygame.Rect,
+        label: str,
+        selected: bool = False,
+        *,
+        disabled: bool = False,
     ) -> None:
-        pygame.draw.rect(screen, PANEL if disabled else BUTTON, rect, border_radius=8)
-        if selected:
-            pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=8)
-        text = self._font.render(label, True, MUTED if disabled else TEXT)
-        screen.blit(text, text.get_rect(center=rect.center))
+        draw_button(screen, self._font, rect, label, selected, disabled=disabled)
 
     def _field(
         self, screen: pygame.Surface, rect: pygame.Rect, value: str, focused: bool
     ) -> None:
-        pygame.draw.rect(screen, PANEL_ALT, rect, border_radius=8)
-        if focused:
-            pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=8)
-        self._text(screen, self._font, value + ("|" if focused else ""), (rect.x + 12, rect.y + 13))
+        draw_field(screen, self._font, rect, value, focused)

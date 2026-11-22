@@ -8,8 +8,17 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-from flip_seven_bots.bots import Bot, FlipThreeMonteCarloBot, ThresholdBot
-from flip_seven_bots.game import Action, ActionType, Game, Rules, VengeanceRules
+from flip_seven_bots.bots import Bot, ThresholdBot
+from flip_seven_bots.game import (
+    Action,
+    ActionType,
+    ChooseCard,
+    ChooseTarget,
+    FlipSevenBonus,
+    Game,
+    Rules,
+    VengeanceRules,
+)
 from flip_seven_bots.game.rules import (
     build_deck,
     build_vengeance_deck,
@@ -33,13 +42,6 @@ def describe_bot(bot: Bot | None) -> str:
             return "human"
         case ThresholdBot(threshold=threshold):
             return f"ThresholdBot({threshold})"
-        case FlipThreeMonteCarloBot(
-            fallback=fallback, rollout=rollout, samples=samples
-        ):
-            return (
-                f"FlipThreeMonteCarloBot(fallback={describe_bot(fallback)}, "
-                f"rollout={describe_bot(rollout)}, samples={samples})"
-            )
         case _:
             return type(bot).__name__
 
@@ -124,14 +126,15 @@ def _status(table: Table) -> str:
         return "Game over; winners: " + ", ".join(table.names[i] for i in game.winners)
     player = observation.current_player
     assert player is not None  # unfinished games await a decision
-    if any(action.kind is ActionType.CHOOSE_CARD for action in observation.legal_actions):
-        decision = f"choose a card for {card_label(observation.pending_card)}" if observation.pending_card else "choose a card"
-    elif any(action.kind is ActionType.TAKE_BONUS for action in observation.legal_actions):
-        decision = "take the Flip 7 bonus or subtract it from a player"
-    elif observation.pending_card is not None:
-        decision = f"choose a player for {card_label(observation.pending_card)}"
-    else:
-        decision = "hit or stay"
+    match observation.decision:
+        case ChooseCard(card=card):
+            decision = f"choose a card for {card_label(card)}"
+        case FlipSevenBonus():
+            decision = "take the Flip 7 bonus or subtract it from a player"
+        case ChooseTarget(card=card):
+            decision = f"choose a player for {card_label(card)}"
+        case _:
+            decision = "hit or stay"
     status = f"Waiting for {table.names[player]} to {decision}"
     if table.round_summary is not None:
         status += f" (round {table.round_summary.round_number} summary on screen)"
@@ -161,8 +164,10 @@ def report_markdown(
 
     rules = game.rules
     mode = (
-        "With A Vengeance (Brutal Mode)" if isinstance(rules, VengeanceRules) and rules.brutal
-        else "With A Vengeance" if isinstance(rules, VengeanceRules)
+        "With A Vengeance (Brutal Mode)"
+        if isinstance(rules, VengeanceRules) and rules.brutal
+        else "With A Vengeance"
+        if isinstance(rules, VengeanceRules)
         else "Flip 7"
     )
     seed = "random" if table.seed is None else str(table.seed)
@@ -314,7 +319,11 @@ def replay(report: Path | str, *, moves: int | None = None) -> Game:
                 f"replay diverged at move {index}: expected player {move['player']}, "
                 f"game is waiting for {game.current_player}"
             )
-        game.apply(Action(
-            ActionType[move["action"].upper()], move.get("target"), move.get("card_index")
-        ))
+        game.apply(
+            Action(
+                ActionType[move["action"].upper()],
+                move.get("target"),
+                move.get("card_index"),
+            )
+        )
     return game

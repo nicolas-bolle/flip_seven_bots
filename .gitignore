@@ -1,6 +1,9 @@
 # bug reports (used to fix issues encountered during gameplay)
 bug_reports/
 
+# tournament results saved from the tournament window
+tournament_results/
+
 # scratchwork and temporary files
 scratch/
 
