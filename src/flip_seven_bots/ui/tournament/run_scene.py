@@ -291,7 +291,7 @@ class TournamentScene:
         ]
         if math.isnan(rating):  # never played
             return "-"
-        if math.isnan(low):  # no bootstrap
+        if math.isnan(low):  # fewer than two deals
             return f"{rating:.0f}"
         return f"{rating:.0f} \u00b1{(high - low) / 2:.0f}"
 

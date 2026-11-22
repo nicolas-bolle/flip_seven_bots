@@ -64,7 +64,7 @@ class TournamentResult:
     Columns: ``games`` played, ``wins`` (shared wins count fully), ``win_rate``,
     ``mean_place``, ``mean_score``; ``rating``, the Bradley-Terry fit to all
     games on the Elo scale, with ``rating_low`` and ``rating_high`` bounding its
-    bootstrap confidence interval; and ``elo``, the final online Elo rating.
+    confidence interval; and ``elo``, the final online Elo rating.
     Statistics are ``NaN`` for a player who never played.
     """
 
@@ -75,16 +75,14 @@ class TournamentResult:
         players: Sequence[str],
         *,
         initial_rating: float,
-        bootstrap: int = 200,
         confidence: float = 0.95,
-        seed: int | None = None,
     ) -> TournamentResult:
         """Build the tables from game records; ``players`` lists every bot, played or not.
 
         ``rating`` is centred so that the players who played average
-        ``initial_rating``. Its interval comes from refitting ``bootstrap``
-        times on deals resampled with replacement (``0`` skips it), seeded by
-        ``seed``.
+        ``initial_rating``. Its ``confidence`` interval uses a cluster-robust
+        standard error that treats each deal as one independent unit; it is
+        ``NaN`` with fewer than two deals.
         """
         rows = [
             {
@@ -126,10 +124,7 @@ class TournamentResult:
         for record in records:
             results.add(record.deal, record.players, record.places)
         fitted = pd.DataFrame(
-            np.column_stack(
-                results.fit(bootstrap=bootstrap, confidence=confidence, seed=seed)
-            )
-            + initial_rating
+            np.column_stack(results.fit(confidence=confidence)) + initial_rating
             if active
             else np.empty((0, 3)),
             index=active,
@@ -217,7 +212,6 @@ def run_tournament(
     k_factor: float = 32.0,
     k_half_life: float | None = 50.0,
     initial_rating: float = 1500.0,
-    bootstrap: int = 200,
     confidence: float = 0.95,
     progress: bool = True,
 ) -> TournamentResult:
@@ -231,8 +225,8 @@ def run_tournament(
     randomness, and each bot object keeps its state across games.
 
     The summary's ``rating`` is fitted to all games at once (see
-    ``TournamentResult``), with a ``confidence`` interval from ``bootstrap``
-    resamples. An online Elo rating is also updated after every game with
+    ``TournamentResult``), with a ``confidence`` interval. An online Elo rating
+    is also updated after every game with
     ``elo_update``: each player's K-factor is ``k_factor * h / (h + n)`` after
     ``n`` games, where ``h`` is ``k_half_life``, or a constant ``k_factor`` if
     ``k_half_life`` is ``None``. ``progress`` shows a progress bar.
@@ -262,9 +256,7 @@ def run_tournament(
         played,
         list(bots),
         initial_rating=initial_rating,
-        bootstrap=bootstrap,
         confidence=confidence,
-        seed=seed,
     )
 
 

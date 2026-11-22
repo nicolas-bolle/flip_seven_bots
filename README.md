@@ -290,10 +290,9 @@ and, with `--output`, saves `games.csv` and `summary.csv`.
 | `--games N` | Number of games (default 100) |
 | `--players-per-game N` | Bots seated in each game (default: all) |
 | `--rotate-seats` | Replay each deal once per seat rotation (see [Reducing card luck](#reducing-card-luck)) |
-| `--seed N` | Seed for seating, decks and resampling |
+| `--seed N` | Seed for seating and decks |
 | `--vengeance`, `--brutal` | Choose the game mode |
 | `--output DIR` | Save `games.csv` and `summary.csv` in this folder |
-| `--bootstrap N` | Resamples for the confidence interval; 0 skips it (default 200) |
 | `--k-factor K`, `--k-half-life N`, `--constant-k`, `--initial-rating R` | Elo settings (see [How ratings work](#how-ratings-work)) |
 
 ### In a window
@@ -332,8 +331,9 @@ result.games  # per game and player: deal, seat, score, place, won, Elo
 ```
 
 `run_tournament` takes the same settings as the command line:
-`players_per_game`, `rotate_seats`, `rules`, `seed`, `bootstrap`,
-`confidence` (default 0.95), `k_factor`, `k_half_life` and `initial_rating`.
+`players_per_game`, `rotate_seats`, `rules`, `seed`, `k_factor`,
+`k_half_life` and `initial_rating`, plus `confidence` (default 0.95) for the
+rating intervals.
 A progress bar shows the current leader; pass `progress=False` to hide it.
 Each bot object keeps its state across games.
 
@@ -348,12 +348,16 @@ Every game is scored as all of its pairwise matches: the better place wins and
 tied scores draw. Two ratings are computed from these, on the same Elo scale:
 
 - **`rating`** (the summary's ranking) is a Bradley-Terry fit to all games at
-  once: the model Elo assumes, fitted by maximum likelihood. It doesn't depend
-  on game order and becomes more precise as games are added, which suits bots
-  that never change. The bots that played average `initial_rating`, and each
-  pair gets one virtual drawn game so ratings stay finite. `rating_low` and
-  `rating_high` bound a confidence interval from `bootstrap` refits on
-  resampled games. Treat bots whose intervals overlap as indistinguishable.
+  once: the model Elo assumes, fitted by maximum likelihood with Newton's
+  method. It doesn't depend on game order and becomes more precise as games
+  are added, which suits bots that never change. The bots that played average
+  `initial_rating`, and each pair gets one virtual drawn game so ratings stay
+  finite. `rating_low` and `rating_high` bound a confidence interval from a
+  cluster-robust (sandwich) standard error. It treats each deal as one
+  independent unit, so the related pairwise results within a game, or within
+  a set of seat-rotated games, aren't counted as separate evidence. Intervals
+  are empty with fewer than two deals. Treat bots whose intervals overlap as
+  indistinguishable.
 - **`elo`** is an online Elo rating updated after every game, shown in
   `result.games` and the tournament window's chart. Each player's change is
   their K-factor divided by `n - 1`, times the sum of actual minus expected

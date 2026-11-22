@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 DEFAULT_BOTS = ("random", "threshold:30", "expected")
 DEFAULT_GAMES = 100
 DEFAULT_K_HALF_LIFE = 50.0
-DEFAULT_BOOTSTRAP = 200
 
 
 @dataclass(frozen=True)
@@ -48,9 +47,6 @@ class TournamentOptions:
     k_half_life: float | None = DEFAULT_K_HALF_LIFE
     """Games after which the Elo K-factor halves, or ``None`` for a constant K."""
 
-    bootstrap: int = DEFAULT_BOOTSTRAP
-    """Resamples for the rating confidence interval; ``0`` skips it."""
-
     @property
     def rules(self) -> Rules | None:
         return VengeanceRules(brutal=self.brutal) if self.vengeance else None
@@ -61,18 +57,12 @@ class TournamentOptions:
 
     def run(self, *, progress: bool = True) -> TournamentResult:
         """Play the whole tournament, optionally showing a terminal progress bar."""
-        return run_tournament(
-            self.bots, **self._settings(), bootstrap=self.bootstrap, progress=progress
-        )
+        return run_tournament(self.bots, **self._settings(), progress=progress)
 
     def result(self, records: Sequence[GameRecord]) -> TournamentResult:
         """Build the result tables for games played with ``start``."""
         return TournamentResult.from_records(
-            records,
-            list(self.bots),
-            initial_rating=self.initial_rating,
-            bootstrap=self.bootstrap,
-            seed=self.seed,
+            records, list(self.bots), initial_rating=self.initial_rating
         )
 
     def describe(self) -> str:
@@ -174,9 +164,7 @@ def parse_options(
             "out card luck; --games must be a multiple of the players per game"
         ),
     )
-    parser.add_argument(
-        "--seed", type=int, help="seed for seating, decks and resampling"
-    )
+    parser.add_argument("--seed", type=int, help="seed for seating and decks")
     parser.add_argument(
         "--vengeance", action="store_true", help="play With A Vengeance"
     )
@@ -200,14 +188,6 @@ def parse_options(
     )
     k_schedule.add_argument(
         "--constant-k", action="store_true", help="keep the Elo K-factor constant"
-    )
-    parser.add_argument(
-        "--bootstrap",
-        type=int,
-        default=DEFAULT_BOOTSTRAP,
-        metavar="N",
-        help="resamples for the rating's 95%% confidence interval; 0 skips it "
-        "(default: %(default)s)",
     )
     parser.add_argument(
         "--initial-rating",
@@ -236,8 +216,6 @@ def parse_options(
     table = args.players_per_game or len(bots)
     if args.rotate_seats and args.games % table:
         parser.error(f"with --rotate-seats, --games must be a multiple of {table}")
-    if args.bootstrap < 0:
-        parser.error("--bootstrap must not be negative")
     return TournamentOptions(
         bots=bots,
         games=args.games,
@@ -250,7 +228,6 @@ def parse_options(
         output=args.output,
         rotate_seats=args.rotate_seats,
         k_half_life=None if args.constant_k else args.k_half_life,
-        bootstrap=args.bootstrap,
     )
 
 

@@ -60,7 +60,6 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         ["--k-factor", "0"],
         ["--rotate-seats", "--games", "10"],
         ["--constant-k", "--k-half-life", "5"],
-        ["--bootstrap", "-1"],
     ],
     ids=[
         "one-bot",
@@ -72,7 +71,6 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         "k",
         "rotation",
         "k-schedule",
-        "bootstrap",
     ],
 )
 def test_invalid_options_are_rejected(argv: list[str]) -> None:
@@ -115,7 +113,7 @@ def test_play_tournament_validates_eagerly_and_plays_lazily() -> None:
     assert first.game == 1 and sorted(first.players) == ["a", "b"]
     rest = list(records)
     rebuilt = TournamentResult.from_records(
-        [first, *rest], list(bots), initial_rating=1500, seed=4
+        [first, *rest], list(bots), initial_rating=1500
     )
     direct = run_tournament(
         {"a": ThresholdBot(10), "b": ThresholdBot(30)}, games=3, seed=4, progress=False
@@ -138,17 +136,11 @@ def test_rating_options_reach_the_tournament() -> None:
             "--games",
             "9",
             "--constant-k",
-            "--bootstrap",
-            "0",
             "--seed",
             "2",
         ]
     )
-    assert (options.rotate_seats, options.k_half_life, options.bootstrap) == (
-        True,
-        None,
-        0,
-    )
+    assert (options.rotate_seats, options.k_half_life) == (True, None)
     assert options.describe().endswith("rotated seats, Flip 7")
     assert parse_options(["--k-half-life", "20"]).k_half_life == 20
 
@@ -158,5 +150,5 @@ def test_rating_options_reach_the_tournament() -> None:
     )
     result = fast.run(progress=False)
     assert result.games["deal"].max() == 3
-    assert result.summary["rating_low"].isna().all()
+    assert (result.summary["rating_low"] < result.summary["rating"]).all()
     assert fast.result(list(fast.start())).games.equals(result.games)

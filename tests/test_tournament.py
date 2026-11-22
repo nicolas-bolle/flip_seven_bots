@@ -9,6 +9,7 @@ from flip_seven_bots.tournament import (
     fit_bradley_terry,
     run_tournament,
 )
+from flip_seven_bots.tournament.ratings import ELO_SCALE
 
 
 def threshold_bots(*thresholds: int) -> dict[str, ThresholdBot]:
@@ -174,6 +175,9 @@ def test_bradley_terry_matches_the_closed_form_for_two_players() -> None:
     assert ratings.sum() == pytest.approx(0)
     # The prior keeps an unbeaten player's rating finite.
     assert np.isfinite(fit_bradley_terry(np.array([[0, 5], [0, 0]]))).all()
+    # Full Newton steps diverge on results this lopsided.
+    lopsided = fit_bradley_terry(np.array([[0, 10**7], [1, 0]]))
+    assert lopsided[0] - lopsided[1] == pytest.approx(400 * np.log10(10**7 / 1.5))
 
 
 def test_ratings_cannot_be_shifted_by_game_order() -> None:
@@ -191,12 +195,42 @@ def test_ratings_cannot_be_shifted_by_game_order() -> None:
     np.testing.assert_allclose(results.fit()[0], reversed_results.fit()[0])
 
 
-def test_bootstrap_intervals_can_be_skipped() -> None:
-    result = run_tournament(
-        threshold_bots(10, 30), games=3, seed=0, bootstrap=0, progress=False
-    )
-    assert result.summary[["rating_low", "rating_high"]].isna().all(axis=None)
-    assert result.summary["rating"].notna().all()
+def two_player_results(
+    games: int, a_wins: int, copies: int = 1, *, shared: bool
+) -> PairwiseResults:
+    """``a`` beats ``b`` in the first ``a_wins`` games; each game is recorded
+    ``copies`` times, in the same unit if ``shared`` and otherwise separately."""
+    results = PairwiseResults(["a", "b"])
+    for game in range(games):
+        for copy in range(copies):
+            unit = game if shared else (game, copy)
+            results.add(unit, ["a", "b"], [1, 2] if game < a_wins else [2, 1])
+    return results
+
+
+def test_rating_interval_matches_the_closed_form_for_two_players() -> None:
+    rating, low, high = two_player_results(40, 30, shared=True).fit(prior=0)
+    # The rating gap has the logit's standard error, 1 / sqrt(n p (1 - p)), with
+    # an n / (n - 1) small-sample correction; each player carries half of it.
+    error = ELO_SCALE * np.sqrt(40 / 39 / (40 * 0.75 * 0.25)) / 2
+    np.testing.assert_allclose(high - rating, 1.96 * error, rtol=1e-3)
+    np.testing.assert_allclose(rating - low, 1.96 * error, rtol=1e-3)
+
+
+def test_rating_interval_counts_each_unit_once() -> None:
+    def width(results: PairwiseResults) -> float:
+        _, low, high = results.fit(prior=0)
+        return high[0] - low[0]
+
+    single = width(two_player_results(40, 30, shared=True))
+    # Repeating results within a unit adds no information...
+    assert width(two_player_results(40, 30, 2, shared=True)) == pytest.approx(single)
+    # ...but independent repeats narrow the interval by about sqrt(2).
+    separate = width(two_player_results(40, 30, 2, shared=False))
+    assert separate == pytest.approx(single / np.sqrt(2), rel=0.02)
+    # One unit gives no interval.
+    _, low, high = two_player_results(1, 1, shared=True).fit()
+    assert np.isnan(low).all() and np.isnan(high).all()
 
 
 def test_rotated_seats_replay_each_deal_from_every_seat() -> None:
