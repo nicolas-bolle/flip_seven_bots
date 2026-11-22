@@ -14,6 +14,7 @@ from .game_scene import GameScene
 from .options import parse_options
 from .setup_scene import SetupScene
 from .table import Table
+from .widgets import make_icon
 
 
 def _report_crash(table: Table, directory: Path) -> None:
@@ -41,6 +42,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     table: Table | None = None
     pygame.init()
     try:
+        pygame.display.set_icon(make_icon())
         screen = pygame.display.set_mode((1280, 900))
         pygame.display.set_caption("Flip 7")
         clock = pygame.time.Clock()

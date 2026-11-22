@@ -7,6 +7,7 @@ import pygame
 
 from flip_seven_bots.tournament.cli import parse_options
 
+from ..widgets import make_icon
 from .run_scene import TournamentScene
 from .setup_scene import TournamentSetupScene
 
@@ -29,6 +30,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     pygame.init()
     scene: TournamentSetupScene | TournamentScene | None = None
     try:
+        pygame.display.set_icon(make_icon(crown=True))
         screen = pygame.display.set_mode((1280, 900))
         pygame.display.set_caption("Flip 7 tournament")
         clock = pygame.time.Clock()
