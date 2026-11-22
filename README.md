@@ -125,7 +125,8 @@ without it. `events` contains the current round's public draws, decisions,
 discard reshuffles, and (once the game ends) the final round result.
 
 The deck seed and a bot's seed are independent. `play_game` raises an error if
-the decision limit is reached, or if the deck is exhausted with no discarded
+a game exceeds 100,000 decisions (for example, with custom rules that make the
+target score unreachable), or if the deck is exhausted with no discarded
 cards available to reshuffle. Pass `rules=Rules(...)` to change the target
 score, bonus, deck, or scoring, and `deck=Deck.stacked(cards)` to `Game` to deal
 cards in a fixed order (useful in tests).

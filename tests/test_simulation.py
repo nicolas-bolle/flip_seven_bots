@@ -32,21 +32,10 @@ def test_simulation_rejects_illegal_bot_action() -> None:
         play_game([IllegalBot()], seed=42)
 
 
-def test_simulation_stops_at_decision_limit() -> None:
-    with pytest.raises(RuntimeError, match="exceeded 1 decisions"):
-        play_game([ThresholdBot(0)], seed=42, max_decisions=1)
-
-
-def test_decision_limit_must_be_positive() -> None:
-    with pytest.raises(ValueError, match="max_decisions"):
-        play_game([ThresholdBot(0)], max_decisions=0)
-
-
-def test_game_finishes_on_last_permitted_decision() -> None:
-    rules = Rules(target_score=1, build_deck=lambda: [Card(CardType.NUMBER, 2)])
-    result = play_game([ThresholdBot(0)], seed=42, rules=rules, max_decisions=1)
-    assert result.winners == (0,)
-    assert result.players[0].total_score == 2
+def test_simulation_stops_endless_game() -> None:
+    rules = Rules(build_deck=lambda: [Card(CardType.NUMBER, 0)] * 20)
+    with pytest.raises(RuntimeError, match="exceeded 100000 decisions"):
+        play_game([ThresholdBot(10), ThresholdBot(10)], seed=1, rules=rules)
 
 
 def test_run_stops_when_condition_is_met() -> None:

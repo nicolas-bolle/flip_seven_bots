@@ -149,7 +149,6 @@ def play_tournament(
     k_factor: float = 32.0,
     k_half_life: float | None = 50.0,
     initial_rating: float = 1500.0,
-    max_decisions: int = 100_000,
 ) -> Iterator[GameRecord]:
     """Validate the settings, then return an iterator that plays one game per step.
 
@@ -190,7 +189,6 @@ def play_tournament(
                     [bots[name] for name in order],
                     seed=deck_seed,
                     rules=rules,
-                    max_decisions=max_decisions,
                 )
                 scores = tuple(view.total_score for view in final.players)
                 places = tuple(
@@ -221,7 +219,6 @@ def run_tournament(
     initial_rating: float = 1500.0,
     bootstrap: int = 200,
     confidence: float = 0.95,
-    max_decisions: int = 100_000,
     progress: bool = True,
 ) -> TournamentResult:
     """Play ``games`` games between named bots and rate them.
@@ -250,7 +247,6 @@ def run_tournament(
         k_factor=k_factor,
         k_half_life=k_half_life,
         initial_rating=initial_rating,
-        max_decisions=max_decisions,
     )
     elo = dict.fromkeys(bots, float(initial_rating))
     played = []
