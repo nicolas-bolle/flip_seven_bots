@@ -26,9 +26,6 @@ class GameRecord:
     game: int
     """Game number, from one."""
 
-    deal: int
-    """Deal number, from one; seat-rotated games of the same deal share a deck."""
-
     players: tuple[str, ...]
     """Names of the seated bots."""
 
@@ -52,7 +49,7 @@ class TournamentResult:
     games: pd.DataFrame
     """One row per player per game, in play order.
 
-    Columns: ``game`` and ``deal`` (numbered from one), ``seat`` (zero-based;
+    Columns: ``game`` (numbered from one), ``seat`` (zero-based;
     seat 0 deals), ``player``, ``score`` (final total), ``place`` (1 is best;
     tied scores share a place), ``won``, ``elo_before``, ``elo`` (after the
     game) and ``elo_change``.
@@ -81,13 +78,12 @@ class TournamentResult:
 
         ``rating`` is centred so that the players who played average
         ``initial_rating``. Its ``confidence`` interval uses a cluster-robust
-        standard error that treats each deal as one independent unit; it is
-        ``NaN`` with fewer than two deals.
+        standard error that treats each game as one independent unit; it is
+        ``NaN`` with fewer than two games.
         """
         rows = [
             {
                 "game": record.game,
-                "deal": record.deal,
                 "seat": seat,
                 "player": name,
                 "score": record.scores[seat],
@@ -104,7 +100,6 @@ class TournamentResult:
             rows,
             columns=[
                 "game",
-                "deal",
                 "seat",
                 "player",
                 "score",
@@ -122,7 +117,7 @@ class TournamentResult:
         active = [name for name in players if name in set(played["player"])]
         results = PairwiseResults(active)
         for record in records:
-            results.add(record.deal, record.players, record.places)
+            results.add(record.game, record.players, record.places)
         fitted = pd.DataFrame(
             np.column_stack(results.fit(confidence=confidence)) + initial_rating
             if active
@@ -138,7 +133,6 @@ def play_tournament(
     *,
     games: int,
     players_per_game: int | None = None,
-    rotate_seats: bool = False,
     rules: Rules | None = None,
     seed: int | None = None,
     k_factor: float = 32.0,
@@ -156,10 +150,6 @@ def play_tournament(
         raise ValueError("games must be at least one")
     if not 2 <= table_size <= len(names):
         raise ValueError("players_per_game must be between two and the number of bots")
-    if rotate_seats and games % table_size:
-        raise ValueError(
-            f"with rotated seats, games must be a multiple of {table_size}"
-        )
     if k_half_life is not None and k_half_life <= 0:
         raise ValueError("k_half_life must be positive")
 
@@ -172,31 +162,23 @@ def play_tournament(
         rng = Random(seed)
         elo = dict.fromkeys(names, float(initial_rating))
         played: Counter[str] = Counter()
-        game = deal = 0
-        while game < games:
-            deal += 1
-            seated = rng.sample(names, table_size)
-            deck_seed = rng.getrandbits(64)
-            for shift in range(table_size if rotate_seats else 1):
-                game += 1
-                order = seated[shift:] + seated[:shift]
-                final = play_game(
-                    [bots[name] for name in order],
-                    seed=deck_seed,
-                    rules=rules,
-                )
-                scores = tuple(view.total_score for view in final.players)
-                places = tuple(
-                    1 + sum(other > score for other in scores) for score in scores
-                )
-                before = tuple(elo[name] for name in order)
-                factors = [k(played[name]) for name in order]
-                after = tuple(elo_update(before, places, k_factor=factors))
-                elo.update(zip(order, after))
-                played.update(order)
-                yield GameRecord(
-                    game, deal, tuple(order), scores, places, before, after
-                )
+        for game in range(1, games + 1):
+            order = rng.sample(names, table_size)
+            final = play_game(
+                [bots[name] for name in order],
+                seed=rng.getrandbits(64),
+                rules=rules,
+            )
+            scores = tuple(view.total_score for view in final.players)
+            places = tuple(
+                1 + sum(other > score for other in scores) for score in scores
+            )
+            before = tuple(elo[name] for name in order)
+            factors = [k(played[name]) for name in order]
+            after = tuple(elo_update(before, places, k_factor=factors))
+            elo.update(zip(order, after))
+            played.update(order)
+            yield GameRecord(game, tuple(order), scores, places, before, after)
 
     return generate()
 
@@ -206,7 +188,6 @@ def run_tournament(
     *,
     games: int,
     players_per_game: int | None = None,
-    rotate_seats: bool = False,
     rules: Rules | None = None,
     seed: int | None = None,
     k_factor: float = 32.0,
@@ -217,12 +198,10 @@ def run_tournament(
 ) -> TournamentResult:
     """Play ``games`` games between named bots and rate them.
 
-    Each deal seats ``players_per_game`` bots (default: all of them), chosen
-    and ordered at random. With ``rotate_seats``, each deal is replayed with the
-    same deck once per seat rotation, so every seated bot gets the same cards
-    from every seat; ``games`` must then be a multiple of the table size.
-    ``seed`` controls seating and decks; bots remain responsible for their own
-    randomness, and each bot object keeps its state across games.
+    Each game seats ``players_per_game`` bots (default: all of them), chosen
+    and ordered at random. ``seed`` controls seating and decks; bots remain
+    responsible for their own randomness, and each bot object keeps its state
+    across games.
 
     The summary's ``rating`` is fitted to all games at once (see
     ``TournamentResult``), with a ``confidence`` interval. An online Elo rating
@@ -235,7 +214,6 @@ def run_tournament(
         bots,
         games=games,
         players_per_game=players_per_game,
-        rotate_seats=rotate_seats,
         rules=rules,
         seed=seed,
         k_factor=k_factor,

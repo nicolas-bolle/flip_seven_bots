@@ -114,11 +114,6 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
             {"games": 1, "players_per_game": 1},
             "players_per_game",
         ),
-        (
-            threshold_bots(10, 20, 30),
-            {"games": 4, "rotate_seats": True},
-            "multiple of 3",
-        ),
         (threshold_bots(10, 20), {"games": 2, "k_half_life": 0}, "k_half_life"),
     ],
     ids=[
@@ -126,7 +121,6 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
         "one-bot",
         "table-too-big",
         "table-too-small",
-        "rotation",
         "half-life",
     ],
 )
@@ -231,19 +225,3 @@ def test_rating_interval_counts_each_unit_once() -> None:
     # One unit gives no interval.
     _, low, high = two_player_results(1, 1, shared=True).fit()
     assert np.isnan(low).all() and np.isnan(high).all()
-
-
-def test_rotated_seats_replay_each_deal_from_every_seat() -> None:
-    result = run_tournament(
-        threshold_bots(10, 20, 30, 40),
-        games=6,
-        players_per_game=3,
-        rotate_seats=True,
-        seed=2,
-        progress=False,
-    )
-    games = result.games
-    assert games["deal"].tolist() == [1] * 9 + [2] * 9
-    for _, deal in games.groupby("deal"):
-        assert deal["player"].nunique() == 3
-        assert deal.groupby("player")["seat"].apply(sorted).tolist() == [[0, 1, 2]] * 3

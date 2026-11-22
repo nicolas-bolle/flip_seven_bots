@@ -43,7 +43,6 @@ class TournamentOptions:
     output: Path | None
     """Folder to save ``games.csv`` and ``summary.csv`` in, if any."""
 
-    rotate_seats: bool = False
     k_half_life: float | None = DEFAULT_K_HALF_LIFE
     """Games after which the Elo K-factor halves, or ``None`` for a constant K."""
 
@@ -71,14 +70,12 @@ class TournamentOptions:
         if self.vengeance:
             mode = "With A Vengeance (Brutal)" if self.brutal else "With A Vengeance"
         table = self.players_per_game or len(self.bots)
-        seats = ", rotated seats" if self.rotate_seats else ""
-        return f"{len(self.bots)} bots, {self.games} games of {table} players{seats}, {mode}"
+        return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
 
     def _settings(self) -> dict:
         return {
             "games": self.games,
             "players_per_game": self.players_per_game,
-            "rotate_seats": self.rotate_seats,
             "rules": self.rules,
             "seed": self.seed,
             "k_factor": self.k_factor,
@@ -156,14 +153,6 @@ def parse_options(
         metavar="N",
         help="bots seated in each game, chosen at random (default: all)",
     )
-    parser.add_argument(
-        "--rotate-seats",
-        action="store_true",
-        help=(
-            "replay each deal with the same deck once per seat rotation to cancel "
-            "out card luck; --games must be a multiple of the players per game"
-        ),
-    )
     parser.add_argument("--seed", type=int, help="seed for seating and decks")
     parser.add_argument(
         "--vengeance", action="store_true", help="play With A Vengeance"
@@ -213,9 +202,6 @@ def parse_options(
         bots
     ):
         parser.error(f"--players-per-game must be between 2 and {len(bots)}")
-    table = args.players_per_game or len(bots)
-    if args.rotate_seats and args.games % table:
-        parser.error(f"with --rotate-seats, --games must be a multiple of {table}")
     return TournamentOptions(
         bots=bots,
         games=args.games,
@@ -226,7 +212,6 @@ def parse_options(
         k_factor=args.k_factor,
         initial_rating=args.initial_rating,
         output=args.output,
-        rotate_seats=args.rotate_seats,
         k_half_life=None if args.constant_k else args.k_half_life,
     )
 

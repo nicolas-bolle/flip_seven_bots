@@ -58,7 +58,6 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         ["--players-per-game", "4"],
         ["--players-per-game", "1"],
         ["--k-factor", "0"],
-        ["--rotate-seats", "--games", "10"],
         ["--constant-k", "--k-half-life", "5"],
     ],
     ids=[
@@ -69,7 +68,6 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         "table-too-big",
         "table-too-small",
         "k",
-        "rotation",
         "k-schedule",
     ],
 )
@@ -130,18 +128,9 @@ def test_bot_specs_round_trip(bot: RandomBot | ThresholdBot | ExpectedValueBot) 
 
 
 def test_rating_options_reach_the_tournament() -> None:
-    options = parse_options(
-        [
-            "--rotate-seats",
-            "--games",
-            "9",
-            "--constant-k",
-            "--seed",
-            "2",
-        ]
-    )
-    assert (options.rotate_seats, options.k_half_life) == (True, None)
-    assert options.describe().endswith("rotated seats, Flip 7")
+    options = parse_options(["--games", "9", "--constant-k", "--seed", "2"])
+    assert options.k_half_life is None
+    assert options.describe() == "3 bots, 9 games of 3 players, Flip 7"
     assert parse_options(["--k-half-life", "20"]).k_half_life == 20
 
     fast = replace(
@@ -149,6 +138,6 @@ def test_rating_options_reach_the_tournament() -> None:
         bots={"a": ThresholdBot(10), "b": ThresholdBot(30), "c": ThresholdBot(20)},
     )
     result = fast.run(progress=False)
-    assert result.games["deal"].max() == 3
+    assert result.games["game"].max() == 9
     assert (result.summary["rating_low"] < result.summary["rating"]).all()
     assert fast.result(list(fast.start())).games.equals(result.games)

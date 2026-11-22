@@ -21,7 +21,6 @@ from flip_seven_bots.ui.tournament.setup_scene import (
     ADD_BUTTON,
     GAMES_FIELD,
     MAX_BOTS,
-    SEATS_BUTTON,
     SEED_FIELD,
     START_BUTTON,
     TABLE_FIELD,
@@ -89,7 +88,6 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     replace_field(scene, GAMES_FIELD, "12")
     replace_field(scene, TABLE_FIELD, "2")
     replace_field(scene, SEED_FIELD, "7x")  # non-digits are ignored
-    click(scene, SEATS_BUTTON)
     click(scene, _row_rects(0)[1])  # random -> threshold
     replace_field(scene, _row_rects(0)[2], "15")
     replace_field(scene, _row_rects(2)[0], "Threshold 30")
@@ -109,7 +107,6 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     assert isinstance(result.bots["Threshold 30 2"], ExpectedValueBot)
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
     assert result.vengeance and not result.brutal and result.k_factor == 16
-    assert result.rotate_seats
 
 
 def test_setup_limits_bot_count() -> None:
@@ -128,16 +125,13 @@ def test_setup_limits_bot_count() -> None:
         (GAMES_FIELD, "0", "play at least one game"),
         (TABLE_FIELD, "4", "players per game must be between 2 and 3"),
         (_row_rects(1)[0], " ", "every bot needs a name"),
-        (GAMES_FIELD, "10", "with rotated seats, games must be a multiple of 3"),
     ],
-    ids=["no-games", "table-too-big", "blank-name", "rotation"],
+    ids=["no-games", "table-too-big", "blank-name"],
 )
 def test_setup_rejects_invalid_settings(
     field: pygame.Rect, value: str, error: str
 ) -> None:
     scene = TournamentSetupScene(parse_options([]))
-    if error.startswith("with rotated seats"):
-        click(scene, SEATS_BUTTON)
     replace_field(scene, field, value)
     click(scene, START_BUTTON)
     assert scene.result is None and scene.error == error

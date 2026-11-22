@@ -107,9 +107,8 @@ def _likelihood(
 class PairwiseResults:
     """Pairwise outcomes grouped into independent units, for fitting with intervals.
 
-    Each unit (a game, or a set of seat-rotated games sharing a deck) adds its
-    pairwise results. Results within a unit may be correlated, but units are
-    assumed independent of each other.
+    Each unit (a game) adds its pairwise results. Results within a unit may be
+    correlated, but units are assumed independent of each other.
     """
 
     def __init__(self, players: Sequence[str]) -> None:

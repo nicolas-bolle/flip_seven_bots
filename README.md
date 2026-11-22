@@ -289,7 +289,6 @@ and, with `--output`, saves `games.csv` and `summary.csv`.
 | `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: `random`, `threshold:30`, `expected` |
 | `--games N` | Number of games (default 100) |
 | `--players-per-game N` | Bots seated in each game (default: all) |
-| `--rotate-seats` | Replay each deal once per seat rotation (see [Reducing card luck](#reducing-card-luck)) |
 | `--seed N` | Seed for seating and decks |
 | `--vengeance`, `--brutal` | Choose the game mode |
 | `--output DIR` | Save `games.csv` and `summary.csv` in this folder |
@@ -302,7 +301,7 @@ uv run python -m flip_seven_bots.ui.tournament
 ```
 
 The setup screen lets you choose the game mode, number of games, players per
-game, seed, seat rotation and up to eight bots. Giving any of the command-line
+game, seed and up to eight bots. Giving any of the command-line
 options above skips setup and starts immediately.
 
 While it runs, the window shows a progress bar, live standings by Elo and an
@@ -327,11 +326,11 @@ result = run_tournament(
 )
 print(result.summary)  # games, wins, win_rate, mean_place, mean_score,
 # rating, rating_low, rating_high, elo
-result.games  # per game and player: deal, seat, score, place, won, Elo
+result.games  # per game and player: seat, score, place, won, Elo
 ```
 
 `run_tournament` takes the same settings as the command line:
-`players_per_game`, `rotate_seats`, `rules`, `seed`, `k_factor`,
+`players_per_game`, `rules`, `seed`, `k_factor`,
 `k_half_life` and `initial_rating`, plus `confidence` (default 0.95) for the
 rating intervals.
 A progress bar shows the current leader; pass `progress=False` to hide it.
@@ -353,11 +352,10 @@ tied scores draw. Two ratings are computed from these, on the same Elo scale:
   are added, which suits bots that never change. The bots that played average
   `initial_rating`, and each pair gets one virtual drawn game so ratings stay
   finite. `rating_low` and `rating_high` bound a confidence interval from a
-  cluster-robust (sandwich) standard error. It treats each deal as one
-  independent unit, so the related pairwise results within a game, or within
-  a set of seat-rotated games, aren't counted as separate evidence. Intervals
-  are empty with fewer than two deals. Treat bots whose intervals overlap as
-  indistinguishable.
+  cluster-robust (sandwich) standard error. It treats each game as one
+  independent unit, so the related pairwise results within a game aren't
+  counted as separate evidence. Intervals are empty with fewer than two games.
+  Treat bots whose intervals overlap as indistinguishable.
 - **`elo`** is an online Elo rating updated after every game, shown in
   `result.games` and the tournament window's chart. Each player's change is
   their K-factor divided by `n - 1`, times the sum of actual minus expected
@@ -369,14 +367,6 @@ tied scores draw. Two ratings are computed from these, on the same Elo scale:
 Ratings assume a bot's strength doesn't depend on its opponents or the table
 size, which may not hold in Flip 7. Only compare ratings between tournaments
 that use the same number of players per game.
-
-### Reducing card luck
-
-Most of the noise in a game comes from the cards. With seat rotation
-(`--rotate-seats` or `rotate_seats=True`), each deal is replayed with the same
-deck once per seat rotation, so every seated bot gets the same cards from
-every seat. The `deal` column groups these games, and the number of games must
-be a multiple of the players per game.
 
 ## Development
 
