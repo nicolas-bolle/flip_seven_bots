@@ -472,13 +472,13 @@ def test_live_score_uses_round_scoring_and_total_score(
     )
     scene.render(pygame.Surface((1280, 900)))
     assert table.observation.players[0].round_score == 14
-    assert "Total: 0    Live: 14" in texts
+    assert "Total: 0    Live round: 14" in texts
 
     press(scene, pygame.K_s)
     press(scene, pygame.K_RETURN)
     texts.clear()
     scene.render(pygame.Surface((1280, 900)))
-    assert "Total: 14    Live: 9" in texts
+    assert "Total: 14    Live round: 9" in texts
 
 
 def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -492,7 +492,7 @@ def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None
     )
     scene.render(pygame.Surface((1280, 900)))
     assert table.observation.players[0].status is PlayerStatus.BUSTED
-    assert "Total: 0    Live: 0" in texts
+    assert "Total: 0    Live round: 0" in texts
 
 
 def test_sorted_number_cards_wrap_in_ascending_order(
@@ -563,7 +563,7 @@ def test_deal_flips_and_moves_cards_before_revealing_their_hands(
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     scene.render(pygame.Surface((1280, 900)))
-    assert "Total: 0    Live: ..." in texts
+    assert "Total: 0    Live round: ..." in texts
     assert not any("drew" in text for text in texts)
 
     def frame() -> pygame.Rect:

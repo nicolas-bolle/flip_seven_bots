@@ -161,6 +161,6 @@ def test_setup_transitions_to_selected_game(monkeypatch: pytest.MonkeyPatch) -> 
         app.main([])
         table = constructor.call_args.args[0]
         assert isinstance(table.game.rules, VengeanceRules) and table.game.rules.brutal
-        assert table.names == ("You", "Random bot", "Threshold bot")
+        assert table.names == ("Me", "Threshold 30", "Expected value")
     finally:
         pygame.font.quit()
