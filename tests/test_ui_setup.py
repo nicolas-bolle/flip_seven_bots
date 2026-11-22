@@ -23,12 +23,16 @@ def fonts() -> Iterator[None]:
 
 
 def click(scene: SetupScene, rect: pygame.Rect) -> None:
-    scene.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center))
+    scene.handle_event(
+        pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center)
+    )
 
 
 def replace_field(scene: SetupScene, rect: pygame.Rect, value: str) -> None:
     click(scene, rect)
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+    scene.handle_event(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL)
+    )
     scene.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
 
 
@@ -38,7 +42,11 @@ def test_setup_defaults_and_start() -> None:
     click(scene, START_BUTTON)
     assert scene.result is not None
     assert not scene.result.vengeance and not scene.result.brutal
-    assert [seat.name for seat in scene.result.seats] == ["You", "Random bot", "Threshold bot"]
+    assert [seat.name for seat in scene.result.seats] == [
+        "You",
+        "Random bot",
+        "Threshold bot",
+    ]
     assert isinstance(scene.result.seats[2].bot, ThresholdBot)
     assert scene.result.seats[2].bot.threshold == 30
 

@@ -34,8 +34,14 @@ SAVE_BUTTON = pygame.Rect(90, 790, 220, 56)
 NEW_BUTTON = pygame.Rect(330, 790, 240, 56)
 DEFAULT_SAVE_DIR = Path("tournament_results")
 LINE_COLORS = (
-    (233, 196, 106), (113, 207, 165), (231, 111, 81), (122, 162, 247),
-    (244, 162, 97), (199, 146, 234), (240, 244, 229), (42, 157, 143),
+    (233, 196, 106),
+    (113, 207, 165),
+    (231, 111, 81),
+    (122, 162, 247),
+    (244, 162, 97),
+    (199, 146, 234),
+    (240, 244, 229),
+    (42, 157, 143),
 )
 
 
@@ -63,7 +69,9 @@ class TournamentScene:
     user asks for a new tournament; ``close`` stops the worker.
     """
 
-    def __init__(self, options: TournamentOptions, *, save_dir: Path = DEFAULT_SAVE_DIR) -> None:
+    def __init__(
+        self, options: TournamentOptions, *, save_dir: Path = DEFAULT_SAVE_DIR
+    ) -> None:
         self.options = options
         self.records: list[GameRecord] = []
         self.finished = False
@@ -72,9 +80,13 @@ class TournamentScene:
         self.saved: tuple[Path, Path] | None = None
         self.result: TournamentResult | None = None
         """Final tables, available once ``finished`` if any game was played."""
-        self._save_dir = options.output or save_dir / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self._save_dir = options.output or save_dir / datetime.now().strftime(
+            "%Y-%m-%d_%H-%M-%S"
+        )
         self._standings = {
-            name: _Standing(name, LINE_COLORS[index % len(LINE_COLORS)], options.initial_rating)
+            name: _Standing(
+                name, LINE_COLORS[index % len(LINE_COLORS)], options.initial_rating
+            )
             for index, name in enumerate(options.bots)
         }
         self._history = [tuple(options.initial_rating for _ in options.bots)]
@@ -169,14 +181,22 @@ class TournamentScene:
         self._draw_standings(screen)
         self._draw_chart(screen)
         if not self.finished:
-            draw_button(screen, self._font, STOP_BUTTON, "Stop", disabled=self._stop.is_set())
+            draw_button(
+                screen, self._font, STOP_BUTTON, "Stop", disabled=self._stop.is_set()
+            )
         else:
             label = "Saved" if self.saved else "Save results"
             disabled = bool(self.saved or self.result is None)
             draw_button(screen, self._font, SAVE_BUTTON, label, disabled=disabled)
             draw_button(screen, self._font, NEW_BUTTON, "New tournament", selected=True)
         if self.saved is not None:
-            draw_text(screen, self._small_font, f"Saved to {self.saved[0].parent}", (600, 810), MUTED)
+            draw_text(
+                screen,
+                self._small_font,
+                f"Saved to {self.saved[0].parent}",
+                (600, 810),
+                MUTED,
+            )
         draw_text(screen, self._small_font, "Esc quits.", (1110, 810), MUTED)
 
     def _draw_progress(self, screen: pygame.Surface) -> None:
@@ -185,8 +205,15 @@ class TournamentScene:
         filled = PROGRESS_BAR.copy()
         filled.width = round(PROGRESS_BAR.width * played / total)
         if filled.width:
-            pygame.draw.rect(screen, ACTIVE if self.error is None else ACCENT, filled, border_radius=8)
-        label = self._font.render(f"{played} / {total} games  ({played / total:.0%})", True, TEXT)
+            pygame.draw.rect(
+                screen,
+                ACTIVE if self.error is None else ACCENT,
+                filled,
+                border_radius=8,
+            )
+        label = self._font.render(
+            f"{played} / {total} games  ({played / total:.0%})", True, TEXT
+        )
         screen.blit(label, label.get_rect(center=PROGRESS_BAR.center))
 
         rate = played / self._elapsed if self._elapsed > 0 else 0.0
@@ -203,8 +230,13 @@ class TournamentScene:
             status = f"Stopped after {played} games in {self._elapsed:.1f} s"
         else:
             status = f"Finished in {self._elapsed:.1f} s ({rate:.1f} games/s)"
-        draw_text(screen, self._font, status, (PROGRESS_BAR.x, PROGRESS_BAR.bottom + 14),
-                  ACCENT if self.error else MUTED)
+        draw_text(
+            screen,
+            self._font,
+            status,
+            (PROGRESS_BAR.x, PROGRESS_BAR.bottom + 14),
+            ACCENT if self.error else MUTED,
+        )
 
     def _draw_standings(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(screen, PANEL, STANDINGS, border_radius=10)
@@ -214,7 +246,11 @@ class TournamentScene:
         draw_text(screen, self._heading_font, title, (x, y))
         rating_label = "RATING (95%)" if summary is not None else "ELO"
         columns = (
-            ("BOT", 18), (rating_label, 190), ("GAMES", 300), ("WINS", 360), ("AVG PLACE", 455),
+            ("BOT", 18),
+            (rating_label, 190),
+            ("GAMES", 300),
+            ("WINS", 360),
+            ("AVG PLACE", 455),
         )
         for label, offset in columns:
             draw_text(screen, self._small_font, label, (x + offset, y + 44), MUTED)
@@ -228,8 +264,14 @@ class TournamentScene:
                 stripe = (STANDINGS.x + 8, row_y - 8, STANDINGS.width - 16, 40)
                 pygame.draw.rect(screen, PANEL_ALT, stripe, border_radius=6)
             pygame.draw.rect(screen, standing.color, (x, row_y + 3, 10, 14))
-            win_rate = f" ({standing.wins / standing.games:.0%})" if standing.games else ""
-            average = f"{standing.place_total / standing.games:.2f}" if standing.games else "-"
+            win_rate = (
+                f" ({standing.wins / standing.games:.0%})" if standing.games else ""
+            )
+            average = (
+                f"{standing.place_total / standing.games:.2f}"
+                if standing.games
+                else "-"
+            )
             cells = (
                 (self._fit(standing.name, 165), 18),
                 (self._rating_text(standing, summary), 190),
@@ -244,7 +286,9 @@ class TournamentScene:
     def _rating_text(standing: _Standing, summary: pd.DataFrame | None) -> str:
         if summary is None:
             return f"{standing.elo:.0f}"
-        rating, low, high = summary.loc[standing.name, ["rating", "rating_low", "rating_high"]]
+        rating, low, high = summary.loc[
+            standing.name, ["rating", "rating_low", "rating_high"]
+        ]
         if math.isnan(rating):  # never played
             return "-"
         if math.isnan(low):  # no bootstrap
@@ -261,8 +305,12 @@ class TournamentScene:
 
     def _draw_chart(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(screen, PANEL, CHART, border_radius=10)
-        draw_text(screen, self._heading_font, "Elo by game", (CHART.x + 18, CHART.y + 16))
-        plot = pygame.Rect(CHART.x + 60, CHART.y + 64, CHART.width - 84, CHART.height - 110)
+        draw_text(
+            screen, self._heading_font, "Elo by game", (CHART.x + 18, CHART.y + 16)
+        )
+        plot = pygame.Rect(
+            CHART.x + 60, CHART.y + 64, CHART.width - 84, CHART.height - 110
+        )
         low = min(min(ratings) for ratings in self._history)
         high = max(max(ratings) for ratings in self._history)
         padding = max(10.0, (high - low) * 0.1)
@@ -279,9 +327,17 @@ class TournamentScene:
             rating = low + (high - low) * fraction
             y = point(0, rating)[1]
             pygame.draw.line(screen, PANEL_ALT, (plot.x, y), (plot.right, y))
-            draw_text(screen, self._small_font, f"{rating:.0f}", (CHART.x + 12, y - 7), MUTED)
+            draw_text(
+                screen, self._small_font, f"{rating:.0f}", (CHART.x + 12, y - 7), MUTED
+            )
         draw_text(screen, self._small_font, "0", (plot.x - 4, plot.bottom + 10), MUTED)
-        draw_text(screen, self._small_font, str(games), (plot.right - 20, plot.bottom + 10), MUTED)
+        draw_text(
+            screen,
+            self._small_font,
+            str(games),
+            (plot.right - 20, plot.bottom + 10),
+            MUTED,
+        )
         pygame.draw.line(screen, BUTTON, plot.bottomleft, plot.bottomright)
 
         # One point per horizontal pixel at most keeps long tournaments cheap to draw.

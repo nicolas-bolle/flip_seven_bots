@@ -34,7 +34,9 @@ def estimate(
         run(game, bots, stop=lambda g, start=round_number: g.round_number != start)
         result = game.last_round
         assert result is not None and result.round_number == round_number
-        opponents = (score for player, score in enumerate(result.scores) if player != me)
+        opponents = (
+            score for player, score in enumerate(result.scores) if player != me
+        )
         total += result.scores[me] - max(opponents, default=0)
     return total / len(seeds)
 
@@ -53,4 +55,6 @@ def best_action(
     if len(actions) == 1:
         return actions[0]
     seeds = [rng.getrandbits(64) for _ in range(samples)]
-    return max(actions, key=lambda action: estimate(observation, action, rollout, seeds))
+    return max(
+        actions, key=lambda action: estimate(observation, action, rollout, seeds)
+    )

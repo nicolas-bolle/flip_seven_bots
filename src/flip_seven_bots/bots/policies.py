@@ -40,16 +40,23 @@ def random_legal(observation: Observation, rng: Random) -> Action:
     return rng.choice(acting_decision(observation).actions)
 
 
-def stay_at_threshold(observation: Observation, decision: HitOrStay, threshold: int) -> Action:
+def stay_at_threshold(
+    observation: Observation, decision: HitOrStay, threshold: int
+) -> Action:
     """Stay once the round score reaches ``threshold`` if allowed; otherwise hit."""
-    if decision.can_stay and observation.players[decision.player].round_score >= threshold:
+    if (
+        decision.can_stay
+        and observation.players[decision.player].round_score >= threshold
+    ):
         return decision.stay()
     return decision.hit()
 
 
 def prefer_opponent(decision: ChooseTarget) -> Action:
     """Target the first eligible opponent, or the deciding player if no one else is eligible."""
-    target = next((t for t in decision.targets if t != decision.player), decision.targets[0])
+    target = next(
+        (t for t in decision.targets if t != decision.player), decision.targets[0]
+    )
     return decision.choose(target)
 
 
@@ -70,7 +77,9 @@ def expected_hit_score(observation: Observation, decision: HitOrStay) -> float:
         # Only the forced card is drawn, so the sampled order of the rest is irrelevant.
         game = observation.sample_game(Random(0), next_draws=(card,))
         game.apply(decision.hit())
-        total += count * _round_score_after(game, decision.player, observation.round_number)
+        total += count * _round_score_after(
+            game, decision.player, observation.round_number
+        )
     return total / len(pool)
 
 

@@ -39,21 +39,29 @@ def fonts() -> Iterator[None]:
 
 
 def click(scene: TournamentSetupScene | TournamentScene, rect: pygame.Rect) -> None:
-    scene.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center))
+    scene.handle_event(
+        pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center)
+    )
 
 
 def replace_field(scene: TournamentSetupScene, rect: pygame.Rect, value: str) -> None:
     click(scene, rect)
-    scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+    scene.handle_event(
+        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL)
+    )
     scene.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
 
 
 def quick_options(**changes: object) -> TournamentOptions:
-    options = parse_options(["--bot", "threshold:10", "--bot", "threshold:30", "--games", "5"])
+    options = parse_options(
+        ["--bot", "threshold:10", "--bot", "threshold:30", "--games", "5"]
+    )
     return replace(options, **changes)
 
 
-def wait_until(scene: TournamentScene, done: Callable[[], bool], timeout: float = 10) -> None:
+def wait_until(
+    scene: TournamentScene, done: Callable[[], bool], timeout: float = 10
+) -> None:
     deadline = time.monotonic() + timeout
     while not done():
         assert time.monotonic() < deadline, "tournament did not progress in time"
@@ -66,7 +74,11 @@ def test_setup_starts_with_the_given_options() -> None:
     scene.render(pygame.Surface((1280, 900)))
     click(scene, START_BUTTON)
     assert scene.result is not None
-    assert list(scene.result.bots) == ["Random bot", "Threshold 30", "Expected value bot"]
+    assert list(scene.result.bots) == [
+        "Random bot",
+        "Threshold 30",
+        "Expected value bot",
+    ]
     assert isinstance(scene.result.bots["Expected value bot"], ExpectedValueBot)
     assert scene.result.games == 100 and scene.result.players_per_game is None
 
@@ -86,7 +98,12 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
 
     result = scene.result
     assert result is not None
-    assert list(result.bots) == ["Random bot", "Threshold 30 1", "Threshold 30 2", "Threshold 30 3"]
+    assert list(result.bots) == [
+        "Random bot",
+        "Threshold 30 1",
+        "Threshold 30 2",
+        "Threshold 30 3",
+    ]
     assert isinstance(result.bots["Random bot"], ThresholdBot)
     assert result.bots["Random bot"].threshold == 15
     assert isinstance(result.bots["Threshold 30 2"], ExpectedValueBot)
@@ -115,7 +132,9 @@ def test_setup_limits_bot_count() -> None:
     ],
     ids=["no-games", "table-too-big", "blank-name", "rotation"],
 )
-def test_setup_rejects_invalid_settings(field: pygame.Rect, value: str, error: str) -> None:
+def test_setup_rejects_invalid_settings(
+    field: pygame.Rect, value: str, error: str
+) -> None:
     scene = TournamentSetupScene(parse_options([]))
     if error.startswith("with rotated seats"):
         click(scene, SEATS_BUTTON)
@@ -139,7 +158,9 @@ def test_tournament_runs_in_the_background_and_shows_results(tmp_path: Path) -> 
     click(scene, SAVE_BUTTON)
     assert scene.saved is not None
     games_csv, summary_csv = scene.saved
-    assert games_csv.parent.parent == tmp_path / "saved"  # a timestamped folder per save
+    assert (
+        games_csv.parent.parent == tmp_path / "saved"
+    )  # a timestamped folder per save
     assert games_csv.exists() and summary_csv.exists()
     click(scene, NEW_BUTTON)
     assert scene.restart
@@ -165,7 +186,9 @@ def test_bot_errors_are_shown_instead_of_crashing() -> None:
         def choose_action(self, observation: Observation) -> Action:
             raise RuntimeError("boom")
 
-    scene = TournamentScene(quick_options(bots={"broken": Broken(), "random": RandomBot()}))
+    scene = TournamentScene(
+        quick_options(bots={"broken": Broken(), "random": RandomBot()})
+    )
     wait_until(scene, lambda: scene.finished)
     scene.render(pygame.Surface((1280, 900)))
     assert scene.error == "RuntimeError: boom" and scene.records == []
@@ -182,14 +205,18 @@ def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(
             super().__init__(options)
             scenes.append(self)
 
-    frames = iter([
-        [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)],
-        [pygame.event.Event(pygame.QUIT)],
-    ])
+    frames = iter(
+        [
+            [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)],
+            [pygame.event.Event(pygame.QUIT)],
+        ]
+    )
     cleanup = Mock()
     monkeypatch.setattr(pygame, "init", Mock())
     monkeypatch.setattr(pygame, "quit", cleanup)
-    monkeypatch.setattr(pygame.display, "set_mode", Mock(return_value=pygame.Surface((1280, 900))))
+    monkeypatch.setattr(
+        pygame.display, "set_mode", Mock(return_value=pygame.Surface((1280, 900)))
+    )
     monkeypatch.setattr(pygame.display, "set_caption", Mock())
     monkeypatch.setattr(pygame.display, "flip", Mock())
     monkeypatch.setattr(pygame.time, "Clock", Mock())

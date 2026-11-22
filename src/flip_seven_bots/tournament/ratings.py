@@ -10,7 +10,10 @@ ELO_SCALE = 400 / np.log(10)
 
 
 def elo_update(
-    ratings: Sequence[float], places: Sequence[int], *, k_factor: float | Sequence[float] = 32.0
+    ratings: Sequence[float],
+    places: Sequence[int],
+    *,
+    k_factor: float | Sequence[float] = 32.0,
 ) -> list[float]:
     """Return new ratings after one game, treating it as every pairwise match.
 
@@ -24,13 +27,19 @@ def elo_update(
         raise ValueError("ratings and places must have the same length")
     if len(ratings) < 2:
         raise ValueError("a rated game needs at least two players")
-    factors = [k_factor] * len(ratings) if isinstance(k_factor, int | float) else list(k_factor)
+    factors = (
+        [k_factor] * len(ratings)
+        if isinstance(k_factor, int | float)
+        else list(k_factor)
+    )
     if len(factors) != len(ratings):
         raise ValueError("give one K-factor per player")
     deltas = [0.0] * len(ratings)
     for i, j in combinations(range(len(ratings)), 2):
         expected = 1 / (1 + 10 ** ((ratings[j] - ratings[i]) / 400))
-        actual = 1.0 if places[i] < places[j] else 0.5 if places[i] == places[j] else 0.0
+        actual = (
+            1.0 if places[i] < places[j] else 0.5 if places[i] == places[j] else 0.0
+        )
         deltas[i] += actual - expected
         deltas[j] -= actual - expected
     return [
@@ -40,7 +49,11 @@ def elo_update(
 
 
 def fit_bradley_terry(
-    wins: np.ndarray, *, prior: float = 0.5, tolerance: float = 1e-9, max_iterations: int = 10_000
+    wins: np.ndarray,
+    *,
+    prior: float = 0.5,
+    tolerance: float = 1e-9,
+    max_iterations: int = 10_000,
 ) -> np.ndarray:
     """Fit Elo-scale ratings (mean zero) to a matrix of pairwise results.
 
@@ -90,7 +103,9 @@ class PairwiseResults:
         size = len(self.players)
         for i, j in combinations(range(len(players)), 2):
             a, b = self._index[players[i]], self._index[players[j]]
-            score = 1.0 if places[i] < places[j] else 0.5 if places[i] == places[j] else 0.0
+            score = (
+                1.0 if places[i] < places[j] else 0.5 if places[i] == places[j] else 0.0
+            )
             self._cells += [a * size + b, b * size + a]
             self._scores += [score, 1 - score]
             self._units += [unit_index, unit_index]
@@ -101,7 +116,9 @@ class PairwiseResults:
         scores = np.asarray(self._scores)
         if weights is not None:
             scores = scores * weights[np.asarray(self._units, dtype=int)]
-        flat = np.bincount(np.asarray(self._cells, dtype=int), scores, minlength=size * size)
+        flat = np.bincount(
+            np.asarray(self._cells, dtype=int), scores, minlength=size * size
+        )
         return flat.reshape(size, size)
 
     def fit(
@@ -118,10 +135,14 @@ class PairwiseResults:
             return rating, nan, nan.copy()
         rng = np.random.default_rng(seed)
         units = self.unit_count
-        samples = np.array([
-            fit_bradley_terry(self.wins(rng.multinomial(units, np.full(units, 1 / units))))
-            for _ in range(bootstrap)
-        ])
+        samples = np.array(
+            [
+                fit_bradley_terry(
+                    self.wins(rng.multinomial(units, np.full(units, 1 / units)))
+                )
+                for _ in range(bootstrap)
+            ]
+        )
         tail = (1 - confidence) / 2 * 100
         low, high = np.percentile(samples, [tail, 100 - tail], axis=0)
         return rating, low, high

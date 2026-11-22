@@ -164,8 +164,10 @@ def report_markdown(
 
     rules = game.rules
     mode = (
-        "With A Vengeance (Brutal Mode)" if isinstance(rules, VengeanceRules) and rules.brutal
-        else "With A Vengeance" if isinstance(rules, VengeanceRules)
+        "With A Vengeance (Brutal Mode)"
+        if isinstance(rules, VengeanceRules) and rules.brutal
+        else "With A Vengeance"
+        if isinstance(rules, VengeanceRules)
         else "Flip 7"
     )
     seed = "random" if table.seed is None else str(table.seed)
@@ -317,7 +319,11 @@ def replay(report: Path | str, *, moves: int | None = None) -> Game:
                 f"replay diverged at move {index}: expected player {move['player']}, "
                 f"game is waiting for {game.current_player}"
             )
-        game.apply(Action(
-            ActionType[move["action"].upper()], move.get("target"), move.get("card_index")
-        ))
+        game.apply(
+            Action(
+                ActionType[move["action"].upper()],
+                move.get("target"),
+                move.get("card_index"),
+            )
+        )
     return game

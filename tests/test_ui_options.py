@@ -18,11 +18,25 @@ def test_no_options_gives_the_default_table() -> None:
 
 def test_seats_follow_option_order() -> None:
     seats = parse_options(
-        ["--bot", "random", "--human", "Ann", "--bot", "threshold:20",
-         "--human", "Ben", "--bot", "expected"]
+        [
+            "--bot",
+            "random",
+            "--human",
+            "Ann",
+            "--bot",
+            "threshold:20",
+            "--human",
+            "Ben",
+            "--bot",
+            "expected",
+        ]
     ).seats
     assert [seat.name for seat in seats] == [
-        "Random bot", "Ann", "Threshold 20", "Ben", "Expected value bot",
+        "Random bot",
+        "Ann",
+        "Threshold 20",
+        "Ben",
+        "Expected value bot",
     ]
     assert isinstance(seats[0].bot, RandomBot)
     assert seats[1].bot is None
@@ -51,8 +65,15 @@ def test_duplicate_names_are_numbered() -> None:
         ["--human", " "],
         ["--bot", "random"] * (MAX_PLAYERS + 1),
     ],
-    ids=["unknown", "random-param", "expected-param", "not-a-number", "negative",
-         "blank-name", "too-many"],
+    ids=[
+        "unknown",
+        "random-param",
+        "expected-param",
+        "not-a-number",
+        "negative",
+        "blank-name",
+        "too-many",
+    ],
 )
 def test_invalid_options_are_rejected(argv: list[str]) -> None:
     with pytest.raises(SystemExit):
@@ -66,9 +87,15 @@ def test_seed_and_bug_folder_can_be_set() -> None:
     assert not options.show_setup
 
 
-@pytest.mark.parametrize(("flag", "brutal"), [("--vengeance", False), ("--brutal", True)])
+@pytest.mark.parametrize(
+    ("flag", "brutal"), [("--vengeance", False), ("--brutal", True)]
+)
 def test_mode_flags_skip_setup_with_default_players(flag: str, brutal: bool) -> None:
     options = parse_options([flag])
     assert options.vengeance and options.brutal is brutal
     assert not options.show_setup
-    assert [seat.name for seat in options.seats] == ["You", "Random bot", "Threshold bot"]
+    assert [seat.name for seat in options.seats] == [
+        "You",
+        "Random bot",
+        "Threshold bot",
+    ]

@@ -48,11 +48,15 @@ def test_tournament_records_games_and_chains_ratings() -> None:
     assert (games["won"] == (games["place"] == 1)).all()
     assert games["elo"].sub(games["elo_before"]).equals(games["elo_change"])
     for _, history in games.groupby("player"):
-        assert history["elo_before"].iloc[1:].tolist() == history["elo"].iloc[:-1].tolist()
+        assert (
+            history["elo_before"].iloc[1:].tolist() == history["elo"].iloc[:-1].tolist()
+        )
 
     summary = result.summary
     assert summary["rating"].is_monotonic_decreasing
-    assert summary["rating"].sum() == pytest.approx(4500)  # centred on the initial rating
+    assert summary["rating"].sum() == pytest.approx(
+        4500
+    )  # centred on the initial rating
     assert (summary["rating_low"] <= summary["rating"]).all()
     assert (summary["rating"] <= summary["rating_high"]).all()
     last = games.groupby("player")["elo"].last()
@@ -71,13 +75,24 @@ def test_tournament_is_reproducible_with_a_seed() -> None:
 
 def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
     result = run_tournament(
-        threshold_bots(10, 20, 30), games=1, players_per_game=2, seed=0, initial_rating=1000
+        threshold_bots(10, 20, 30),
+        games=1,
+        players_per_game=2,
+        seed=0,
+        initial_rating=1000,
     )
     assert len(result.games) == 2
     benched = result.summary[result.summary["games"] == 0]
     assert len(benched) == 1
     assert benched["elo"].item() == 1000
-    statistics = ["win_rate", "mean_place", "mean_score", "rating", "rating_low", "rating_high"]
+    statistics = [
+        "win_rate",
+        "mean_place",
+        "mean_score",
+        "rating",
+        "rating_low",
+        "rating_high",
+    ]
     assert benched[statistics].isna().all(axis=None)
     assert result.summary.index[-1] == benched.index[0]
     assert result.summary["rating"].dropna().mean() == pytest.approx(1000)
@@ -88,12 +103,31 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
     [
         (threshold_bots(10, 20), {"games": 0}, "games"),
         (threshold_bots(10), {"games": 1}, "players_per_game"),
-        (threshold_bots(10, 20), {"games": 1, "players_per_game": 3}, "players_per_game"),
-        (threshold_bots(10, 20), {"games": 1, "players_per_game": 1}, "players_per_game"),
-        (threshold_bots(10, 20, 30), {"games": 4, "rotate_seats": True}, "multiple of 3"),
+        (
+            threshold_bots(10, 20),
+            {"games": 1, "players_per_game": 3},
+            "players_per_game",
+        ),
+        (
+            threshold_bots(10, 20),
+            {"games": 1, "players_per_game": 1},
+            "players_per_game",
+        ),
+        (
+            threshold_bots(10, 20, 30),
+            {"games": 4, "rotate_seats": True},
+            "multiple of 3",
+        ),
         (threshold_bots(10, 20), {"games": 2, "k_half_life": 0}, "k_half_life"),
     ],
-    ids=["no-games", "one-bot", "table-too-big", "table-too-small", "rotation", "half-life"],
+    ids=[
+        "no-games",
+        "one-bot",
+        "table-too-big",
+        "table-too-small",
+        "rotation",
+        "half-life",
+    ],
 )
 def test_invalid_tournaments_are_rejected(
     bots: dict[str, ThresholdBot], options: dict[str, int | bool], message: str
@@ -118,7 +152,11 @@ def test_elo_accepts_a_k_factor_per_player() -> None:
 def test_elo_k_factor_decays_with_games_played() -> None:
     def changes(k_half_life: float | None) -> list[float]:
         result = run_tournament(
-            threshold_bots(10, 30), games=2, seed=1, k_half_life=k_half_life, progress=False
+            threshold_bots(10, 30),
+            games=2,
+            seed=1,
+            k_half_life=k_half_life,
+            progress=False,
         )
         return result.games.groupby("game")["elo_change"].max().tolist()
 
@@ -140,7 +178,11 @@ def test_bradley_terry_matches_the_closed_form_for_two_players() -> None:
 
 def test_ratings_cannot_be_shifted_by_game_order() -> None:
     results = PairwiseResults(["a", "b", "c"])
-    games = [(("a", "b", "c"), (1, 2, 3)), (("b", "c", "a"), (1, 1, 3)), (("c", "a", "b"), (2, 1, 3))]
+    games = [
+        (("a", "b", "c"), (1, 2, 3)),
+        (("b", "c", "a"), (1, 1, 3)),
+        (("c", "a", "b"), (2, 1, 3)),
+    ]
     for unit, (players, places) in enumerate(games):
         results.add(unit, players, places)
     reversed_results = PairwiseResults(["a", "b", "c"])
@@ -150,15 +192,21 @@ def test_ratings_cannot_be_shifted_by_game_order() -> None:
 
 
 def test_bootstrap_intervals_can_be_skipped() -> None:
-    result = run_tournament(threshold_bots(10, 30), games=3, seed=0, bootstrap=0, progress=False)
+    result = run_tournament(
+        threshold_bots(10, 30), games=3, seed=0, bootstrap=0, progress=False
+    )
     assert result.summary[["rating_low", "rating_high"]].isna().all(axis=None)
     assert result.summary["rating"].notna().all()
 
 
 def test_rotated_seats_replay_each_deal_from_every_seat() -> None:
     result = run_tournament(
-        threshold_bots(10, 20, 30, 40), games=6, players_per_game=3, rotate_seats=True,
-        seed=2, progress=False,
+        threshold_bots(10, 20, 30, 40),
+        games=6,
+        players_per_game=3,
+        rotate_seats=True,
+        seed=2,
+        progress=False,
     )
     games = result.games
     assert games["deal"].tolist() == [1] * 9 + [2] * 9

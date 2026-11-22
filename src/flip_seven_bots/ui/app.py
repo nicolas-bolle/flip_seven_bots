@@ -64,7 +64,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                     scene.handle_event(event)
                     if isinstance(scene, SetupScene) and scene.result is not None:
                         result = scene.result
-                        rules = VengeanceRules(brutal=result.brutal) if result.vengeance else None
+                        rules = (
+                            VengeanceRules(brutal=result.brutal)
+                            if result.vengeance
+                            else None
+                        )
                         table = Table(result.seats, seed=options.seed, rules=rules)
                         scene = GameScene(table, report_dir=options.bug_dir)
 

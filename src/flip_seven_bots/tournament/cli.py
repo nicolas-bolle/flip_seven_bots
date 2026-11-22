@@ -68,8 +68,11 @@ class TournamentOptions:
     def result(self, records: Sequence[GameRecord]) -> TournamentResult:
         """Build the result tables for games played with ``start``."""
         return TournamentResult.from_records(
-            records, list(self.bots), initial_rating=self.initial_rating,
-            bootstrap=self.bootstrap, seed=self.seed,
+            records,
+            list(self.bots),
+            initial_rating=self.initial_rating,
+            bootstrap=self.bootstrap,
+            seed=self.seed,
         )
 
     def describe(self) -> str:
@@ -151,48 +154,72 @@ def parse_options(
         ),
     )
     parser.add_argument(
-        "--games", type=_positive_int, default=DEFAULT_GAMES, metavar="N",
+        "--games",
+        type=_positive_int,
+        default=DEFAULT_GAMES,
+        metavar="N",
         help="number of games to play (default: %(default)s)",
     )
     parser.add_argument(
-        "--players-per-game", type=_positive_int, metavar="N",
+        "--players-per-game",
+        type=_positive_int,
+        metavar="N",
         help="bots seated in each game, chosen at random (default: all)",
     )
     parser.add_argument(
-        "--rotate-seats", action="store_true",
+        "--rotate-seats",
+        action="store_true",
         help=(
             "replay each deal with the same deck once per seat rotation to cancel "
             "out card luck; --games must be a multiple of the players per game"
         ),
     )
-    parser.add_argument("--seed", type=int, help="seed for seating, decks and resampling")
-    parser.add_argument("--vengeance", action="store_true", help="play With A Vengeance")
+    parser.add_argument(
+        "--seed", type=int, help="seed for seating, decks and resampling"
+    )
+    parser.add_argument(
+        "--vengeance", action="store_true", help="play With A Vengeance"
+    )
     parser.add_argument(
         "--brutal", action="store_true", help="play With A Vengeance in Brutal Mode"
     )
     parser.add_argument(
-        "--k-factor", type=_positive_float, default=32.0, metavar="K",
+        "--k-factor",
+        type=_positive_float,
+        default=32.0,
+        metavar="K",
         help="starting Elo K-factor (default: %(default)s)",
     )
     k_schedule = parser.add_mutually_exclusive_group()
     k_schedule.add_argument(
-        "--k-half-life", type=_positive_float, default=DEFAULT_K_HALF_LIFE, metavar="N",
+        "--k-half-life",
+        type=_positive_float,
+        default=DEFAULT_K_HALF_LIFE,
+        metavar="N",
         help="games after which a bot's Elo K-factor halves (default: %(default)s)",
     )
     k_schedule.add_argument(
         "--constant-k", action="store_true", help="keep the Elo K-factor constant"
     )
     parser.add_argument(
-        "--bootstrap", type=int, default=DEFAULT_BOOTSTRAP, metavar="N",
+        "--bootstrap",
+        type=int,
+        default=DEFAULT_BOOTSTRAP,
+        metavar="N",
         help="resamples for the rating's 95%% confidence interval; 0 skips it "
         "(default: %(default)s)",
     )
     parser.add_argument(
-        "--initial-rating", type=float, default=1500.0, metavar="R",
+        "--initial-rating",
+        type=float,
+        default=1500.0,
+        metavar="R",
         help="starting Elo rating (default: %(default)s)",
     )
     parser.add_argument(
-        "--output", type=Path, metavar="DIR",
+        "--output",
+        type=Path,
+        metavar="DIR",
         help="save games.csv and summary.csv in this folder",
     )
     args = parser.parse_args(argv)
@@ -202,7 +229,9 @@ def parse_options(
         parser.error("a tournament needs at least two bots")
     names = number_duplicates([name for name, _ in named])
     bots = {name: bot for name, (_, bot) in zip(names, named)}
-    if args.players_per_game is not None and not 2 <= args.players_per_game <= len(bots):
+    if args.players_per_game is not None and not 2 <= args.players_per_game <= len(
+        bots
+    ):
         parser.error(f"--players-per-game must be between 2 and {len(bots)}")
     table = args.players_per_game or len(bots)
     if args.rotate_seats and args.games % table:

@@ -48,7 +48,10 @@ def test_playing_a_sampled_game_does_not_change_the_original() -> None:
 
 def test_samples_draw_the_hidden_deck_order_from_the_given_rng() -> None:
     _, observation = hit_or_stay_observation()
-    draws = [cards_drawn_after_hit(observation.sample_game(Random(seed))) for seed in range(5)]
+    draws = [
+        cards_drawn_after_hit(observation.sample_game(Random(seed)))
+        for seed in range(5)
+    ]
     assert len(set(draws)) > 1
     assert cards_drawn_after_hit(observation.sample_game(Random(0))) == draws[0]
 
@@ -68,7 +71,9 @@ def test_unlinked_observation_cannot_be_sampled() -> None:
 
 def test_draw_pile_is_the_sorted_hidden_composition() -> None:
     game, observation = hit_or_stay_observation()
-    assert sorted(observation.draw_pile, key=repr) == sorted(game.hidden_deck(), key=repr)
+    assert sorted(observation.draw_pile, key=repr) == sorted(
+        game.hidden_deck(), key=repr
+    )
     assert observation.draw_pile != game.hidden_deck()
     assert observation.cards_remaining == len(game.hidden_deck())
 

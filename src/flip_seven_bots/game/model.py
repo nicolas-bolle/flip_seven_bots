@@ -45,7 +45,9 @@ class Card:
     def is_number(self) -> bool:
         """Whether this card counts as a number, including Vengeance special numbers."""
         return self.kind in (
-            CardType.NUMBER, CardType.ZERO, CardType.UNLUCKY_SEVEN,
+            CardType.NUMBER,
+            CardType.ZERO,
+            CardType.UNLUCKY_SEVEN,
             CardType.LUCKY_THIRTEEN,
         )
 
@@ -95,9 +97,13 @@ class Action:
         if (self.kind in (ActionType.CHOOSE_TARGET, ActionType.CHOOSE_CARD)) != (
             self.target is not None
         ):
-            raise ValueError("an action has a target exactly when it chooses a target or card")
+            raise ValueError(
+                "an action has a target exactly when it chooses a target or card"
+            )
         if (self.kind is ActionType.CHOOSE_CARD) != (self.card_index is not None):
-            raise ValueError("an action has a card index exactly when it chooses a card")
+            raise ValueError(
+                "an action has a card index exactly when it chooses a card"
+            )
 
 
 @dataclass(frozen=True)

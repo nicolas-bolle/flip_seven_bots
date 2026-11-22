@@ -195,8 +195,8 @@ result = run_tournament(
     seed=0,
 )
 print(result.summary)  # games, wins, win_rate, mean_place, mean_score,
-                       # rating, rating_low, rating_high, elo
-result.games           # per game and player: deal, seat, score, place, won, Elo
+# rating, rating_low, rating_high, elo
+result.games  # per game and player: deal, seat, score, place, won, Elo
 ```
 
 Every game is scored as all of its pairwise matches: the better place wins and

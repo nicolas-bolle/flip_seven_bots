@@ -32,7 +32,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         screen = pygame.display.set_mode((1280, 900))
         pygame.display.set_caption("Flip 7 tournament")
         clock = pygame.time.Clock()
-        scene = TournamentSetupScene(options) if show_setup else TournamentScene(options)
+        scene = (
+            TournamentSetupScene(options) if show_setup else TournamentScene(options)
+        )
         running = True
         while running:
             for event in pygame.event.get():

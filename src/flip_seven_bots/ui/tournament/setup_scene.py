@@ -72,7 +72,9 @@ class TournamentSetupScene:
         self.rotate_seats = defaults.rotate_seats
         self.numbers = {
             "games": str(defaults.games),
-            "table": "" if defaults.players_per_game is None else str(defaults.players_per_game),
+            "table": ""
+            if defaults.players_per_game is None
+            else str(defaults.players_per_game),
             "seed": "" if defaults.seed is None else str(defaults.seed),
         }
         self.result: TournamentOptions | None = None
@@ -97,7 +99,9 @@ class TournamentSetupScene:
                 self._start()
             elif self._focus is None:
                 return
-            elif event.key == pygame.K_a and getattr(event, "mod", 0) & pygame.KMOD_CTRL:
+            elif (
+                event.key == pygame.K_a and getattr(event, "mod", 0) & pygame.KMOD_CTRL
+            ):
                 self._set_focused("")
             elif event.key == pygame.K_BACKSPACE:
                 self._set_focused(self._focused_value()[:-1])
@@ -118,7 +122,9 @@ class TournamentSetupScene:
         if field == "name":
             self.bots[index].name = value[:MAX_NAME_LENGTH]
         else:
-            digits = "".join(char for char in value if char.isdigit())[:MAX_NUMBER_LENGTH]
+            digits = "".join(char for char in value if char.isdigit())[
+                :MAX_NUMBER_LENGTH
+            ]
             if field in self.numbers:
                 self.numbers[field] = digits
             else:
@@ -129,7 +135,9 @@ class TournamentSetupScene:
         self._focus = None
         self.error = None
         fields = {"games": GAMES_FIELD, "table": TABLE_FIELD, "seed": SEED_FIELD}
-        clicked = next((name for name, rect in fields.items() if rect.collidepoint(pos)), None)
+        clicked = next(
+            (name for name, rect in fields.items() if rect.collidepoint(pos)), None
+        )
         if clicked is not None:
             self._focus = (clicked, 0)
         elif BASE_BUTTON.collidepoint(pos):
@@ -170,7 +178,9 @@ class TournamentSetupScene:
         if any(not bot.name.strip() for bot in self.bots):
             raise ValueError("every bot needs a name")
         names = number_duplicates([bot.name.strip() for bot in self.bots])
-        bots = {name: parse_bot(setting.spec)[1] for name, setting in zip(names, self.bots)}
+        bots = {
+            name: parse_bot(setting.spec)[1] for name, setting in zip(names, self.bots)
+        }
         games = int(self.numbers["games"] or 0)
         if games < 1:
             raise ValueError("play at least one game")
@@ -178,7 +188,9 @@ class TournamentSetupScene:
         if table is not None and not 2 <= table <= len(bots):
             raise ValueError(f"players per game must be between 2 and {len(bots)}")
         if self.rotate_seats and games % (table or len(bots)):
-            raise ValueError(f"with rotated seats, games must be a multiple of {table or len(bots)}")
+            raise ValueError(
+                f"with rotated seats, games must be a multiple of {table or len(bots)}"
+            )
         return replace(
             self._defaults,
             bots=bots,
@@ -204,8 +216,12 @@ class TournamentSetupScene:
         draw_button(screen, font, BASE_BUTTON, "Flip 7", not self.vengeance)
         draw_button(screen, font, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
         draw_button(
-            screen, font, BRUTAL_BUTTON, f"Brutal: {'on' if self.brutal else 'off'}",
-            self.brutal, disabled=not self.vengeance,
+            screen,
+            font,
+            BRUTAL_BUTTON,
+            f"Brutal: {'on' if self.brutal else 'off'}",
+            self.brutal,
+            disabled=not self.vengeance,
         )
         labels = (
             ("games", GAMES_FIELD, "GAMES"),
@@ -214,8 +230,16 @@ class TournamentSetupScene:
         )
         for field, rect, label in labels:
             draw_text(screen, small, label, (rect.x, 245), MUTED)
-            draw_field(screen, font, rect, self.numbers[field], self._focus == (field, 0))
-        draw_text(screen, small, "SEATING (ROTATED = SAME CARDS)", (SEATS_BUTTON.x, 245), MUTED)
+            draw_field(
+                screen, font, rect, self.numbers[field], self._focus == (field, 0)
+            )
+        draw_text(
+            screen,
+            small,
+            "SEATING (ROTATED = SAME CARDS)",
+            (SEATS_BUTTON.x, 245),
+            MUTED,
+        )
         seats = "Seats: rotated" if self.rotate_seats else "Seats: random"
         draw_button(screen, font, SEATS_BUTTON, seats, self.rotate_seats)
 
@@ -231,13 +255,20 @@ class TournamentSetupScene:
                 focused = self._focus == ("parameter", index)
                 draw_field(screen, font, parameter, bot.parameter, focused)
             else:
-                draw_text(screen, font, "-", (parameter.x + 12, parameter.y + 10), MUTED)
+                draw_text(
+                    screen, font, "-", (parameter.x + 12, parameter.y + 10), MUTED
+                )
             draw_button(screen, font, remove, "Remove", disabled=len(self.bots) <= 2)
-        draw_button(screen, font, ADD_BUTTON, "Add bot", disabled=len(self.bots) >= MAX_BOTS)
+        draw_button(
+            screen, font, ADD_BUTTON, "Add bot", disabled=len(self.bots) >= MAX_BOTS
+        )
         draw_button(screen, font, START_BUTTON, "Start  [Enter]", selected=True)
         draw_text(
-            screen, small, "Click a field to edit; Ctrl+A clears it. Esc quits.",
-            (340, 816), MUTED,
+            screen,
+            small,
+            "Click a field to edit; Ctrl+A clears it. Esc quits.",
+            (340, 816),
+            MUTED,
         )
         if self.error is not None:
             draw_text(screen, font, self.error, (90, 862), ACCENT)

@@ -102,10 +102,21 @@ class TournamentResult:
             for record in records
             for seat, name in enumerate(record.players)
         ]
-        played = pd.DataFrame(rows, columns=[
-            "game", "deal", "seat", "player", "score", "place", "won",
-            "elo_before", "elo", "elo_change",
-        ])
+        played = pd.DataFrame(
+            rows,
+            columns=[
+                "game",
+                "deal",
+                "seat",
+                "player",
+                "score",
+                "place",
+                "won",
+                "elo_before",
+                "elo",
+                "elo_change",
+            ],
+        )
         elo = dict.fromkeys(players, float(initial_rating))
         for record in records:
             elo.update(zip(record.players, record.elo))
@@ -115,8 +126,12 @@ class TournamentResult:
         for record in records:
             results.add(record.deal, record.players, record.places)
         fitted = pd.DataFrame(
-            np.column_stack(results.fit(bootstrap=bootstrap, confidence=confidence, seed=seed))
-            + initial_rating if active else np.empty((0, 3)),
+            np.column_stack(
+                results.fit(bootstrap=bootstrap, confidence=confidence, seed=seed)
+            )
+            + initial_rating
+            if active
+            else np.empty((0, 3)),
             index=active,
             columns=["rating", "rating_low", "rating_high"],
         )
@@ -148,7 +163,9 @@ def play_tournament(
     if not 2 <= table_size <= len(names):
         raise ValueError("players_per_game must be between two and the number of bots")
     if rotate_seats and games % table_size:
-        raise ValueError(f"with rotated seats, games must be a multiple of {table_size}")
+        raise ValueError(
+            f"with rotated seats, games must be a multiple of {table_size}"
+        )
     if k_half_life is not None and k_half_life <= 0:
         raise ValueError("k_half_life must be positive")
 
@@ -176,13 +193,17 @@ def play_tournament(
                     max_decisions=max_decisions,
                 )
                 scores = tuple(view.total_score for view in final.players)
-                places = tuple(1 + sum(other > score for other in scores) for score in scores)
+                places = tuple(
+                    1 + sum(other > score for other in scores) for score in scores
+                )
                 before = tuple(elo[name] for name in order)
                 factors = [k(played[name]) for name in order]
                 after = tuple(elo_update(before, places, k_factor=factors))
                 elo.update(zip(order, after))
                 played.update(order)
-                yield GameRecord(game, deal, tuple(order), scores, places, before, after)
+                yield GameRecord(
+                    game, deal, tuple(order), scores, places, before, after
+                )
 
     return generate()
 
@@ -220,21 +241,34 @@ def run_tournament(
     ``k_half_life`` is ``None``. ``progress`` shows a progress bar.
     """
     records = play_tournament(
-        bots, games=games, players_per_game=players_per_game, rotate_seats=rotate_seats,
-        rules=rules, seed=seed, k_factor=k_factor, k_half_life=k_half_life,
-        initial_rating=initial_rating, max_decisions=max_decisions,
+        bots,
+        games=games,
+        players_per_game=players_per_game,
+        rotate_seats=rotate_seats,
+        rules=rules,
+        seed=seed,
+        k_factor=k_factor,
+        k_half_life=k_half_life,
+        initial_rating=initial_rating,
+        max_decisions=max_decisions,
     )
     elo = dict.fromkeys(bots, float(initial_rating))
     played = []
-    bar = tqdm(records, total=games, desc="Tournament", unit="game", disable=not progress)
+    bar = tqdm(
+        records, total=games, desc="Tournament", unit="game", disable=not progress
+    )
     for record in bar:
         played.append(record)
         elo.update(zip(record.players, record.elo))
         leader = max(elo, key=elo.__getitem__)
         bar.set_postfix(leader=leader, elo=round(elo[leader]))
     return TournamentResult.from_records(
-        played, list(bots), initial_rating=initial_rating,
-        bootstrap=bootstrap, confidence=confidence, seed=seed,
+        played,
+        list(bots),
+        initial_rating=initial_rating,
+        bootstrap=bootstrap,
+        confidence=confidence,
+        seed=seed,
     )
 
 
@@ -245,12 +279,14 @@ def _summarize(
     elo: Mapping[str, float],
 ) -> pd.DataFrame:
     grouped = played.groupby("player")
-    summary = pd.DataFrame({
-        "games": grouped.size(),
-        "wins": grouped["won"].sum(),
-        "mean_place": grouped["place"].mean(),
-        "mean_score": grouped["score"].mean(),
-    }).reindex(players)
+    summary = pd.DataFrame(
+        {
+            "games": grouped.size(),
+            "wins": grouped["won"].sum(),
+            "mean_place": grouped["place"].mean(),
+            "mean_score": grouped["score"].mean(),
+        }
+    ).reindex(players)
     summary["games"] = summary["games"].fillna(0).astype(int)
     summary["wins"] = summary["wins"].fillna(0).astype(int)
     summary["win_rate"] = summary["wins"] / summary["games"].where(summary["games"] > 0)
@@ -258,7 +294,14 @@ def _summarize(
     summary["elo"] = pd.Series(elo)
     summary.index.name = "player"
     columns = [
-        "games", "wins", "win_rate", "mean_place", "mean_score",
-        "rating", "rating_low", "rating_high", "elo",
+        "games",
+        "wins",
+        "win_rate",
+        "mean_place",
+        "mean_score",
+        "rating",
+        "rating_low",
+        "rating_high",
+        "elo",
     ]
     return summary[columns].sort_values("rating", ascending=False, na_position="last")

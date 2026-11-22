@@ -82,8 +82,12 @@ def test_threshold_bot_prefers_an_opponent_but_can_target_itself() -> None:
     assert bot.choose_action(only_me) == Action(ActionType.CHOOSE_TARGET, me)
 
 
-@pytest.mark.parametrize("bot", [RandomBot(), ThresholdBot(30)], ids=["random", "threshold"])
-def test_bots_reject_observations_without_legal_actions(bot: RandomBot | ThresholdBot) -> None:
+@pytest.mark.parametrize(
+    "bot", [RandomBot(), ThresholdBot(30)], ids=["random", "threshold"]
+)
+def test_bots_reject_observations_without_legal_actions(
+    bot: RandomBot | ThresholdBot,
+) -> None:
     observation = replace(opening_observation(), decision=None)
     with pytest.raises(ValueError, match="no legal actions"):
         bot.choose_action(observation)
@@ -94,21 +98,32 @@ def test_threshold_must_not_be_negative() -> None:
         ThresholdBot(-1)
 
 
-def test_rollouts_target_self_with_flip_three_when_the_remaining_cards_are_safe() -> None:
+def test_rollouts_target_self_with_flip_three_when_the_remaining_cards_are_safe() -> (
+    None
+):
     # Player 1 holds a 7 and the unseen cards are 8, 9 and 10 in some order, so
     # flipping three for itself is worth more than giving the cards to player 0.
-    game = Game(2, deck=Deck.stacked([number(7), number(4), FLIP_THREE, number(8), number(9), number(10)]))
+    game = Game(
+        2,
+        deck=Deck.stacked(
+            [number(7), number(4), FLIP_THREE, number(8), number(9), number(10)]
+        ),
+    )
     game.apply(HIT)
     observation = game.observe(1)
     assert observation.decision == ChooseTarget(1, FLIP_THREE, (0, 1))
 
-    assert ThresholdBot(30).choose_action(observation) == Action(ActionType.CHOOSE_TARGET, 0)
+    assert ThresholdBot(30).choose_action(observation) == Action(
+        ActionType.CHOOSE_TARGET, 0
+    )
     best = rollouts.best_action(observation, ThresholdBot(0), samples=5, rng=Random(0))
     assert best == Action(ActionType.CHOOSE_TARGET, 1)
 
 
 def test_rollouts_target_an_opponent_who_would_bust() -> None:
-    game = Game(2, deck=Deck.stacked([number(7), number(4), FLIP_THREE] + [number(4)] * 6))
+    game = Game(
+        2, deck=Deck.stacked([number(7), number(4), FLIP_THREE] + [number(4)] * 6)
+    )
     game.apply(HIT)
     observation = game.observe(1)
 
@@ -122,12 +137,17 @@ def test_rollouts_evaluate_hit_or_stay_decisions() -> None:
     observation = game.observe(0)
     assert observation.decision == HitOrStay(0, True)
 
-    assert rollouts.best_action(observation, ThresholdBot(0), samples=3, rng=Random(0)) == STAY
+    assert (
+        rollouts.best_action(observation, ThresholdBot(0), samples=3, rng=Random(0))
+        == STAY
+    )
 
 
 def test_rollouts_need_at_least_one_sample() -> None:
     with pytest.raises(ValueError, match="samples"):
-        rollouts.best_action(opening_observation(), ThresholdBot(0), samples=0, rng=Random(0))
+        rollouts.best_action(
+            opening_observation(), ThresholdBot(0), samples=0, rng=Random(0)
+        )
 
 
 @pytest.mark.parametrize(

@@ -106,7 +106,8 @@ class SetupScene:
                 player.name = (player.name + event.text)[:MAX_NAME_LENGTH]
             else:
                 player.parameter = (
-                    player.parameter + "".join(char for char in event.text if char.isdigit())
+                    player.parameter
+                    + "".join(char for char in event.text if char.isdigit())
                 )[:MAX_PARAMETER_LENGTH]
             self.error = None
             return
@@ -144,7 +145,9 @@ class SetupScene:
         elif BRUTAL_BUTTON.collidepoint(pos) and self.vengeance:
             self.brutal = not self.brutal
         elif ADD_BUTTON.collidepoint(pos) and len(self.players) < MAX_PLAYERS:
-            self.players.append(_PlayerSetting(f"Player {len(self.players) + 1}", "human"))
+            self.players.append(
+                _PlayerSetting(f"Player {len(self.players) + 1}", "human")
+            )
         elif START_BUTTON.collidepoint(pos):
             self._start()
         else:
@@ -177,7 +180,9 @@ class SetupScene:
         except argparse.ArgumentTypeError as error:
             self.error = str(error)
             return
-        self.result = SetupResult(_number_duplicates(seats), self.vengeance, self.brutal)
+        self.result = SetupResult(
+            _number_duplicates(seats), self.vengeance, self.brutal
+        )
 
     def update(self, _now: int) -> None:
         """Satisfy the scene interface; setup has no time-dependent updates."""
@@ -192,12 +197,17 @@ class SetupScene:
         self._button(screen, BASE_BUTTON, "Flip 7", self.vengeance is False)
         self._button(screen, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
         self._button(
-            screen, BRUTAL_BUTTON, f"Brutal: {'on' if self.brutal else 'off'}",
-            self.brutal, disabled=not self.vengeance,
+            screen,
+            BRUTAL_BUTTON,
+            f"Brutal: {'on' if self.brutal else 'off'}",
+            self.brutal,
+            disabled=not self.vengeance,
         )
         self._text(screen, self._heading_font, "Players", (90, 235))
         self._text(screen, self._small_font, "NAME", (90, 282), MUTED)
-        self._text(screen, self._small_font, "TYPE (CLICK TO CHANGE)", (425, 282), MUTED)
+        self._text(
+            screen, self._small_font, "TYPE (CLICK TO CHANGE)", (425, 282), MUTED
+        )
         self._text(screen, self._small_font, "SCORE", (690, 282), MUTED)
         for index, player in enumerate(self.players):
             name, kind, parameter, remove = _row_rects(index)
@@ -205,29 +215,48 @@ class SetupScene:
             self._button(screen, kind, KIND_LABELS[player.kind])
             if player.kind == "threshold":
                 self._field(
-                    screen, parameter, player.parameter, self._focus == (index, "parameter")
+                    screen,
+                    parameter,
+                    player.parameter,
+                    self._focus == (index, "parameter"),
                 )
             else:
-                self._text(screen, self._font, "-", (parameter.x + 12, parameter.y + 13), MUTED)
+                self._text(
+                    screen, self._font, "-", (parameter.x + 12, parameter.y + 13), MUTED
+                )
             self._button(screen, remove, "Remove", disabled=len(self.players) == 1)
-        self._button(screen, ADD_BUTTON, "Add player", disabled=len(self.players) >= MAX_PLAYERS)
+        self._button(
+            screen, ADD_BUTTON, "Add player", disabled=len(self.players) >= MAX_PLAYERS
+        )
         self._button(screen, START_BUTTON, "Start  [Enter]", selected=True)
         self._text(
-            screen, self._small_font, "Click a name or value to edit. Esc quits.",
-            (90, 805), MUTED,
+            screen,
+            self._small_font,
+            "Click a name or value to edit. Esc quits.",
+            (90, 805),
+            MUTED,
         )
         if self.error is not None:
             self._text(screen, self._font, self.error, (90, 850), ACCENT)
 
     def _text(
-        self, screen: pygame.Surface, font: pygame.font.Font, text: str,
-        pos: tuple[int, int], color: tuple[int, int, int] = TEXT,
+        self,
+        screen: pygame.Surface,
+        font: pygame.font.Font,
+        text: str,
+        pos: tuple[int, int],
+        color: tuple[int, int, int] = TEXT,
     ) -> None:
         draw_text(screen, font, text, pos, color)
 
     def _button(
-        self, screen: pygame.Surface, rect: pygame.Rect, label: str,
-        selected: bool = False, *, disabled: bool = False,
+        self,
+        screen: pygame.Surface,
+        rect: pygame.Rect,
+        label: str,
+        selected: bool = False,
+        *,
+        disabled: bool = False,
     ) -> None:
         draw_button(screen, self._font, rect, label, selected, disabled=disabled)
 

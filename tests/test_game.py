@@ -67,7 +67,9 @@ def test_dealer_rotates_and_player_left_of_dealer_starts() -> None:
     observation = game.observe(0)
     assert observation.dealer == 0
     assert [view.cards for view in observation.players] == [
-        (number(3),), (number(1),), (number(2),),
+        (number(3),),
+        (number(1),),
+        (number(2),),
     ]
     assert game.current_player == 1
 
@@ -206,7 +208,9 @@ def test_action_cards_are_discarded_once_round_ends(target_score: int) -> None:
 def test_retained_action_cards_are_included_in_custom_round_scoring() -> None:
     rules = Rules(
         target_score=1,
-        score_cards=lambda cards: sum(10 if card == FREEZE else card.value for card in cards),
+        score_cards=lambda cards: sum(
+            10 if card == FREEZE else card.value for card in cards
+        ),
     )
     game = stacked_game([number(2), number(4), FREEZE], rules=rules)
     game.apply(HIT)
@@ -284,9 +288,7 @@ def test_second_chance_saves_a_duplicate_number() -> None:
 
 
 def test_seven_numbers_end_round_and_award_bonus() -> None:
-    game = stacked_game(
-        [number(n) for n in (0, 1, 2, 3, 4, 5, 6, 9)], player_count=1
-    )
+    game = stacked_game([number(n) for n in (0, 1, 2, 3, 4, 5, 6, 9)], player_count=1)
     for _ in range(6):
         game.apply(HIT)
 
@@ -364,7 +366,10 @@ def test_discard_is_reshuffled_for_next_round() -> None:
     assert observation.last_round is not None
     assert observation.last_round.scores == (4, 2)
     assert observation.discard == ()
-    assert {player.cards for player in observation.players} == {(number(2),), (number(4),)}
+    assert {player.cards for player in observation.players} == {
+        (number(2),),
+        (number(4),),
+    }
     assert sum(isinstance(event, DiscardShuffled) for event in observation.events) == 1
 
 

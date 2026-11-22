@@ -18,14 +18,34 @@ def test_default_lineup_and_settings() -> None:
 
 
 def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
-    options = parse_options([
-        "--bot", "threshold:20", "--bot", "threshold:20", "--bot", "careful=threshold:40",
-        "--bot", "random", "--brutal", "--games", "7", "--players-per-game", "3",
-    ])
-    assert list(options.bots) == ["Threshold 20 1", "Threshold 20 2", "careful", "Random bot"]
+    options = parse_options(
+        [
+            "--bot",
+            "threshold:20",
+            "--bot",
+            "threshold:20",
+            "--bot",
+            "careful=threshold:40",
+            "--bot",
+            "random",
+            "--brutal",
+            "--games",
+            "7",
+            "--players-per-game",
+            "3",
+        ]
+    )
+    assert list(options.bots) == [
+        "Threshold 20 1",
+        "Threshold 20 2",
+        "careful",
+        "Random bot",
+    ]
     assert options.bots["careful"].threshold == 40
     assert isinstance(options.rules, VengeanceRules) and options.rules.brutal
-    assert options.describe() == "4 bots, 7 games of 3 players, With A Vengeance (Brutal)"
+    assert (
+        options.describe() == "4 bots, 7 games of 3 players, With A Vengeance (Brutal)"
+    )
 
 
 @pytest.mark.parametrize(
@@ -43,8 +63,16 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         ["--bootstrap", "-1"],
     ],
     ids=[
-        "one-bot", "unknown", "blank-name", "no-games", "table-too-big", "table-too-small", "k",
-        "rotation", "k-schedule", "bootstrap",
+        "one-bot",
+        "unknown",
+        "blank-name",
+        "no-games",
+        "table-too-big",
+        "table-too-small",
+        "k",
+        "rotation",
+        "k-schedule",
+        "bootstrap",
     ],
 )
 def test_invalid_options_are_rejected(argv: list[str]) -> None:
@@ -55,8 +83,20 @@ def test_invalid_options_are_rejected(argv: list[str]) -> None:
 def test_main_prints_progress_and_summary_and_saves_csvs(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    main(["--bot", "threshold:10", "--bot", "threshold:30", "--games", "3", "--seed", "1",
-          "--output", str(tmp_path / "out")])
+    main(
+        [
+            "--bot",
+            "threshold:10",
+            "--bot",
+            "threshold:30",
+            "--games",
+            "3",
+            "--seed",
+            "1",
+            "--output",
+            str(tmp_path / "out"),
+        ]
+    )
     out, err = capsys.readouterr()
     assert out.startswith("2 bots, 3 games of 2 players, Flip 7\n")
     assert "win_rate" in out and "Threshold 30" in out and "95% interval" in out
@@ -92,14 +132,30 @@ def test_bot_specs_round_trip(bot: RandomBot | ThresholdBot | ExpectedValueBot) 
 
 
 def test_rating_options_reach_the_tournament() -> None:
-    options = parse_options([
-        "--rotate-seats", "--games", "9", "--constant-k", "--bootstrap", "0", "--seed", "2",
-    ])
-    assert (options.rotate_seats, options.k_half_life, options.bootstrap) == (True, None, 0)
+    options = parse_options(
+        [
+            "--rotate-seats",
+            "--games",
+            "9",
+            "--constant-k",
+            "--bootstrap",
+            "0",
+            "--seed",
+            "2",
+        ]
+    )
+    assert (options.rotate_seats, options.k_half_life, options.bootstrap) == (
+        True,
+        None,
+        0,
+    )
     assert options.describe().endswith("rotated seats, Flip 7")
     assert parse_options(["--k-half-life", "20"]).k_half_life == 20
 
-    fast = replace(options, bots={"a": ThresholdBot(10), "b": ThresholdBot(30), "c": ThresholdBot(20)})
+    fast = replace(
+        options,
+        bots={"a": ThresholdBot(10), "b": ThresholdBot(30), "c": ThresholdBot(20)},
+    )
     result = fast.run(progress=False)
     assert result.games["deal"].max() == 3
     assert result.summary["rating_low"].isna().all()

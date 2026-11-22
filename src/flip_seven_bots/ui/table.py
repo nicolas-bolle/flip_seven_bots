@@ -143,7 +143,9 @@ class Table:
         """Start a new game with the next generated seed and clear its move history."""
         self._game_seed = self._random.getrandbits(64)
         if self._new_game is seeded_game:
-            self._game = seeded_game(len(self.seats), self._game_seed, rules=self._rules)
+            self._game = seeded_game(
+                len(self.seats), self._game_seed, rules=self._rules
+            )
         else:
             self._game = self._new_game(len(self.seats), self._game_seed)
         self._starting_dealer = self._game.observe(0).dealer

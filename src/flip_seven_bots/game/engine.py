@@ -36,10 +36,15 @@ from .model import (
 from .rules import Rules, VengeanceRules
 
 _SECOND_CHANCE = Card(CardType.SECOND_CHANCE)
-_VENGEANCE_ACTIONS = frozenset((
-    CardType.JUST_ONE_MORE, CardType.FLIP_FOUR, CardType.SWAP,
-    CardType.STEAL, CardType.DISCARD,
-))
+_VENGEANCE_ACTIONS = frozenset(
+    (
+        CardType.JUST_ONE_MORE,
+        CardType.FLIP_FOUR,
+        CardType.SWAP,
+        CardType.STEAL,
+        CardType.DISCARD,
+    )
+)
 _VENGEANCE_MODIFIERS = frozenset((CardType.SUBTRACT, CardType.DIVIDE))
 _ROUND_ACTIONS = frozenset((CardType.FREEZE, CardType.FLIP_THREE))
 _SINGLE_USE = _VENGEANCE_ACTIONS | _ROUND_ACTIONS
@@ -141,7 +146,9 @@ class Game:
             raise ValueError("pass either a deck or a seed, not both")
 
         self._rules = rules if rules is not None else Rules()
-        self._deck = deck if deck is not None else Deck(self._rules.build_deck(), Random(seed))
+        self._deck = (
+            deck if deck is not None else Deck(self._rules.build_deck(), Random(seed))
+        )
         self._players = [_Player() for _ in range(player_count)]
         self._dealer = dealer
         self._round_number = 0
@@ -343,16 +350,24 @@ class Game:
         self._recent_draws.append(event)
         match card.kind:
             case (
-                CardType.NUMBER | CardType.ZERO | CardType.UNLUCKY_SEVEN
+                CardType.NUMBER
+                | CardType.ZERO
+                | CardType.UNLUCKY_SEVEN
                 | CardType.LUCKY_THIRTEEN
             ):
                 self._receive_number(player_index, card, sequence)
             case CardType.SECOND_CHANCE:
                 self._receive_second_chance(player_index, card)
             case (
-                CardType.FREEZE | CardType.FLIP_THREE | CardType.JUST_ONE_MORE
-                | CardType.FLIP_FOUR | CardType.SWAP | CardType.STEAL
-                | CardType.DISCARD | CardType.SUBTRACT | CardType.DIVIDE
+                CardType.FREEZE
+                | CardType.FLIP_THREE
+                | CardType.JUST_ONE_MORE
+                | CardType.FLIP_FOUR
+                | CardType.SWAP
+                | CardType.STEAL
+                | CardType.DISCARD
+                | CardType.SUBTRACT
+                | CardType.DIVIDE
             ):
                 self._players[player_index].cards.append(card)
                 effect = _Resolve(player_index, card, sequence)
@@ -370,7 +385,8 @@ class Game:
         if card.kind is CardType.UNLUCKY_SEVEN:
             deferred = [effect.card for effect in sequence.deferred] if sequence else []
             deferred.extend(
-                task.card for task in self._tasks
+                task.card
+                for task in self._tasks
                 if isinstance(task, _Resolve) and task.player == player_index
             )
             for existing in player.cards[:]:
@@ -381,11 +397,18 @@ class Game:
                     self._deck.discard((existing,))
             player.cards.append(card)
             return
-        matching = [existing for existing in player.cards if existing.is_number and existing.value == card.value]
+        matching = [
+            existing
+            for existing in player.cards
+            if existing.is_number and existing.value == card.value
+        ]
         lucky_thirteen = (
-            card.value == 13 and len(matching) == 1
-            and (card.kind is CardType.LUCKY_THIRTEEN
-                 or matching[0].kind is CardType.LUCKY_THIRTEEN)
+            card.value == 13
+            and len(matching) == 1
+            and (
+                card.kind is CardType.LUCKY_THIRTEEN
+                or matching[0].kind is CardType.LUCKY_THIRTEEN
+            )
         )
         if not matching or lucky_thirteen:
             player.cards.append(card)
@@ -406,7 +429,8 @@ class Game:
             player.cards.append(card)
             return
         targets = tuple(
-            index for index, other in enumerate(self._players)
+            index
+            for index, other in enumerate(self._players)
             if index != player_index and other.is_active and card not in other.cards
         )
         if targets:
@@ -425,7 +449,8 @@ class Game:
             return
         # The loop in _advance ends the round before this runs if nobody is active.
         targets = tuple(
-            index for index, player in enumerate(self._players)
+            index
+            for index, player in enumerate(self._players)
             if (
                 player.is_active
                 if not isinstance(self._rules, VengeanceRules)
@@ -473,7 +498,8 @@ class Game:
         }
         choices = tuple(
             (index, card_index)
-            for index, state in enumerate(self._players) if not state.is_busted
+            for index, state in enumerate(self._players)
+            if not state.is_busted
             for card_index, card in enumerate(state.cards)
             if (card.is_number or card.kind in _VENGEANCE_MODIFIERS)
             and (index, card) not in unresolved
@@ -549,7 +575,11 @@ class Game:
     ) -> None:
         scores = tuple(
             self._round_score(player, flip_seven=index == flip_seven_player)
-            + (self._rules.flip_seven_bonus if index == flip_seven_player and penalty_target is None else 0)
+            + (
+                self._rules.flip_seven_bonus
+                if index == flip_seven_player and penalty_target is None
+                else 0
+            )
             - (self._rules.flip_seven_bonus if index == penalty_target else 0)
             for index, player in enumerate(self._players)
         )
@@ -560,11 +590,15 @@ class Game:
         for player, score in zip(self._players, scores):
             player.total_score += score
         totals = tuple(player.total_score for player in self._players)
-        self._last_round = RoundResult(self._round_number, scores, totals, flip_seven_player)
+        self._last_round = RoundResult(
+            self._round_number, scores, totals, flip_seven_player
+        )
         self._events.append(RoundEnded(self._round_number, self._last_round))
         high_score = max(totals)
         if high_score >= self._rules.target_score:
-            self._winners = tuple(i for i, total in enumerate(totals) if total == high_score)
+            self._winners = tuple(
+                i for i, total in enumerate(totals) if total == high_score
+            )
             self._tasks.clear()
             self._pending = None
         else:
