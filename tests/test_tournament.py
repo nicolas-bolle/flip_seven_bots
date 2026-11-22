@@ -1,5 +1,8 @@
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import pytest
 
 from flip_seven_bots.bots import ThresholdBot
@@ -16,6 +19,11 @@ from flip_seven_bots.tournament.ratings import ELO_SCALE
 
 def threshold_bots(*thresholds: int) -> dict[str, ThresholdBot]:
     return {f"t{threshold}": ThresholdBot(threshold) for threshold in thresholds}
+
+
+def traces(figure: go.Figure) -> tuple[Any, ...]:
+    # plotly leaves Figure.data untyped, so Pylance can't infer the trace type.
+    return cast("tuple[Any, ...]", figure.data)
 
 
 def test_two_player_elo_is_standard_elo() -> None:
@@ -66,7 +74,7 @@ def test_tournament_records_games_and_chains_ratings() -> None:
     assert summary["elo"].to_dict() == pytest.approx(last.to_dict())
     assert summary["games"].tolist() == [4, 4, 4]
     assert summary["wins"].sum() >= 4
-    assert summary.loc["t20", "win_rate"] == summary.loc["t20", "wins"] / 4
+    assert summary["win_rate"]["t20"] == summary["wins"]["t20"] / 4
 
 
 def test_tournament_is_reproducible_with_a_seed() -> None:
@@ -127,7 +135,7 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
     ],
 )
 def test_invalid_tournaments_are_rejected(
-    bots: dict[str, ThresholdBot], options: dict[str, int | bool], message: str
+    bots: dict[str, ThresholdBot], options: dict[str, Any], message: str
 ) -> None:
     with pytest.raises(ValueError, match=message):
         run_tournament(bots, **options)
@@ -237,8 +245,8 @@ def test_plots_show_ratings_intervals_and_elo_history() -> None:
     summary = result.summary.dropna(subset=["rating"])
 
     ratings = result.plot_ratings()
-    assert [trace.x[0] for trace in ratings.data] == list(summary.index)
-    for trace, (_, row) in zip(ratings.data, summary.iterrows()):
+    assert [trace.x[0] for trace in traces(ratings)] == list(summary.index)
+    for trace, (_, row) in zip(traces(ratings), summary.iterrows()):
         assert trace.y[0] == row["rating"]
         assert trace.y[0] + trace.error_y.array[0] == pytest.approx(row["rating_high"])
         assert trace.y[0] - trace.error_y.arrayminus[0] == pytest.approx(
@@ -246,9 +254,9 @@ def test_plots_show_ratings_intervals_and_elo_history() -> None:
         )
 
     elo = result.plot_elo()
-    assert {trace.legendgroup for trace in elo.data} == set(summary.index)
+    assert {trace.legendgroup for trace in traces(elo)} == set(summary.index)
     for name, row in summary.iterrows():
-        band, rating, history = (t for t in elo.data if t.legendgroup == name)
+        band, rating, history = (t for t in traces(elo) if t.legendgroup == name)
         assert (min(band.y), max(band.y)) == (row["rating_low"], row["rating_high"])
         assert set(rating.y) == {row["rating"]}
         assert (history.x[0], history.y[0]) == (0, 1500)

@@ -220,7 +220,7 @@ def format_summary(summary: pd.DataFrame) -> str:
     """Render a tournament summary as an aligned text table, with intervals as ranges."""
     table = summary.drop(columns=["rating_low", "rating_high"])
     table.insert(
-        table.columns.get_loc("rating") + 1,
+        list(table.columns).index("rating") + 1,
         "95% interval",
         [
             "-" if pd.isna(low) else f"{low:.0f}-{high:.0f}"

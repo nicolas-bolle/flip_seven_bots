@@ -288,7 +288,7 @@ class TournamentScene:
             return f"{standing.elo:.0f}"
         rating, low, high = summary.loc[
             standing.name, ["rating", "rating_low", "rating_high"]
-        ]
+        ].to_numpy(dtype=float)
         if math.isnan(rating):  # never played
             return "-"
         if math.isnan(low):  # fewer than two deals

@@ -13,6 +13,7 @@ from flip_seven_bots.game import (
     Card,
     CardDrawn,
     CardType,
+    ChooseTarget,
     Deck,
     DiscardShuffled,
     Game,
@@ -181,6 +182,7 @@ def test_vengeance_player_target_buttons(card: Card) -> None:
         rules=VengeanceRules(),
     )
     press(scene, pygame.K_h)
+    assert isinstance(table.observation.decision, ChooseTarget)
     assert table.observation.decision.card == card
     scene.render(pygame.Surface((1280, 900)))
     press(scene, pygame.K_2)
@@ -285,6 +287,7 @@ def test_buttons_offer_the_legal_actions_with_seat_names() -> None:
 def test_clicking_buttons_hits_and_chooses_a_target() -> None:
     scene, table = make_scene(numbers(3, 1, 2) + [FREEZE])
     click(scene, button(scene, "Hit"))
+    assert isinstance(table.observation.decision, ChooseTarget)
     assert table.observation.decision.card == FREEZE
 
     click(scene, button(scene, "Bot 2"))
@@ -365,6 +368,7 @@ def test_target_buttons_fit_on_screen_for_any_player_count(player_count: int) ->
         numbers(*range(1, player_count + 1)) + [FREEZE], player_count
     )
     press(scene, pygame.K_h)
+    assert isinstance(table.observation.decision, ChooseTarget)
     assert table.observation.decision.card == FREEZE
 
     scene.render(pygame.Surface((1280, 900)), mouse_pos=(0, 0))

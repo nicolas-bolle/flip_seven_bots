@@ -41,7 +41,8 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         "careful",
         "Random bot",
     ]
-    assert options.bots["careful"].threshold == 40
+    careful = options.bots["careful"]
+    assert isinstance(careful, ThresholdBot) and careful.threshold == 40
     assert isinstance(options.rules, VengeanceRules) and options.rules.brutal
     assert (
         options.describe() == "4 bots, 7 games of 3 players, With A Vengeance (Brutal)"

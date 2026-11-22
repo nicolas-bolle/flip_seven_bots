@@ -27,7 +27,7 @@ def plot_ratings(summary: pd.DataFrame) -> go.Figure:
                 y=[row["rating"]],
                 mode="markers",
                 name=name,
-                marker={"color": colors[name], "size": 12},
+                marker={"color": colors[str(name)], "size": 12},
                 error_y={
                     "type": "data",
                     "array": [row["rating_high"] - row["rating"]],

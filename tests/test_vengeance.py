@@ -9,6 +9,7 @@ from flip_seven_bots.game import (
     Card,
     CardType,
     ChooseCard,
+    ChooseTarget,
     Deck,
     Game,
     HitOrStay,
@@ -168,10 +169,12 @@ def test_flip_four_defers_modifiers_and_actions_until_all_draws() -> None:
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(0)
+    assert isinstance(observation.decision, ChooseTarget)
     assert observation.decision.card == subtract(2)
     assert {number(3), number(4), number(5)} <= set(observation.players[0].cards)
     game.apply(target(1))
-    assert game.observe(0).decision.card == STEAL
+    decision = game.observe(0).decision
+    assert isinstance(decision, ChooseCard) and decision.card == STEAL
     choose_card(game, 1, number(2))
     assert number(2) in game.observe(0).players[0].cards
 
@@ -183,6 +186,7 @@ def test_unlucky_seven_during_flip_four_keeps_unresolved_modifier() -> None:
     game.apply(HIT)
     game.apply(target(0))
     observation = game.observe(0)
+    assert isinstance(observation.decision, ChooseTarget)
     assert observation.decision.card == subtract(2)
     assert number(3) in observation.discard
     game.apply(target(1))
@@ -209,7 +213,8 @@ def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
     )
     game.apply(HIT)
     game.apply(target(0))
-    assert game.observe(0).decision.card == SWAP
+    decision = game.observe(0).decision
+    assert isinstance(decision, ChooseCard) and decision.card == SWAP
     first = (1, game.observe(0).players[1].cards.index(UNLUCKY))
     choose_card(game, 1, UNLUCKY)
     # The pending second Swap choice is public, but only the chooser may act on it.
@@ -219,6 +224,7 @@ def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
     assert bystander.legal_actions == ()
     choose_card(game, 0, number(4))
     observation = game.observe(0)
+    assert isinstance(observation.decision, ChooseTarget)
     assert observation.decision.card == subtract(2)
     assert number(3) in observation.discard
     assert number(5) in observation.discard

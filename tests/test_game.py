@@ -89,6 +89,7 @@ def test_deferred_action_and_second_chance_during_flip_three() -> None:
     game.apply(target(1))
 
     observation = game.observe(1)
+    assert isinstance(observation.decision, ChooseTarget)
     assert observation.decision.card == FREEZE
     assert observation.players[1].status == PlayerStatus.ACTIVE
     assert observation.discard == (CHANCE, number(2))
@@ -110,6 +111,7 @@ def test_resolved_action_cards_remain_with_their_recipients() -> None:
     game.apply(target(0))
 
     observation = game.observe(0)
+    assert isinstance(observation.decision, ChooseTarget)
     assert observation.decision.card == FREEZE
     assert FLIP_THREE not in observation.discard
     assert FLIP_THREE in observation.players[0].cards
@@ -140,7 +142,8 @@ def test_bust_during_deferred_flip_keeps_remaining_deferred_actions() -> None:
     )
     game.apply(HIT)
     game.apply(target(1))
-    assert game.observe(1).decision.card == FLIP_THREE
+    decision = game.observe(1).decision
+    assert isinstance(decision, ChooseTarget) and decision.card == FLIP_THREE
     game.apply(target(1))
 
     observation = game.observe(0)
@@ -255,6 +258,7 @@ def test_flip_three_drawn_during_flip_three_resolves_after_the_draws() -> None:
     game.apply(target(0))
 
     observation = game.observe(0)
+    assert isinstance(observation.decision, ChooseTarget)
     assert observation.decision.card == FLIP_THREE
     assert observation.current_player == 0
     assert {number(5), number(6)} <= set(observation.players[0].cards)
@@ -426,7 +430,8 @@ def test_draw_fails_if_deck_and_discard_are_exhausted() -> None:
 
 def test_freezing_player_during_initial_deal_skips_their_deal() -> None:
     game = stacked_game([FREEZE, number(9)])
-    assert game.observe(1).decision.card == FREEZE
+    decision = game.observe(1).decision
+    assert isinstance(decision, ChooseTarget) and decision.card == FREEZE
 
     game.apply(target(0))
     observation = game.observe(1)
