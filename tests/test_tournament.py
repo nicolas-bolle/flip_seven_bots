@@ -5,8 +5,10 @@ import pytest
 from flip_seven_bots.bots import ThresholdBot
 from flip_seven_bots.tournament import (
     PairwiseResults,
+    TournamentResult,
     elo_update,
     fit_bradley_terry,
+    play_tournament,
     run_tournament,
 )
 from flip_seven_bots.tournament.ratings import ELO_SCALE
@@ -225,3 +227,29 @@ def test_rating_interval_counts_each_unit_once() -> None:
     # One unit gives no interval.
     _, low, high = two_player_results(1, 1, shared=True).fit()
     assert np.isnan(low).all() and np.isnan(high).all()
+
+
+def test_plots_show_ratings_intervals_and_elo_history() -> None:
+    records = list(play_tournament(threshold_bots(10, 30), games=4, seed=1))
+    result = TournamentResult.from_records(
+        records, ["t10", "t30", "idle"], initial_rating=1500
+    )
+    summary = result.summary.dropna(subset=["rating"])
+
+    ratings = result.plot_ratings()
+    assert [trace.x[0] for trace in ratings.data] == list(summary.index)
+    for trace, (_, row) in zip(ratings.data, summary.iterrows()):
+        assert trace.y[0] == row["rating"]
+        assert trace.y[0] + trace.error_y.array[0] == pytest.approx(row["rating_high"])
+        assert trace.y[0] - trace.error_y.arrayminus[0] == pytest.approx(
+            row["rating_low"]
+        )
+
+    elo = result.plot_elo()
+    assert {trace.legendgroup for trace in elo.data} == set(summary.index)
+    for name, row in summary.iterrows():
+        band, rating, history = (t for t in elo.data if t.legendgroup == name)
+        assert (min(band.y), max(band.y)) == (row["rating_low"], row["rating_high"])
+        assert set(rating.y) == {row["rating"]}
+        assert (history.x[0], history.y[0]) == (0, 1500)
+        assert (history.x[-1], history.y[-1]) == (4, row["elo"])

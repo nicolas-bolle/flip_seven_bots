@@ -8,11 +8,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 from tqdm.auto import tqdm
 
 from flip_seven_bots.game import Rules
 from flip_seven_bots.simulation import play_game
 
+from . import plots
 from .ratings import PairwiseResults, elo_update
 
 if TYPE_CHECKING:
@@ -64,6 +66,14 @@ class TournamentResult:
     confidence interval; and ``elo``, the final online Elo rating.
     Statistics are ``NaN`` for a player who never played.
     """
+
+    def plot_ratings(self) -> go.Figure:
+        """Plot each player's ``rating`` with its confidence interval, best first."""
+        return plots.plot_ratings(self.summary)
+
+    def plot_elo(self) -> go.Figure:
+        """Plot the online Elo after each game, over each final ``rating`` and interval."""
+        return plots.plot_elo(self.games, self.summary)
 
     @classmethod
     def from_records(

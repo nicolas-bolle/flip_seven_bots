@@ -327,7 +327,14 @@ result = run_tournament(
 print(result.summary)  # games, wins, win_rate, mean_place, mean_score,
 # rating, rating_low, rating_high, elo
 result.games  # per game and player: seat, score, place, won, Elo
+
+result.plot_ratings().show()  # each rating with its confidence interval
+result.plot_elo().show()  # Elo after each game, over each final rating and interval
 ```
+
+The plot methods return Plotly figures, which display directly in a notebook.
+In the Elo chart, each bot's final rating is a dotted line inside a shaded band
+for its interval; click a bot in the legend to hide or show all three.
 
 `run_tournament` takes the same settings as the command line:
 `players_per_game`, `rules`, `seed`, `k_factor`,
