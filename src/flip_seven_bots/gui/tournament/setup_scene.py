@@ -11,16 +11,16 @@ from flip_seven_bots.tournament.config import TournamentOptions
 from ..common.theme import ACCENT, BACKGROUND, MUTED
 from ..common.widgets import draw_button, draw_field, draw_text
 
-BASE_BUTTON = pygame.Rect(90, 150, 260, 52)
-VENGEANCE_BUTTON = pygame.Rect(365, 150, 330, 52)
-BRUTAL_BUTTON = pygame.Rect(710, 150, 270, 52)
-GAMES_FIELD = pygame.Rect(90, 268, 180, 48)
-TABLE_FIELD = pygame.Rect(300, 268, 180, 48)
-SEED_FIELD = pygame.Rect(510, 268, 180, 48)
-JOBS_FIELD = pygame.Rect(720, 268, 180, 48)
+BASE_BUTTON = pygame.Rect(90, 135, 260, 52)
+VENGEANCE_BUTTON = pygame.Rect(365, 135, 330, 52)
+BRUTAL_BUTTON = pygame.Rect(710, 135, 270, 52)
+GAMES_FIELD = pygame.Rect(90, 243, 180, 48)
+TABLE_FIELD = pygame.Rect(300, 243, 180, 48)
+SEED_FIELD = pygame.Rect(510, 243, 180, 48)
+JOBS_FIELD = pygame.Rect(720, 243, 180, 48)
 ADD_BUTTON = pygame.Rect(90, 800, 220, 48)
 START_BUTTON = pygame.Rect(1000, 795, 190, 56)
-MAX_BOTS = 8
+MAX_BOTS = 10
 MAX_NAME_LENGTH = 24
 MAX_NUMBER_LENGTH = 6
 
@@ -39,12 +39,12 @@ class _BotSetting:
 
 
 def _row_rects(index: int) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
-    y = 400 + index * 48
+    y = 364 + index * 42
     return (
-        pygame.Rect(90, y, 320, 40),
-        pygame.Rect(425, y, 250, 40),
-        pygame.Rect(690, y, 180, 40),
-        pygame.Rect(885, y, 150, 40),
+        pygame.Rect(90, y, 320, 38),
+        pygame.Rect(425, y, 250, 38),
+        pygame.Rect(690, y, 180, 38),
+        pygame.Rect(885, y, 150, 38),
     )
 
 
@@ -214,7 +214,7 @@ class TournamentSetupScene:
         font, small = self._font, self._small_font
         screen.fill(BACKGROUND)
         draw_text(screen, self._title_font, "TOURNAMENT SETUP", (90, 45), ACCENT)
-        draw_text(screen, self._heading_font, "Game mode", (90, 110))
+        draw_text(screen, self._heading_font, "Game mode", (90, 95))
         draw_button(screen, font, BASE_BUTTON, "Flip 7", not self.vengeance)
         draw_button(screen, font, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
         draw_button(
@@ -232,15 +232,15 @@ class TournamentSetupScene:
             ("jobs", JOBS_FIELD, "WORKERS"),
         )
         for field, rect, label in labels:
-            draw_text(screen, small, label, (rect.x, 245), MUTED)
+            draw_text(screen, small, label, (rect.x, rect.y - 23), MUTED)
             draw_field(
                 screen, font, rect, self.numbers[field], self._focus == (field, 0)
             )
 
-        draw_text(screen, self._heading_font, "Bots", (90, 340))
-        draw_text(screen, small, "NAME", (90, 378), MUTED)
-        draw_text(screen, small, "TYPE (CLICK TO CHANGE)", (425, 378), MUTED)
-        draw_text(screen, small, "PARAMETERS", (690, 378), MUTED)
+        draw_text(screen, self._heading_font, "Bots", (90, 310))
+        draw_text(screen, small, "NAME", (90, 342), MUTED)
+        draw_text(screen, small, "TYPE (CLICK TO CHANGE)", (425, 342), MUTED)
+        draw_text(screen, small, "PARAMETERS", (690, 342), MUTED)
         for index, bot in enumerate(self.bots):
             name, kind, parameter, remove = _row_rects(index)
             draw_field(screen, font, name, bot.name, self._focus == ("name", index))

@@ -9,10 +9,11 @@ import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.game import Action, Observation
-from flip_seven_bots.gui.tournament import app
+from flip_seven_bots.gui.tournament import app, run_scene
 from flip_seven_bots.gui.tournament.run_scene import (
     NEW_BUTTON,
     SAVE_BUTTON,
+    STANDINGS,
     STOP_BUTTON,
     TournamentScene,
 )
@@ -120,6 +121,42 @@ def test_setup_limits_bot_count() -> None:
     for _ in range(MAX_BOTS):
         click(scene, _row_rects(0)[3])
     assert len(scene.bots) == 2
+
+
+def test_setup_fits_the_most_bots_between_the_settings_and_buttons() -> None:
+    rows = [rect for index in range(MAX_BOTS) for rect in _row_rects(index)]
+    assert all(rect.top > GAMES_FIELD.bottom for rect in rows)
+    assert all(not rect.colliderect(ADD_BUTTON) for rect in rows)
+    assert all(not rect.colliderect(START_BUTTON) for rect in rows)
+
+
+def test_standings_fit_the_most_bots_in_distinct_colors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    names = [f"bot {index}" for index in range(MAX_BOTS)]
+    argv = [arg for name in names for arg in ("--bot", f"{name}=random")]
+    scene = TournamentScene(parse_options([*argv, "--games", "1"]))
+    drawn: dict[str, tuple[int, int]] = {}
+    colors: set[object] = set()
+    monkeypatch.setattr(
+        run_scene,
+        "draw_text",
+        lambda _screen, _font, text, position, _color=None: drawn.setdefault(
+            text, position
+        ),
+    )
+    monkeypatch.setattr(
+        run_scene.pygame.draw,
+        "rect",
+        lambda _screen, color, *_args, **_kwargs: colors.add(tuple(color)),
+    )
+    try:
+        scene.render(pygame.Surface((1280, 900)))
+    finally:
+        scene.close()
+    # Each row's stripe spans 8 pixels above its text to 32 below.
+    assert all(drawn[name][1] + 32 <= STANDINGS.bottom for name in names)
+    assert len(colors & set(run_scene.LINE_COLORS)) == MAX_BOTS
 
 
 @pytest.mark.parametrize(

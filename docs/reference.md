@@ -300,7 +300,7 @@ uv run flip7 tournament --gui
 ```
 
 The setup screen lets you choose the game mode, number of games, players per
-game, seed, and up to eight bots. Giving any of the tournament options above
+game, seed, and up to ten bots. Giving any of the tournament options above
 skips setup and starts immediately unless `--setup` is supplied.
 
 While it runs, the window shows a progress bar, live standings by Elo, and an

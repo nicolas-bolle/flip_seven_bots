@@ -44,6 +44,8 @@ LINE_COLORS = (
     (199, 146, 234),
     (240, 244, 229),
     (42, 157, 143),
+    (239, 112, 160),
+    (176, 216, 88),
 )
 
 
@@ -265,7 +267,7 @@ class TournamentScene:
         else:
             ranked = sorted(self._standings.values(), key=lambda s: s.elo, reverse=True)
         for row, standing in enumerate(ranked):
-            row_y = y + 70 + row * 46
+            row_y = y + 70 + row * 43
             if row % 2 == 0:
                 stripe = (STANDINGS.x + 8, row_y - 8, STANDINGS.width - 16, 40)
                 pygame.draw.rect(screen, PANEL_ALT, stripe, border_radius=6)
