@@ -1,32 +1,20 @@
 """Pygame application loop for tournaments."""
 
-import sys
-from collections.abc import Sequence
-
 import pygame
 
-from flip_seven_bots.tournament.cli import parse_options
+from flip_seven_bots.tournament.config import TournamentOptions
 
-from ..widgets import make_icon
+from ..common.widgets import make_icon
 from .run_scene import TournamentScene
 from .setup_scene import TournamentSetupScene
 
 
-def main(argv: Sequence[str] | None = None) -> None:
-    """Open tournament setup, or run a tournament directly if any options are given.
+def main(options: TournamentOptions, *, show_setup: bool = False) -> None:
+    """Open the tournament window with these settings, on setup or running.
 
-    Options are the same as for ``python -m flip_seven_bots.tournament``. A
-    running tournament is stopped when the window closes.
+    A running tournament is stopped when the window closes. Command-line
+    options are parsed by ``flip7 tournament`` (see ``tournament.cli``).
     """
-    options = parse_options(
-        argv,
-        prog="python -m flip_seven_bots.ui.tournament",
-        description=(
-            "Watch a tournament between bots. With no options, configure it on the "
-            "setup screen; any options start it immediately."
-        ),
-    )
-    show_setup = not (sys.argv[1:] if argv is None else argv)
     pygame.init()
     scene: TournamentSetupScene | TournamentScene | None = None
     try:

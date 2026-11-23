@@ -80,6 +80,7 @@ def test_vengeance_scoring_applies_division_then_subtractions_and_clamps() -> No
 
 
 def test_zero_forces_hit_and_only_zeroes_the_round_score() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([ZERO, number(4), number(5)])
     observation = game.observe(1)
     assert observation.legal_actions == (HIT,)
@@ -145,12 +146,35 @@ def test_just_one_more_can_target_a_stayed_player_and_they_remain_stayed() -> No
     assert game.current_player == 0
 
 
-def test_player_with_no_cards_can_stay_after_giving_away_initial_modifier() -> None:
+def test_drawn_modifier_is_unresolved_and_unscored_until_a_player_receives_it() -> None:
+    game = game_with([number(5), number(12), subtract(10)])
+    game.apply(HIT)
+    drawer = game.observe(1).players[1]
+    assert drawer.unresolved == (subtract(10),)
+    assert (drawer.cards, drawer.round_score) == ((number(5),), 5)
+    game.apply(target(0))
+    receiver, drawer = game.observe(1).players
+    assert drawer.unresolved == ()
+    assert (receiver.cards, receiver.round_score) == ((number(12), subtract(10)), 2)
+
+
+def test_just_one_more_before_a_players_deal_replaces_their_deal() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = game_with([ONE_MORE, number(4), number(9)])
+    game.apply(target(0))
+    observation = game.observe(1)
+    assert observation.players[0].cards == (number(4),)
+    assert observation.players[0].status is PlayerStatus.STAYED
+    assert game.hidden_deck() == (number(9),)
+
+
+def test_player_with_no_cards_must_hit_after_giving_away_initial_modifier() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([subtract(2), number(4)])
     game.apply(target(0))
     observation = game.observe(1)
     assert observation.players[1].cards == ()
-    assert observation.legal_actions == (HIT, STAY)
+    assert observation.legal_actions == (HIT,)
 
 
 def test_just_one_more_resolves_drawn_action_even_if_everyone_has_stayed() -> None:
@@ -180,6 +204,7 @@ def test_flip_four_defers_modifiers_and_actions_until_all_draws() -> None:
 
 
 def test_unlucky_seven_during_flip_four_keeps_unresolved_modifier() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with(
         [number(2), number(3), FLIP_FOUR, subtract(2), UNLUCKY, number(4), number(5)]
     )
@@ -207,7 +232,45 @@ def test_flip_four_stops_on_bust_and_discards_deferred_effects() -> None:
     assert game.hidden_deck() == (number(9),)
 
 
+def test_flip_seven_during_flip_four_does_not_score_a_modifier_not_yet_played() -> None:
+    low = [number(value) for value in range(2, 7)]
+    game = game_with([number(1), number(12), *low, FLIP_FOUR, subtract(10), number(8)])
+    game.apply(HIT)
+    game.apply(STAY)
+    for _ in range(4):
+        game.apply(HIT)
+    game.apply(HIT)
+    game.apply(target(1))
+    assert game.last_round is not None
+    assert game.last_round.flip_seven_player == 1
+    assert game.last_round.scores == (12, 29 + 15)
+
+
+def test_flip_seven_before_a_deferred_modifier_resolves_does_not_score_it() -> None:
+    game = game_with(
+        [
+            *(number(value) for value in (1, 12, 2, 3, 4)),
+            FLIP_FOUR,
+            STEAL,
+            subtract(10),
+            number(5),
+            number(6),
+        ]
+    )
+    game.apply(HIT)
+    game.apply(STAY)
+    game.apply(HIT)
+    game.apply(HIT)
+    game.apply(HIT)
+    game.apply(target(1))
+    choose_card(game, 0, number(12))
+    assert game.last_round is not None
+    assert game.last_round.flip_seven_player == 1
+    assert game.last_round.scores == (0, 33 + 15)
+
+
 def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with(
         [UNLUCKY, number(3), FLIP_FOUR, SWAP, subtract(2), number(4), number(5)]
     )
@@ -233,11 +296,23 @@ def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
 
 
 def test_stealing_duplicate_busts_the_recipient() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([number(2), number(2), STEAL])
     game.apply(HIT)
     choose_card(game, 0, number(2))
     assert game.observe(0).players[1].status is PlayerStatus.BUSTED
     assert STEAL in game.observe(0).discard
+
+
+def test_busted_players_cards_cannot_be_chosen() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = game_with([number(2), number(3), number(2), DISCARD])
+    game.apply(HIT)
+    game.apply(HIT)
+    observation = game.observe(0)
+    assert observation.players[1].status is PlayerStatus.BUSTED
+    assert isinstance(observation.decision, ChooseCard)
+    assert {owner for owner, _ in observation.decision.choices} == {0}
 
 
 def test_stealing_zero_moves_its_effect_to_the_new_owner() -> None:
@@ -299,6 +374,7 @@ def test_untargetable_action_is_discarded(card: Card) -> None:
 
 
 def test_brutal_mode_modifier_can_give_busted_player_negative_score() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([number(2), number(3), number(2), subtract(4)], brutal=True)
     game.apply(HIT)
     game.apply(HIT)
@@ -307,6 +383,26 @@ def test_brutal_mode_modifier_can_give_busted_player_negative_score() -> None:
     observation = game.observe(0)
     assert observation.players[1].status is PlayerStatus.BUSTED
     assert observation.players[1].round_score == -4
+
+
+def test_brutal_mode_modifier_held_before_busting_still_counts() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = game_with([number(5), number(12), subtract(10), number(12)], brutal=True)
+    game.apply(HIT)
+    game.apply(target(0))
+    game.apply(HIT)
+    observation = game.observe(0)
+    assert observation.players[0].status is PlayerStatus.BUSTED
+    assert observation.players[0].round_score == -10
+
+
+def test_brutal_mode_zero_holder_scores_zero_despite_modifiers() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = game_with([ZERO, number(4), subtract(10)], brutal=True)
+    game.apply(HIT)
+    game.apply(target(1))
+    assert game.observe(1).players[1].cards == (ZERO, subtract(10))
+    assert game.observe(1).players[1].round_score == 0
 
 
 def test_brutal_mode_can_subtract_flip_seven_bonus_from_another_player() -> None:
@@ -340,7 +436,7 @@ def test_brutal_mode_can_keep_flip_seven_bonus() -> None:
 
 
 @pytest.mark.parametrize("brutal", [False, True])
-def test_complete_seeded_vengeance_game(brutal: bool) -> None:
+def test_seeded_vengeance_game_finishes_with_a_winner(brutal: bool) -> None:
     result = play_game(
         [ThresholdBot(25), ThresholdBot(25), ThresholdBot(25)],
         seed=42,
@@ -361,6 +457,7 @@ def test_vengeance_card_conservation_through_a_game(brutal: bool) -> None:
         cards = Counter(game.hidden_deck()) + Counter(observation.discard)
         for player in observation.players:
             cards.update(player.cards)
+            cards.update(player.unresolved)
         assert cards == expected
         if game.is_finished:
             break

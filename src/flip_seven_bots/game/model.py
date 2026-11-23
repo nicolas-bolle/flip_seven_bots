@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class CardType(Enum):
-    """Kinds of cards in the base and With A Vengeance decks."""
+    """Kinds of cards in the base and With a Vengeance decks."""
 
     NUMBER = auto()
     ADD = auto()
@@ -116,8 +116,8 @@ class HitOrStay:
     can_stay: bool
     """Whether ``STAY`` is legal in addition to ``HIT``.
 
-    Staying is unavailable with an empty hand in the base game, or while holding
-    a Vengeance Zero.
+    Staying is unavailable with an empty hand, or while holding a Vengeance
+    Zero.
     """
 
     @property
@@ -160,7 +160,7 @@ class ChooseTarget:
 
 @dataclass(frozen=True)
 class ChooseCard:
-    """Choose a card in someone's hand for a Vengeance Swap, Steal or Discard.
+    """Choose a card in someone's hand for a Vengeance Swap, Steal, or Discard.
 
     A Swap takes two such decisions, one per card.
     """
@@ -226,9 +226,17 @@ class PlayerView:
     """Whether this player is active, stayed, or busted in the current round."""
 
     cards: tuple[Card, ...]
-    """Revealed cards in engine hand order, not UI display order.
+    """The player's hand in engine hand order, not UI display order.
 
-    Includes unresolved cards, and cards kept after staying or busting.
+    Includes cards kept after staying or busting, but not ``unresolved`` cards.
+    """
+
+    unresolved: tuple[Card, ...]
+    """Action and modifier cards this player revealed that are awaiting resolution.
+
+    They wait for a target, a card choice, or the end of a multi-card flip.
+    They are in nobody's hand, so they affect no score and cannot be chosen
+    by a Swap, Steal, or Discard.
     """
 
     round_score: int

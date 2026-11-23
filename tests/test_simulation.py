@@ -23,6 +23,26 @@ def test_seeded_game_completes_reproducibly() -> None:
     assert first.current_player is None
 
 
+def test_optional_game_hooks_receive_seat_and_final_observation() -> None:
+    class ObservingBot(ThresholdBot):
+        def __init__(self) -> None:
+            super().__init__(0)
+            self.started = None
+            self.finished = None
+
+        def on_game_start(self, seat: int, count: int, rules: Rules) -> None:
+            self.started = (seat, count, rules.target_score)
+
+        def on_game_end(self, observation: Observation) -> None:
+            self.finished = observation
+
+    bot = ObservingBot()
+    play_game([ThresholdBot(0), bot], seed=2, rules=Rules(target_score=20))
+    assert bot.started == (1, 2, 20)
+    assert bot.finished is not None
+    assert bot.finished.player == 1 and bot.finished.winners
+
+
 def test_simulation_rejects_illegal_bot_action() -> None:
     class IllegalBot:
         def choose_action(self, observation: Observation) -> Action:

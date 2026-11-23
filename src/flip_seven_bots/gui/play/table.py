@@ -6,6 +6,7 @@ from random import Random
 
 from flip_seven_bots.bots import Bot
 from flip_seven_bots.game import Action, Game, Observation, RoundResult, Rules
+from flip_seven_bots.simulation import end_bots, start_bots
 
 MINIMUM_BOT_TIME_SECONDS = 1
 
@@ -148,6 +149,7 @@ class Table:
             )
         else:
             self._game = self._new_game(len(self.seats), self._game_seed)
+        start_bots(self._game, [seat.bot for seat in self.seats])
         self._starting_dealer = self._game.observe(0).dealer
         self._moves: list[Move] = []
         self._shown_round = 0
@@ -189,6 +191,8 @@ class Table:
         # Recorded first so a report written after a crash includes the failing move.
         self._moves.append(Move(player, action))
         self._game.apply(action)
+        if self._game.is_finished:
+            end_bots(self._game, [seat.bot for seat in self.seats])
         self._bot_due = None
         self._check_round_summary()
 

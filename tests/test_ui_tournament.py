@@ -9,17 +9,18 @@ import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.game import Action, Observation
-from flip_seven_bots.tournament.cli import TournamentOptions, parse_options
-from flip_seven_bots.ui.tournament import app
-from flip_seven_bots.ui.tournament.run_scene import (
+from flip_seven_bots.gui.tournament import app, run_scene
+from flip_seven_bots.gui.tournament.run_scene import (
     NEW_BUTTON,
     SAVE_BUTTON,
+    STANDINGS,
     STOP_BUTTON,
     TournamentScene,
 )
-from flip_seven_bots.ui.tournament.setup_scene import (
+from flip_seven_bots.gui.tournament.setup_scene import (
     ADD_BUTTON,
     GAMES_FIELD,
+    JOBS_FIELD,
     MAX_BOTS,
     SEED_FIELD,
     START_BUTTON,
@@ -28,6 +29,7 @@ from flip_seven_bots.ui.tournament.setup_scene import (
     TournamentSetupScene,
     _row_rects,
 )
+from flip_seven_bots.tournament.cli import TournamentOptions, parse_options
 
 
 @pytest.fixture(autouse=True)
@@ -88,6 +90,7 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     replace_field(scene, GAMES_FIELD, "12")
     replace_field(scene, TABLE_FIELD, "2")
     replace_field(scene, SEED_FIELD, "7x")  # non-digits are ignored
+    replace_field(scene, JOBS_FIELD, "2")
     click(scene, _row_rects(0)[1])  # random -> threshold
     replace_field(scene, _row_rects(0)[2], "15")
     replace_field(scene, _row_rects(2)[0], "Threshold 30")
@@ -106,6 +109,7 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     assert result.bots["Random bot"].threshold == 15
     assert isinstance(result.bots["Threshold 30 2"], ExpectedValueBot)
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
+    assert result.jobs == 2
     assert result.vengeance and not result.brutal and result.k_factor == 16
 
 
@@ -117,6 +121,42 @@ def test_setup_limits_bot_count() -> None:
     for _ in range(MAX_BOTS):
         click(scene, _row_rects(0)[3])
     assert len(scene.bots) == 2
+
+
+def test_setup_fits_the_most_bots_between_the_settings_and_buttons() -> None:
+    rows = [rect for index in range(MAX_BOTS) for rect in _row_rects(index)]
+    assert all(rect.top > GAMES_FIELD.bottom for rect in rows)
+    assert all(not rect.colliderect(ADD_BUTTON) for rect in rows)
+    assert all(not rect.colliderect(START_BUTTON) for rect in rows)
+
+
+def test_standings_fit_the_most_bots_in_distinct_colors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    names = [f"bot {index}" for index in range(MAX_BOTS)]
+    argv = [arg for name in names for arg in ("--bot", f"{name}=random")]
+    scene = TournamentScene(parse_options([*argv, "--games", "1"]))
+    drawn: dict[str, tuple[int, int]] = {}
+    colors: set[object] = set()
+    monkeypatch.setattr(
+        run_scene,
+        "draw_text",
+        lambda _screen, _font, text, position, _color=None: drawn.setdefault(
+            text, position
+        ),
+    )
+    monkeypatch.setattr(
+        run_scene.pygame.draw,
+        "rect",
+        lambda _screen, color, *_args, **_kwargs: colors.add(tuple(color)),
+    )
+    try:
+        scene.render(pygame.Surface((1280, 900)))
+    finally:
+        scene.close()
+    # Each row's stripe spans 8 pixels above its text to 32 below.
+    assert all(drawn[name][1] + 32 <= STANDINGS.bottom for name in names)
+    assert len(colors & set(run_scene.LINE_COLORS)) == MAX_BOTS
 
 
 @pytest.mark.parametrize(
@@ -160,6 +200,12 @@ def test_tournament_runs_in_the_background_and_shows_results(tmp_path: Path) -> 
     assert scene.restart
 
 
+def test_tournament_window_runs_with_parallel_workers() -> None:
+    scene = TournamentScene(quick_options(seed=3, jobs=2))
+    wait_until(scene, lambda: scene.finished)
+    assert scene.error is None and len(scene.records) == 5
+
+
 def test_tournament_saves_automatically_to_the_output_folder(tmp_path: Path) -> None:
     scene = TournamentScene(quick_options(output=tmp_path))
     wait_until(scene, lambda: scene.finished)
@@ -181,7 +227,7 @@ def test_bot_errors_are_shown_instead_of_crashing() -> None:
             raise RuntimeError("boom")
 
     scene = TournamentScene(
-        quick_options(bots={"broken": Broken(), "random": RandomBot()})
+        quick_options(bots={"broken": lambda seed: Broken(), "random": RandomBot()})
     )
     wait_until(scene, lambda: scene.finished)
     scene.render(pygame.Surface((1280, 900)))
@@ -219,7 +265,7 @@ def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(
     monkeypatch.setattr(pygame.event, "get", lambda: next(frames))
     monkeypatch.setattr(app, "TournamentScene", Recording)
 
-    app.main([])
+    app.main(parse_options([]), show_setup=True)
 
     assert len(scenes) == 1 and scenes[0]._stop.is_set()
     cleanup.assert_called_once_with()

@@ -1,4 +1,4 @@
-"""A turn-based, headless engine for the base and With A Vengeance games.
+"""A turn-based, headless engine for the base and With a Vengeance games.
 
 Automatic effects are queued as tasks. The engine executes them until a player
 decision is needed, then resumes the queue when ``Game.apply`` is called.
@@ -49,12 +49,34 @@ _VENGEANCE_MODIFIERS = frozenset((CardType.SUBTRACT, CardType.DIVIDE))
 _ROUND_ACTIONS = frozenset((CardType.FREEZE, CardType.FLIP_THREE))
 _SINGLE_USE = _VENGEANCE_ACTIONS | _ROUND_ACTIONS
 
+MAX_PLAYERS = 10
+"""Most seats a game allows, so the draw and discard piles can never both run out.
+
+Each player holds at most seven number cards, and the one drawing at most six,
+so with more seats every number card could be on the table with none to draw.
+"""
+
+
+def _sample_observation(
+    snapshot: Game,
+    version: list[int],
+    expected: int,
+    rng: Random,
+    next_draws: Sequence[Card],
+) -> Game:
+    if version[0] != expected:
+        raise RuntimeError("observation is out of date; the game has advanced")
+    clone = snapshot.determinize(rng)
+    clone._deck.stack(next_draws)
+    return clone
+
 
 @dataclass
 class _Player:
     total_score: int = 0
     status: PlayerStatus = PlayerStatus.ACTIVE
     cards: list[Card] = field(default_factory=list)
+    unresolved: list[Card] = field(default_factory=list)
 
     @property
     def is_active(self) -> bool:
@@ -73,6 +95,7 @@ class _Player:
     def reset(self) -> None:
         self.status = PlayerStatus.ACTIVE
         self.cards.clear()
+        self.unresolved.clear()
 
 
 @dataclass(eq=False)
@@ -123,7 +146,8 @@ class Game:
     ``observe`` exposes public information, never the shuffled deck. Use
     ``VengeanceRules`` to select the alternate game.
 
-    ``player_count`` must be positive and ``dealer`` must identify a seat.
+    ``player_count`` must be between one and ``MAX_PLAYERS`` and ``dealer``
+    must identify a seat.
     ``seed`` controls the shuffled deck; alternatively, pass a prepared
     ``deck`` (but not both). Initial dealing occurs during construction and
     may itself stop at an action-card decision.
@@ -138,8 +162,8 @@ class Game:
         seed: int | None = None,
         dealer: int = 0,
     ):
-        if player_count < 1:
-            raise ValueError("player_count must be at least one")
+        if not 1 <= player_count <= MAX_PLAYERS:
+            raise ValueError(f"player_count must be between 1 and {MAX_PLAYERS}")
         if not 0 <= dealer < player_count:
             raise ValueError("dealer must be a valid player index")
         if deck is not None and seed is not None:
@@ -159,6 +183,7 @@ class Game:
         self._events: list[GameEvent] = []
         self._recent_draws: list[CardDrawn] = []
         self._version = 0
+        self._version_token = [0]
         self._start_round()
         self._advance()
 
@@ -216,6 +241,7 @@ class Game:
                 total_score=state.total_score,
                 status=state.status,
                 cards=tuple(state.cards),
+                unresolved=tuple(state.unresolved),
                 round_score=self._round_score(state),
             )
             for index, state in enumerate(self._players)
@@ -232,8 +258,34 @@ class Game:
             last_round=self._last_round,
             winners=self._winners,
             events=tuple(self._events),
-            _sampler=partial(self._sample, self._version),
+            _sampler=partial(
+                _sample_observation,
+                self._public_snapshot(),
+                self._version_token,
+                self._version,
+            ),
         )
+
+    def _public_snapshot(self) -> Game:
+        snapshot = copy.copy(self)
+        snapshot._deck = copy.copy(self._deck)
+        snapshot._deck._cards = list(self._deck.composition)
+        snapshot._deck._discard = list(self._deck.discard_pile)
+        snapshot._deck._random = Random(0)
+        snapshot._players = [
+            _Player(
+                player.total_score,
+                player.status,
+                list(player.cards),
+                list(player.unresolved),
+            )
+            for player in self._players
+        ]
+        snapshot._tasks = copy.deepcopy(self._tasks)
+        snapshot._events = list(self._events)
+        snapshot._recent_draws = list(self._recent_draws)
+        snapshot._version_token = [self._version]
+        return snapshot
 
     def determinize(self, rng: Random) -> Game:
         """Return an independent copy with the hidden deck order resampled from ``rng``."""
@@ -252,6 +304,7 @@ class Game:
             raise ValueError(f"illegal action: {action!r}")
         self._pending = None
         self._version += 1
+        self._version_token[0] = self._version
         self._events.append(ActionChosen(self._round_number, decision.player, action))
 
         match decision:
@@ -270,13 +323,6 @@ class Game:
                 else:
                     self._tasks.appendleft(_Draw(player))
         self._advance()
-
-    def _sample(self, version: int, rng: Random, next_draws: Sequence[Card]) -> Game:
-        if version != self._version:
-            raise RuntimeError("observation is out of date; the game has advanced")
-        clone = self.determinize(rng)
-        clone._deck.stack(next_draws)
-        return clone
 
     def _start_round(self) -> None:
         self._round_number += 1
@@ -310,7 +356,7 @@ class Game:
                     if sequence is None or not self._players[sequence.player].is_busted:
                         self._resolve(effect)
                     elif effect.card.kind not in _ROUND_ACTIONS:
-                        self._discard_action(effect.player, effect.card)
+                        self._discard_unresolved(effect.player, effect.card)
                 case _FinishFlip(sequence=sequence):
                     if sequence.card.kind not in _ROUND_ACTIONS:
                         self._discard_action(sequence.player, sequence.card)
@@ -319,7 +365,7 @@ class Game:
                     else:
                         for effect in sequence.deferred:
                             if effect.card.kind not in _ROUND_ACTIONS:
-                                self._discard_action(effect.player, effect.card)
+                                self._discard_unresolved(effect.player, effect.card)
                 case _FindTurn(start=start):
                     if any(player.is_active for player in self._players):
                         self._find_turn(start)
@@ -337,9 +383,7 @@ class Game:
 
     def _can_stay(self, player_index: int) -> bool:
         cards = self._players[player_index].cards
-        if any(card.kind is CardType.ZERO for card in cards):
-            return False
-        return isinstance(self._rules, VengeanceRules) or bool(cards)
+        return bool(cards) and not any(card.kind is CardType.ZERO for card in cards)
 
     def _draw(self, player_index: int, sequence: _FlipSequence | None) -> None:
         card, reshuffled = self._deck.draw()
@@ -355,7 +399,7 @@ class Game:
                 | CardType.UNLUCKY_SEVEN
                 | CardType.LUCKY_THIRTEEN
             ):
-                self._receive_number(player_index, card, sequence)
+                self._receive_number(player_index, card)
             case CardType.SECOND_CHANCE:
                 self._receive_second_chance(player_index, card)
             case (
@@ -369,7 +413,7 @@ class Game:
                 | CardType.SUBTRACT
                 | CardType.DIVIDE
             ):
-                self._players[player_index].cards.append(card)
+                self._players[player_index].unresolved.append(card)
                 effect = _Resolve(player_index, card, sequence)
                 if sequence is None:
                     self._tasks.appendleft(effect)
@@ -378,21 +422,11 @@ class Game:
             case CardType.ADD | CardType.MULTIPLY:
                 self._players[player_index].cards.append(card)
 
-    def _receive_number(
-        self, player_index: int, card: Card, sequence: _FlipSequence | None = None
-    ) -> None:
+    def _receive_number(self, player_index: int, card: Card) -> None:
         player = self._players[player_index]
         if card.kind is CardType.UNLUCKY_SEVEN:
-            deferred = [effect.card for effect in sequence.deferred] if sequence else []
-            deferred.extend(
-                task.card
-                for task in self._tasks
-                if isinstance(task, _Resolve) and task.player == player_index
-            )
             for existing in player.cards[:]:
-                if (existing.is_number or existing.kind in _VENGEANCE_MODIFIERS) and (
-                    existing not in deferred
-                ):
+                if existing.is_number or existing.kind in _VENGEANCE_MODIFIERS:
                     player.cards.remove(existing)
                     self._deck.discard((existing,))
             player.cards.append(card)
@@ -434,7 +468,7 @@ class Game:
             if index != player_index and other.is_active and card not in other.cards
         )
         if targets:
-            player.cards.append(card)
+            player.unresolved.append(card)
             self._pending = ChooseTarget(player_index, card, targets)
         else:
             self._deck.discard((card,))
@@ -445,7 +479,7 @@ class Game:
             if choices:
                 self._pending = ChooseCard(effect.player, effect.card, choices)
             else:
-                self._discard_action(effect.player, effect.card)
+                self._discard_unresolved(effect.player, effect.card)
             return
         # The loop in _advance ends the round before this runs if nobody is active.
         targets = tuple(
@@ -463,7 +497,7 @@ class Game:
         self._pending = ChooseTarget(effect.player, effect.card, targets)
 
     def _apply_target(self, decision: ChooseTarget, target: int) -> None:
-        self._players[decision.player].cards.remove(decision.card)
+        self._players[decision.player].unresolved.remove(decision.card)
         recipient = self._players[target]
         if decision.card.kind is CardType.FREEZE:
             recipient.status = PlayerStatus.STAYED
@@ -491,18 +525,12 @@ class Game:
         self, player: int, action_card: Card, first: tuple[int, int] | None = None
     ) -> tuple[tuple[int, int], ...]:
         """Find eligible (owner, hand index) pairs for a card-selection effect."""
-        unresolved = {
-            (task.player, task.card)
-            for task in self._tasks
-            if isinstance(task, _Resolve) and task.card.kind in _VENGEANCE_MODIFIERS
-        }
         choices = tuple(
             (index, card_index)
             for index, state in enumerate(self._players)
             if not state.is_busted
             for card_index, card in enumerate(state.cards)
             if (card.is_number or card.kind in _VENGEANCE_MODIFIERS)
-            and (index, card) not in unresolved
             and (action_card.kind is not CardType.STEAL or index != player)
             and (first is None or index != first[0])
         )
@@ -529,7 +557,7 @@ class Game:
             first_card = self._players[first_owner].cards.pop(first_index)
             self._receive_transferred(first_owner, card)
             self._receive_transferred(owner, first_card)
-        self._discard_action(decision.player, decision.card)
+        self._discard_unresolved(decision.player, decision.card)
 
     def _receive_transferred(self, player: int, card: Card) -> None:
         if card.is_number:
@@ -539,6 +567,10 @@ class Game:
 
     def _discard_action(self, player: int, card: Card) -> None:
         self._players[player].cards.remove(card)
+        self._deck.discard((card,))
+
+    def _discard_unresolved(self, player: int, card: Card) -> None:
+        self._players[player].unresolved.remove(card)
         self._deck.discard((card,))
 
     def _end_round(self, flip_seven_player: int | None) -> None:
@@ -587,6 +619,8 @@ class Game:
             for card in player.cards[:]:
                 if card.kind in _SINGLE_USE:
                     self._discard_action(index, card)
+            self._deck.discard(player.unresolved)
+            player.unresolved.clear()
         for player, score in zip(self._players, scores):
             player.total_score += score
         totals = tuple(player.total_score for player in self._players)

@@ -24,20 +24,21 @@ from flip_seven_bots.game import (
     RoundResult,
 )
 
+from ..common.text import card_label, event_text
+from ..common.theme import (
+    ACCENT,
+    ACTIVE,
+    BACKGROUND,
+    BUTTON,
+    BUTTON_HOVER,
+    MUTED,
+    PANEL,
+    PANEL_ALT,
+    TEXT,
+)
 from .bug_report import write_report
 from .options import default_seats
 from .table import Table
-from .text import card_label, event_text
-
-BACKGROUND = (15, 30, 35)
-PANEL = (28, 52, 55)
-PANEL_ALT = (34, 62, 63)
-TEXT = (240, 244, 229)
-MUTED = (174, 193, 184)
-ACCENT = (233, 196, 106)
-ACTIVE = (113, 207, 165)
-BUTTON = (53, 109, 91)
-BUTTON_HOVER = (67, 139, 112)
 
 PLAYER_AREA = pygame.Rect(30, 112, 895, 570)
 PANEL_GAP = 12
@@ -127,6 +128,14 @@ def _player_rects(count: int) -> list[pygame.Rect]:
         )
         for index in range(count)
     ]
+
+
+def _shown_cards(player: PlayerView) -> tuple[Card, ...]:
+    """Cards drawn in a player's panel: the hand, then cards awaiting resolution.
+
+    The hand comes first so that ``CHOOSE_CARD`` indices still address it.
+    """
+    return player.cards + player.unresolved
 
 
 def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
@@ -268,7 +277,8 @@ class GameScene:
             return tuple(
                 Button(
                     _card_rects(
-                        observation.players[action.target].cards, panels[action.target]
+                        _shown_cards(observation.players[action.target]),
+                        panels[action.target],
                     )[action.card_index],
                     "",
                     action,
@@ -382,9 +392,9 @@ class GameScene:
         if before is not None and before.round_number != after.round_number:
             self._previous_round = before
         added = [
-            Counter(player.cards)
+            Counter(_shown_cards(player))
             - (
-                Counter(before.players[player.player].cards)
+                Counter(_shown_cards(before.players[player.player]))
                 if before is not None and before.round_number == after.round_number
                 else Counter()
             )
@@ -475,7 +485,7 @@ class GameScene:
         if self._swap_first is not None and not self._animating:
             owner, index = self._swap_first
             panel = _player_rects(len(observation.players))[owner]
-            rect = _card_rects(observation.players[owner].cards, panel)[index]
+            rect = _card_rects(_shown_cards(observation.players[owner]), panel)[index]
             pygame.draw.rect(
                 screen, ACCENT, rect.inflate(4, 4), width=2, border_radius=6
             )
@@ -540,7 +550,8 @@ class GameScene:
         score = f"Total: {player.total_score}    Live round: {live_score}"
         self._text(screen, self._font, score, (rect.x + 570, rect.y + 16))
 
-        if not player.cards:
+        cards = _shown_cards(player)
+        if not cards:
             self._text(
                 screen,
                 self._small_font,
@@ -557,8 +568,8 @@ class GameScene:
             and draw.event.round_number == observation.round_number
             and draw.event.player == player.player
         )
-        rects = _card_rects(player.cards, rect)
-        for card, card_rect in reversed(list(zip(player.cards, rects))):
+        rects = _card_rects(cards, rect)
+        for card, card_rect in reversed(list(zip(cards, rects))):
             if hidden[card]:
                 hidden[card] -= 1
             else:
@@ -580,7 +591,7 @@ class GameScene:
         event = draw.event
         player = observation.players[event.player]
         panel = _player_rects(len(observation.players))[event.player]
-        cards = player.cards
+        cards = _shown_cards(player)
         if draw.in_hand:
             hidden_count = sum(
                 queued.in_hand
@@ -711,6 +722,11 @@ class GameScene:
                     message = f"{turn}: choose {choice} for {card_label(card)}"
                 case FlipSevenBonus():
                     message = f"{turn}: take the bonus or subtract it from a player"
+                case ChooseTarget(card=card) if card.kind is CardType.SECOND_CHANCE:
+                    message = (
+                        f"{turn}: you already have a Second Chance, "
+                        "so give this one to another player"
+                    )
                 case ChooseTarget(card=card):
                     message = f"{turn}: choose a player for {card_label(card)}"
                 case HitOrStay(can_stay=False):

@@ -1,7 +1,7 @@
 """Headless Flip 7 game engine."""
 
 from .deck import Deck
-from .engine import Game
+from .engine import MAX_PLAYERS, Game
 from .model import (
     Action,
     ActionChosen,
@@ -26,6 +26,7 @@ from .model import (
 from .rules import Rules, VengeanceRules
 
 __all__ = [
+    "MAX_PLAYERS",
     "Action",
     "ActionChosen",
     "ActionType",

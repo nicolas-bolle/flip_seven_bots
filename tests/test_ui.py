@@ -26,15 +26,15 @@ from flip_seven_bots.game import (
     Rules,
     VengeanceRules,
 )
-from flip_seven_bots.ui.game_scene import (
+from flip_seven_bots.gui.common.text import card_label, event_text
+from flip_seven_bots.gui.play.game_scene import (
     CARD_ANIMATION_MS,
     Button,
     Command,
     GameScene,
     _card_rects,
 )
-from flip_seven_bots.ui.table import Seat, Table
-from flip_seven_bots.ui.text import card_label, event_text
+from flip_seven_bots.gui.play.table import Seat, Table
 
 NAMES = ("You", "Random bot", "Threshold bot")
 FREEZE = Card(CardType.FREEZE)
@@ -112,7 +112,7 @@ def press(scene: GameScene, key: int) -> None:
         finish_animations(scene)
 
 
-def test_vengeance_cards_sort_and_render() -> None:
+def test_vengeance_cards_sort_into_number_and_modifier_rows_and_render() -> None:
     cards = [
         Card(CardType.NUMBER, 13),
         Card(CardType.ZERO),
@@ -176,7 +176,7 @@ def test_vengeance_card_selection_uses_highlighted_cards(kind: CardType) -> None
         Card(CardType.FLIP_FOUR),
     ],
 )
-def test_vengeance_player_target_buttons(card: Card) -> None:
+def test_vengeance_targeted_cards_offer_player_buttons(card: Card) -> None:
     scene, table = make_scene(
         numbers(9, 2, 4) + [card] + numbers(5, 6, 7, 8, 10),
         rules=VengeanceRules(),
@@ -222,7 +222,7 @@ def test_swap_uses_two_card_clicks_and_blocks_selection_during_dialog() -> None:
 
 
 @pytest.mark.parametrize("take_bonus", [True, False])
-def test_brutal_flip_seven_bonus_choice(
+def test_brutal_flip_seven_can_take_or_subtract_the_bonus(
     take_bonus: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -497,6 +497,30 @@ def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None
     scene.render(pygame.Surface((1280, 900)))
     assert table.observation.players[0].status is PlayerStatus.BUSTED
     assert "Total: 0    Live round: 0" in texts
+
+
+def test_unresolved_card_shows_in_its_drawers_panel_without_changing_live_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    modifier = Card(CardType.SUBTRACT, 10)
+    scene, table = make_scene(
+        numbers(5, 12) + [modifier], player_count=2, rules=VengeanceRules()
+    )
+    press(scene, pygame.K_h)
+    texts: list[str] = []
+    drawn: list[Card] = []
+    monkeypatch.setattr(
+        scene,
+        "_text",
+        lambda _screen, _font, text, _position, _color=None: texts.append(text),
+    )
+    monkeypatch.setattr(
+        scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert isinstance(table.observation.decision, ChooseTarget)
+    assert modifier in drawn
+    assert "Total: 0    Live round: 5" in texts
 
 
 def test_sorted_number_cards_wrap_in_ascending_order(
@@ -781,7 +805,7 @@ def test_long_report_messages_wrap_in_the_dialog() -> None:
         (Card(CardType.SECOND_CHANCE), "SECOND CHANCE"),
     ],
 )
-def test_card_labels(card: Card, label: str) -> None:
+def test_card_labels_show_values_signs_and_action_names(card: Card, label: str) -> None:
     assert card_label(card) == label
 
 
@@ -803,5 +827,5 @@ def test_card_labels(card: Card, label: str) -> None:
         (RoundEnded(2, RoundResult(2, (0, 0, 0), (0, 0, 0), None)), "Round 2 ended"),
     ],
 )
-def test_activity_messages(event: GameEvent, message: str) -> None:
+def test_events_are_described_with_seat_names(event: GameEvent, message: str) -> None:
     assert event_text(event, NAMES) == message

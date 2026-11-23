@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
-from flip_seven_bots.ui.options import MAX_PLAYERS, parse_options
+from flip_seven_bots.gui.play.options import MAX_PLAYERS, parse_options
 
 
 def test_no_options_gives_the_default_table() -> None:
@@ -85,6 +85,13 @@ def test_seed_and_bug_folder_can_be_set() -> None:
     assert options.seed == 7
     assert options.bug_dir == Path("reports/flip")
     assert not options.show_setup
+
+
+def test_setup_flags_override_the_options_given_default() -> None:
+    options = parse_options(["--setup", "--bot", "rival=threshold:25", "--seed", "7"])
+    assert options.show_setup
+    assert options.seats[0].name == "rival"
+    assert not parse_options(["--no-setup"]).show_setup
 
 
 @pytest.mark.parametrize(

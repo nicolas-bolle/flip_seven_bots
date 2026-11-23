@@ -1,4 +1,4 @@
-"""Plain-text descriptions shared by the screen and bug reports."""
+"""Plain-text descriptions shared by the screens and bug reports."""
 
 from collections.abc import Sequence
 

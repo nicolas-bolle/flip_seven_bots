@@ -14,8 +14,8 @@ from flip_seven_bots.game import (
     Observation,
     VengeanceRules,
 )
-from flip_seven_bots.ui.bug_report import replay, write_report
-from flip_seven_bots.ui.table import Seat, Table
+from flip_seven_bots.gui.play.bug_report import replay, write_report
+from flip_seven_bots.gui.play.table import Seat, Table
 
 NOW = datetime(2026, 11, 21, 16, 30, 5)
 
@@ -52,6 +52,7 @@ def test_report_describes_the_table_and_message(tmp_path: Path) -> None:
     assert f"**Round:** {table.observation.round_number}" in text
     assert f"<summary>{len(table.game.hidden_deck())} cards" in text
     assert "## Error" not in text
+    assert "flip_seven_bots.game.replay.replay(path)" in text
 
 
 def test_replay_rebuilds_the_reported_game(tmp_path: Path) -> None:

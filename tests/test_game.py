@@ -82,7 +82,7 @@ def test_dealer_rotates_and_player_left_of_dealer_starts() -> None:
     assert game.current_player == 2
 
 
-def test_deferred_action_and_second_chance_during_flip_three() -> None:
+def test_flip_three_defers_freeze_but_second_chance_saves_a_duplicate_at_once() -> None:
     draws = [number(2), number(4), FLIP_THREE, FREEZE, CHANCE, number(2)]
     game = stacked_game(draws)
     game.apply(HIT)
@@ -107,7 +107,7 @@ def test_resolved_action_cards_remain_with_their_recipients() -> None:
         [number(2), number(4), FLIP_THREE, FREEZE, number(5), number(6)]
     )
     game.apply(HIT)
-    assert FLIP_THREE in game.observe(1).players[1].cards
+    assert FLIP_THREE in game.observe(1).players[1].unresolved
     game.apply(target(0))
 
     observation = game.observe(0)
@@ -115,13 +115,13 @@ def test_resolved_action_cards_remain_with_their_recipients() -> None:
     assert observation.decision.card == FREEZE
     assert FLIP_THREE not in observation.discard
     assert FLIP_THREE in observation.players[0].cards
-    assert FREEZE in observation.players[0].cards
+    assert FREEZE in observation.players[0].unresolved
 
     game.apply(target(1))
     observation = game.observe(0)
     assert FREEZE not in observation.discard
     assert FREEZE in observation.players[1].cards
-    assert FREEZE not in observation.players[0].cards
+    assert FREEZE not in observation.players[0].unresolved
 
 
 def test_bust_keeps_cancelled_deferred_actions_until_round_end() -> None:
@@ -133,7 +133,7 @@ def test_bust_keeps_cancelled_deferred_actions_until_round_end() -> None:
     assert observation.players[1].status is PlayerStatus.BUSTED
     assert observation.discard == ()
     assert FLIP_THREE in observation.players[1].cards
-    assert FREEZE in observation.players[1].cards
+    assert FREEZE in observation.players[1].unresolved
 
 
 def test_bust_during_deferred_flip_keeps_remaining_deferred_actions() -> None:
@@ -149,7 +149,7 @@ def test_bust_during_deferred_flip_keeps_remaining_deferred_actions() -> None:
     observation = game.observe(0)
     assert observation.players[1].status is PlayerStatus.BUSTED
     assert observation.players[1].cards.count(FLIP_THREE) == 2
-    assert FREEZE in observation.players[1].cards
+    assert FREEZE in observation.players[1].unresolved
     assert observation.discard == ()
 
 
@@ -403,12 +403,13 @@ def test_match_ends_after_round_reaching_target(
     ("player_count", "dealer", "seed", "message"),
     [
         (0, 0, None, "player_count"),
+        (11, 0, None, "player_count"),
         (2, -1, None, "dealer"),
         (2, 2, None, "dealer"),
         (2, 0, 1, "deck or a seed"),
     ],
 )
-def test_invalid_game_setup(
+def test_game_rejects_bad_player_count_dealer_or_seeded_stacked_deck(
     player_count: int, dealer: int, seed: int | None, message: str
 ) -> None:
     with pytest.raises(ValueError, match=message):
@@ -416,7 +417,7 @@ def test_invalid_game_setup(
 
 
 @pytest.mark.parametrize("player", [-1, 2])
-def test_invalid_observer(player: int) -> None:
+def test_observe_rejects_a_seat_outside_the_game(player: int) -> None:
     game = Game(2, seed=42)
     with pytest.raises(ValueError, match="player"):
         game.observe(player)
@@ -429,6 +430,7 @@ def test_draw_fails_if_deck_and_discard_are_exhausted() -> None:
 
 
 def test_freezing_player_during_initial_deal_skips_their_deal() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = stacked_game([FREEZE, number(9)])
     decision = game.observe(1).decision
     assert isinstance(decision, ChooseTarget) and decision.card == FREEZE
@@ -443,3 +445,13 @@ def test_freezing_player_during_initial_deal_skips_their_deal() -> None:
 
     game.apply(HIT)
     assert game.observe(1).players[1].cards == (number(9),)
+
+
+def test_flip_three_before_a_players_deal_still_deals_them_a_card() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = stacked_game([FLIP_THREE, *(number(n) for n in (1, 2, 3, 4))])
+    game.apply(target(0))
+    observation = game.observe(1)
+    hand = (FLIP_THREE, number(1), number(2), number(3), number(4))
+    assert observation.players[0].cards == hand
+    assert observation.players[0].status is PlayerStatus.ACTIVE

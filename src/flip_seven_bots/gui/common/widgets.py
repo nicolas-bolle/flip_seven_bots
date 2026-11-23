@@ -1,8 +1,8 @@
-"""Drawing helpers shared by the setup and tournament screens."""
+"""Drawing helpers shared by the game and tournament screens."""
 
 import pygame
 
-from .game_scene import (
+from .theme import (
     ACCENT,
     ACTIVE,
     BACKGROUND,

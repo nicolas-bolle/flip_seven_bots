@@ -1,4 +1,5 @@
 from dataclasses import replace
+from functools import partial
 from random import Random
 
 import pytest
@@ -111,3 +112,15 @@ def test_samples_reveal_nothing_about_the_true_deck_order() -> None:
     assert observations[0] == observations[1]
     first, second = (o.sample_game(Random(5)).hidden_deck() for o in observations)
     assert first == second
+    first_sampler, second_sampler = (
+        observation._sampler for observation in observations
+    )
+    assert isinstance(first_sampler, partial) and isinstance(second_sampler, partial)
+    assert first_sampler.args[0].hidden_deck() == second_sampler.args[0].hidden_deck()
+
+
+def test_sampler_does_not_reference_the_original_game() -> None:
+    game, observation = hit_or_stay_observation()
+    sampler = observation._sampler
+    assert isinstance(sampler, partial)
+    assert all(value is not game for value in sampler.args)

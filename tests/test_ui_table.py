@@ -11,7 +11,7 @@ from flip_seven_bots.game import (
     PlayerStatus,
     Rules,
 )
-from flip_seven_bots.ui.table import Seat, Table
+from flip_seven_bots.gui.play.table import Seat, Table
 
 HIT = Action(ActionType.HIT)
 STAY = Action(ActionType.STAY)

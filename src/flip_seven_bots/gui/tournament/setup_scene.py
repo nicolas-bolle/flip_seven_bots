@@ -4,27 +4,23 @@ from dataclasses import dataclass, replace
 
 import pygame
 
+from flip_seven_bots.bots.registry import default_parameters, kinds
 from flip_seven_bots.bots.specs import bot_spec, number_duplicates, parse_bot
-from flip_seven_bots.tournament.cli import TournamentOptions
+from flip_seven_bots.tournament.config import TournamentOptions
 
-from ..game_scene import ACCENT, BACKGROUND, MUTED
-from ..widgets import draw_button, draw_field, draw_text
+from ..common.theme import ACCENT, BACKGROUND, MUTED
+from ..common.widgets import draw_button, draw_field, draw_text
 
-BASE_BUTTON = pygame.Rect(90, 150, 260, 52)
-VENGEANCE_BUTTON = pygame.Rect(365, 150, 330, 52)
-BRUTAL_BUTTON = pygame.Rect(710, 150, 270, 52)
-GAMES_FIELD = pygame.Rect(90, 268, 180, 48)
-TABLE_FIELD = pygame.Rect(300, 268, 180, 48)
-SEED_FIELD = pygame.Rect(510, 268, 180, 48)
+BASE_BUTTON = pygame.Rect(90, 135, 260, 52)
+VENGEANCE_BUTTON = pygame.Rect(365, 135, 330, 52)
+BRUTAL_BUTTON = pygame.Rect(710, 135, 270, 52)
+GAMES_FIELD = pygame.Rect(90, 243, 180, 48)
+TABLE_FIELD = pygame.Rect(300, 243, 180, 48)
+SEED_FIELD = pygame.Rect(510, 243, 180, 48)
+JOBS_FIELD = pygame.Rect(720, 243, 180, 48)
 ADD_BUTTON = pygame.Rect(90, 800, 220, 48)
 START_BUTTON = pygame.Rect(1000, 795, 190, 56)
-KINDS = ("random", "threshold", "expected")
-KIND_LABELS = {
-    "random": "Random bot",
-    "threshold": "Threshold bot",
-    "expected": "Expected value bot",
-}
-MAX_BOTS = 8
+MAX_BOTS = 10
 MAX_NAME_LENGTH = 24
 MAX_NUMBER_LENGTH = 6
 
@@ -37,18 +33,18 @@ class _BotSetting:
 
     @property
     def spec(self) -> str:
-        if self.kind == "threshold" and self.parameter:
-            return f"threshold:{self.parameter}"
+        if self.parameter:
+            return f"{self.kind}:{self.parameter}"
         return self.kind
 
 
 def _row_rects(index: int) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
-    y = 400 + index * 48
+    y = 364 + index * 42
     return (
-        pygame.Rect(90, y, 320, 40),
-        pygame.Rect(425, y, 250, 40),
-        pygame.Rect(690, y, 180, 40),
-        pygame.Rect(885, y, 150, 40),
+        pygame.Rect(90, y, 320, 38),
+        pygame.Rect(425, y, 250, 38),
+        pygame.Rect(690, y, 180, 38),
+        pygame.Rect(885, y, 150, 38),
     )
 
 
@@ -74,6 +70,7 @@ class TournamentSetupScene:
             if defaults.players_per_game is None
             else str(defaults.players_per_game),
             "seed": "" if defaults.seed is None else str(defaults.seed),
+            "jobs": str(defaults.jobs),
         }
         self.result: TournamentOptions | None = None
         self.error: str | None = None
@@ -119,20 +116,24 @@ class TournamentSetupScene:
         field, index = self._focus
         if field == "name":
             self.bots[index].name = value[:MAX_NAME_LENGTH]
-        else:
+        elif field in self.numbers:
             digits = "".join(char for char in value if char.isdigit())[
                 :MAX_NUMBER_LENGTH
             ]
-            if field in self.numbers:
-                self.numbers[field] = digits
-            else:
-                self.bots[index].parameter = digits
+            self.numbers[field] = digits
+        else:
+            self.bots[index].parameter = value[:100]
         self.error = None
 
     def _click(self, pos: tuple[int, int]) -> None:
         self._focus = None
         self.error = None
-        fields = {"games": GAMES_FIELD, "table": TABLE_FIELD, "seed": SEED_FIELD}
+        fields = {
+            "games": GAMES_FIELD,
+            "table": TABLE_FIELD,
+            "seed": SEED_FIELD,
+            "jobs": JOBS_FIELD,
+        }
         clicked = next(
             (name for name, rect in fields.items() if rect.collidepoint(pos)), None
         )
@@ -154,9 +155,15 @@ class TournamentSetupScene:
                 if name.collidepoint(pos):
                     self._focus = ("name", index)
                 elif kind.collidepoint(pos):
-                    bot.kind = KINDS[(KINDS.index(bot.kind) + 1) % len(KINDS)]
-                    bot.parameter = "30" if bot.kind == "threshold" else ""
-                elif parameter.collidepoint(pos) and bot.kind == "threshold":
+                    definitions = kinds()
+                    names = tuple(kind.kind for kind in definitions)
+                    definition = definitions[(names.index(bot.kind) + 1) % len(names)]
+                    bot.kind = definition.kind
+                    bot.parameter = default_parameters(definition)
+                elif (
+                    parameter.collidepoint(pos)
+                    and next(k for k in kinds() if k.kind == bot.kind).parameters
+                ):
                     self._focus = ("parameter", index)
                 elif remove.collidepoint(pos) and len(self.bots) > 2:
                     self.bots.pop(index)
@@ -183,6 +190,9 @@ class TournamentSetupScene:
         table = int(self.numbers["table"]) if self.numbers["table"] else None
         if table is not None and not 2 <= table <= len(bots):
             raise ValueError(f"players per game must be between 2 and {len(bots)}")
+        jobs = int(self.numbers["jobs"] or 0)
+        if jobs < 1:
+            raise ValueError("use at least one worker")
         return replace(
             self._defaults,
             bots=bots,
@@ -191,6 +201,7 @@ class TournamentSetupScene:
             seed=int(self.numbers["seed"]) if self.numbers["seed"] else None,
             vengeance=self.vengeance,
             brutal=self.vengeance and self.brutal,
+            jobs=jobs,
         )
 
     def update(self, _now: int) -> None:
@@ -203,9 +214,9 @@ class TournamentSetupScene:
         font, small = self._font, self._small_font
         screen.fill(BACKGROUND)
         draw_text(screen, self._title_font, "TOURNAMENT SETUP", (90, 45), ACCENT)
-        draw_text(screen, self._heading_font, "Game mode", (90, 110))
+        draw_text(screen, self._heading_font, "Game mode", (90, 95))
         draw_button(screen, font, BASE_BUTTON, "Flip 7", not self.vengeance)
-        draw_button(screen, font, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
+        draw_button(screen, font, VENGEANCE_BUTTON, "With a Vengeance", self.vengeance)
         draw_button(
             screen,
             font,
@@ -218,22 +229,24 @@ class TournamentSetupScene:
             ("games", GAMES_FIELD, "GAMES"),
             ("table", TABLE_FIELD, "PER GAME (BLANK = ALL)"),
             ("seed", SEED_FIELD, "SEED (BLANK = RANDOM)"),
+            ("jobs", JOBS_FIELD, "WORKERS"),
         )
         for field, rect, label in labels:
-            draw_text(screen, small, label, (rect.x, 245), MUTED)
+            draw_text(screen, small, label, (rect.x, rect.y - 23), MUTED)
             draw_field(
                 screen, font, rect, self.numbers[field], self._focus == (field, 0)
             )
 
-        draw_text(screen, self._heading_font, "Bots", (90, 340))
-        draw_text(screen, small, "NAME", (90, 378), MUTED)
-        draw_text(screen, small, "TYPE (CLICK TO CHANGE)", (425, 378), MUTED)
-        draw_text(screen, small, "SCORE", (690, 378), MUTED)
+        draw_text(screen, self._heading_font, "Bots", (90, 310))
+        draw_text(screen, small, "NAME", (90, 342), MUTED)
+        draw_text(screen, small, "TYPE (CLICK TO CHANGE)", (425, 342), MUTED)
+        draw_text(screen, small, "PARAMETERS", (690, 342), MUTED)
         for index, bot in enumerate(self.bots):
             name, kind, parameter, remove = _row_rects(index)
             draw_field(screen, font, name, bot.name, self._focus == ("name", index))
-            draw_button(screen, font, kind, KIND_LABELS[bot.kind])
-            if bot.kind == "threshold":
+            definition = next(k for k in kinds() if k.kind == bot.kind)
+            draw_button(screen, font, kind, definition.label)
+            if definition.parameters:
                 focused = self._focus == ("parameter", index)
                 draw_field(screen, font, parameter, bot.parameter, focused)
             else:

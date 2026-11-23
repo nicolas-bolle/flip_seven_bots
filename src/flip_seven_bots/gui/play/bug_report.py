@@ -1,8 +1,6 @@
 """Write bug reports describing a table, and rebuild games from them."""
 
 import json
-import re
-import subprocess
 from collections.abc import Mapping
 from datetime import datetime
 from functools import partial
@@ -15,24 +13,20 @@ from flip_seven_bots.game import (
     ChooseCard,
     ChooseTarget,
     FlipSevenBonus,
-    Game,
-    Rules,
     VengeanceRules,
 )
+from flip_seven_bots.game.replay import REPORT_FORMAT
+from flip_seven_bots.game.replay import replay as replay  # noqa: PLC0414
 from flip_seven_bots.game.rules import (
     build_deck,
     build_vengeance_deck,
     score_cards,
     score_vengeance_cards,
 )
+from flip_seven_bots.provenance import git_commit
 
+from ..common.text import card_label, event_text
 from .table import Move, Table
-from .text import card_label, event_text
-
-REPORT_FORMAT = 1
-_REPLAY_BLOCK = re.compile(
-    r"^## Replay$.*?^```json\n(.*?)^```$", re.MULTILINE | re.DOTALL
-)
 
 
 def describe_bot(bot: Bot | None) -> str:
@@ -46,23 +40,7 @@ def describe_bot(bot: Bot | None) -> str:
             return type(bot).__name__
 
 
-def _git_commit() -> str:
-    def git(*args: str) -> str:
-        return subprocess.run(
-            ["git", *args],
-            cwd=Path(__file__).resolve().parent,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=True,
-        ).stdout.strip()
-
-    try:
-        commit = git("rev-parse", "--short", "HEAD")
-        dirty = git("status", "--porcelain")
-    except OSError, subprocess.SubprocessError:
-        return "unknown"
-    return f"{commit} (with uncommitted changes)" if dirty else commit
+_git_commit = git_commit
 
 
 def _cell(text: str) -> str:
@@ -164,9 +142,9 @@ def report_markdown(
 
     rules = game.rules
     mode = (
-        "With A Vengeance (Brutal Mode)"
+        "With a Vengeance (Brutal Mode)"
         if isinstance(rules, VengeanceRules) and rules.brutal
-        else "With A Vengeance"
+        else "With a Vengeance"
         if isinstance(rules, VengeanceRules)
         else "Flip 7"
     )
@@ -181,16 +159,17 @@ def report_markdown(
             f"Flip 7 bonus {rules.flip_seven_bonus}"
         ),
         "",
-        "| Seat | Name | Player | Status | Cards | Round score | Total |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Seat | Name | Player | Status | Cards | Unresolved | Round score | Total |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for view in observation.players:
         seat = table.seats[view.player]
         cards = ", ".join(card_label(card) for card in view.cards) or "-"
+        unresolved = ", ".join(card_label(card) for card in view.unresolved) or "-"
         lines.append(
             f"| {view.player} | {_cell(seat.name)} | {describe_bot(seat.bot)} "
-            f"| {view.status.name.lower()} | {cards} | {view.round_score} "
-            f"| {view.total_score} |"
+            f"| {view.status.name.lower()} | {cards} | {unresolved} "
+            f"| {view.round_score} | {view.total_score} |"
         )
 
     lines += [
@@ -246,7 +225,7 @@ def report_markdown(
         lines += [
             (
                 f"{len(table.moves)} moves so far. Rebuild the game with "
-                "`flip_seven_bots.ui.bug_report.replay(path)`."
+                "`flip_seven_bots.game.replay.replay(path)`."
             ),
             "",
             "```json",
@@ -280,50 +259,3 @@ def write_report(
             continue
         return path
     raise FileExistsError(f"too many reports named {stem} in {directory}")
-
-
-def replay(report: Path | str, *, moves: int | None = None) -> Game:
-    """Rebuild the reported game by replaying its first ``moves`` moves (default: all).
-
-    A crash report's last move is the one that failed, so replaying all moves
-    reproduces the crash.
-    """
-    # The last block is used so a user's message can't stand in for the real one.
-    blocks = _REPLAY_BLOCK.findall(Path(report).read_text(encoding="utf-8"))
-    if not blocks:
-        raise ValueError("report has no replay data")
-    data = json.loads(blocks[-1])
-    if data["format"] not in (REPORT_FORMAT, 2):
-        raise ValueError(f"unsupported report format: {data['format']}")
-    if data["format"] == 2:
-        if data.get("mode") != "vengeance" or not isinstance(data.get("brutal"), bool):
-            raise ValueError("invalid Vengeance replay rules")
-        rules = VengeanceRules(
-            target_score=data["target_score"],
-            flip_seven_bonus=data["flip_seven_bonus"],
-            brutal=data["brutal"],
-        )
-    else:
-        rules = Rules(
-            target_score=data["target_score"], flip_seven_bonus=data["flip_seven_bonus"]
-        )
-    game = Game(
-        data["players"],
-        seed=data["game_seed"],
-        dealer=data["starting_dealer"],
-        rules=rules,
-    )
-    for index, move in enumerate(data["moves"][:moves], start=1):
-        if game.current_player != move["player"]:
-            raise ValueError(
-                f"replay diverged at move {index}: expected player {move['player']}, "
-                f"game is waiting for {game.current_player}"
-            )
-        game.apply(
-            Action(
-                ActionType[move["action"].upper()],
-                move.get("target"),
-                move.get("card_index"),
-            )
-        )
-    return game

@@ -4,8 +4,8 @@ import pygame
 import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
-from flip_seven_bots.ui.options import MAX_PLAYERS
-from flip_seven_bots.ui.setup_scene import (
+from flip_seven_bots.gui.play.options import MAX_PLAYERS
+from flip_seven_bots.gui.play.setup_scene import (
     ADD_BUTTON,
     BRUTAL_BUTTON,
     START_BUTTON,
@@ -36,7 +36,7 @@ def replace_field(scene: SetupScene, rect: pygame.Rect, value: str) -> None:
     scene.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
 
 
-def test_setup_defaults_and_start() -> None:
+def test_setup_starts_a_base_game_with_the_default_seats() -> None:
     scene = SetupScene()
     scene.render(pygame.Surface((1280, 900)))
     click(scene, START_BUTTON)

@@ -1,9 +1,10 @@
-"""Run a tournament in the background and show live progress, standings and ratings."""
+"""Run a tournament in the background and show live progress, standings, and ratings."""
 
 import math
 import queue
 import threading
 import time
+from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -12,9 +13,10 @@ import pandas as pd
 import pygame
 
 from flip_seven_bots.tournament import GameRecord, TournamentResult
-from flip_seven_bots.tournament.cli import TournamentOptions, save_results
+from flip_seven_bots.tournament.config import TournamentOptions
+from flip_seven_bots.tournament.storage import save_results
 
-from ..game_scene import (
+from ..common.theme import (
     ACCENT,
     ACTIVE,
     BACKGROUND,
@@ -24,7 +26,7 @@ from ..game_scene import (
     PANEL_ALT,
     TEXT,
 )
-from ..widgets import draw_button, draw_text
+from ..common.widgets import draw_button, draw_text
 
 PROGRESS_BAR = pygame.Rect(90, 130, 1100, 40)
 STANDINGS = pygame.Rect(90, 230, 560, 520)
@@ -42,6 +44,8 @@ LINE_COLORS = (
     (199, 146, 234),
     (240, 244, 229),
     (42, 157, 143),
+    (239, 112, 160),
+    (176, 216, 88),
 )
 
 
@@ -110,11 +114,15 @@ class TournamentScene:
     def _play(self, games) -> None:
         try:
             played = []
-            for record in games:
-                played.append(record)
-                self._queue.put(record)
-                if self._stop.is_set():
-                    break
+            try:
+                for record in games:
+                    played.append(record)
+                    self._queue.put(record)
+                    if self._stop.is_set():
+                        break
+            finally:
+                if isinstance(games, Generator):
+                    games.close()
             # Fitting with confidence intervals can take a moment, so do it off the UI thread.
             self._queue.put(_Finished(self.options.result(played) if played else None))
         except BaseException as error:  # noqa: BLE001 - reported on screen instead
@@ -134,7 +142,7 @@ class TournamentScene:
         elif NEW_BUTTON.collidepoint(event.pos):
             self.restart = True
         elif SAVE_BUTTON.collidepoint(event.pos) and self.result and self.saved is None:
-            self.saved = save_results(self.result, self._save_dir)
+            self.saved = save_results(self.result, self._save_dir, self.options)
 
     def update(self, _now: int) -> None:
         """Apply every game the worker has finished since the last frame."""
@@ -168,7 +176,7 @@ class TournamentScene:
         self.finished = True
         self.result = result
         if self.options.output is not None and result is not None:
-            self.saved = save_results(result, self.options.output)
+            self.saved = save_results(result, self.options.output, self.options)
 
     def render(
         self, screen: pygame.Surface, _mouse_pos: tuple[int, int] | None = None
@@ -259,7 +267,7 @@ class TournamentScene:
         else:
             ranked = sorted(self._standings.values(), key=lambda s: s.elo, reverse=True)
         for row, standing in enumerate(ranked):
-            row_y = y + 70 + row * 46
+            row_y = y + 70 + row * 43
             if row % 2 == 0:
                 stripe = (STANDINGS.x + 8, row_y - 8, STANDINGS.width - 16, 40)
                 pygame.draw.rect(screen, PANEL_ALT, stripe, border_radius=6)

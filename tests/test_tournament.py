@@ -5,7 +5,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from flip_seven_bots.bots import ThresholdBot
+from flip_seven_bots.bots import RandomBot, ThresholdBot
+from flip_seven_bots.game import Action, Observation
 from flip_seven_bots.tournament import (
     PairwiseResults,
     TournamentResult,
@@ -19,6 +20,15 @@ from flip_seven_bots.tournament.ratings import ELO_SCALE
 
 def threshold_bots(*thresholds: int) -> dict[str, ThresholdBot]:
     return {f"t{threshold}": ThresholdBot(threshold) for threshold in thresholds}
+
+
+class BrokenBot:
+    def choose_action(self, observation: Observation) -> Action:
+        raise RuntimeError("worker bot failed")
+
+
+def broken_factory(seed: int | None) -> BrokenBot:
+    return BrokenBot()
 
 
 def traces(figure: go.Figure) -> tuple[Any, ...]:
@@ -84,6 +94,51 @@ def test_tournament_is_reproducible_with_a_seed() -> None:
     pd.testing.assert_frame_equal(first.summary, second.summary)
 
 
+def test_random_bots_are_reproducible_across_worker_counts() -> None:
+    bots = {"random": RandomBot(), "threshold": ThresholdBot(25)}
+    sequential = run_tournament(bots, games=8, seed=42, jobs=1, progress=False)
+    parallel = run_tournament(bots, games=8, seed=42, jobs=2, progress=False)
+    pd.testing.assert_frame_equal(sequential.games, parallel.games)
+    pd.testing.assert_frame_equal(sequential.summary, parallel.summary)
+
+
+def test_factory_gets_fresh_seed_and_bot_for_every_game() -> None:
+    seeds: list[int | None] = []
+
+    def factory(seed: int | None) -> RandomBot:
+        seeds.append(seed)
+        return RandomBot(seed)
+
+    run_tournament(
+        {"random": factory, "threshold": ThresholdBot(30)},
+        games=5,
+        seed=7,
+        progress=False,
+    )
+    assert len(seeds) == 5 and len(set(seeds)) == 5
+
+
+def test_bot_class_is_accepted_as_a_seeded_factory() -> None:
+    result = run_tournament(
+        {"random": RandomBot, "threshold": ThresholdBot(30)},
+        games=2,
+        seed=3,
+        progress=False,
+    )
+    assert len(result.games) == 4
+
+
+def test_parallel_worker_errors_reach_the_caller() -> None:
+    with pytest.raises(RuntimeError, match="worker bot failed"):
+        run_tournament(
+            {"broken": broken_factory, "other": ThresholdBot(0)},
+            games=3,
+            seed=3,
+            jobs=2,
+            progress=False,
+        )
+
+
 def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
     result = run_tournament(
         threshold_bots(10, 20, 30),
@@ -109,6 +164,11 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
     assert result.summary["rating"].dropna().mean() == pytest.approx(1000)
 
 
+def test_default_table_seats_every_bot_up_to_the_player_limit() -> None:
+    result = run_tournament(threshold_bots(*range(11)), games=1, seed=0, progress=False)
+    assert len(result.games) == 10
+
+
 @pytest.mark.parametrize(
     ("bots", "options", "message"),
     [
@@ -124,6 +184,11 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
             {"games": 1, "players_per_game": 1},
             "players_per_game",
         ),
+        (
+            threshold_bots(*range(11)),
+            {"games": 1, "players_per_game": 11},
+            "players_per_game",
+        ),
         (threshold_bots(10, 20), {"games": 2, "k_half_life": 0}, "k_half_life"),
     ],
     ids=[
@@ -131,6 +196,7 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
         "one-bot",
         "table-too-big",
         "table-too-small",
+        "table-over-player-limit",
         "half-life",
     ],
 )
