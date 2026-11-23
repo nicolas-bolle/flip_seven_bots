@@ -68,6 +68,11 @@ Rules notes:
   points. A duplicate number received through a swap or steal causes a bust.
   A modifier drawn during a Flip Four that nobody has received when a Flip 7
   ends the round is discarded and affects no score.
+- In With A Vengeance, an Unlucky 7 doesn't discard a modifier that was
+  revealed earlier in the same Flip Four and is still waiting to be played.
+  You play that modifier on any player afterwards, as usual. The Unlucky 7
+  discards only the number and modifier cards "in front of you", which we
+  read as your hand.
 - A busted player's cards are face down and out of play, so Swap, Steal, and
   Discard cannot choose them. Stayed players' cards can still be chosen.
 - In Brutal Mode, a player who gets Flip 7 can take the bonus or subtract it

@@ -204,6 +204,7 @@ def test_flip_four_defers_modifiers_and_actions_until_all_draws() -> None:
 
 
 def test_unlucky_seven_during_flip_four_keeps_unresolved_modifier() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with(
         [number(2), number(3), FLIP_FOUR, subtract(2), UNLUCKY, number(4), number(5)]
     )
@@ -269,6 +270,7 @@ def test_flip_seven_before_a_deferred_modifier_resolves_does_not_score_it() -> N
 
 
 def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with(
         [UNLUCKY, number(3), FLIP_FOUR, SWAP, subtract(2), number(4), number(5)]
     )
