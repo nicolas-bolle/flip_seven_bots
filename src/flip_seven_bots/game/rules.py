@@ -37,7 +37,7 @@ def score_cards(cards: Iterable[Card]) -> int:
 
 
 def build_vengeance_deck() -> list[Card]:
-    """Build the unshuffled With A Vengeance deck, including special cards."""
+    """Build the unshuffled With a Vengeance deck, including special cards."""
     cards = [
         Card(CardType.NUMBER, number)
         for number in range(1, 14)

@@ -41,14 +41,14 @@ Three rule sets are supported, and every interface can select them:
 | Mode | Window | Command line | Python |
 | --- | --- | --- | --- |
 | Flip 7 (base game) | Default | Default | `rules=None` (default) |
-| With A Vengeance | Setup screen toggle | `--vengeance` | `rules=VengeanceRules()` |
-| With A Vengeance, Brutal Mode | Setup screen toggle | `--brutal` | `rules=VengeanceRules(brutal=True)` |
+| With a Vengeance | Setup screen toggle | `--vengeance` | `rules=VengeanceRules()` |
+| With a Vengeance, Brutal Mode | Setup screen toggle | `--brutal` | `rules=VengeanceRules(brutal=True)` |
 
 Rules notes:
 
 - Player IDs are zero-based seat indices. The dealer defaults to player 0, and
   the player to their left is dealt first.
-- During the initial deal, a player frozen (or, in With A Vengeance, forced to
+- During the initial deal, a player frozen (or, in With a Vengeance, forced to
   stay by Just One More) before their turn to be dealt gets no deal card; they
   are already out of the round. A player hit with Flip Three or Flip Four
   before their turn is still active, so they are dealt a card as well. The
@@ -62,13 +62,13 @@ Rules notes:
   hold every number card and leave nothing to draw. The rulebooks allow up to
   18 players with one deck.
 - Staying requires at least one card in your hand, in both games. The base
-  rulebook says so; the With A Vengeance rulebook doesn't repeat it, but its
+  rulebook says so; the With a Vengeance rulebook doesn't repeat it, but its
   definition of staying (turning your leftmost card sideways) assumes it.
-- In With A Vengeance, the Zero affects the round score, not accumulated
+- In With a Vengeance, the Zero affects the round score, not accumulated
   points. A duplicate number received through a swap or steal causes a bust.
   A modifier drawn during a Flip Four that nobody has received when a Flip 7
   ends the round is discarded and affects no score.
-- In With A Vengeance, an Unlucky 7 doesn't discard a modifier that was
+- In With a Vengeance, an Unlucky 7 doesn't discard a modifier that was
   revealed earlier in the same Flip Four and is still waiting to be played.
   You play that modifier on any player afterwards, as usual. The Unlucky 7
   discards only the number and modifier cards "in front of you", which we
@@ -205,7 +205,7 @@ A bot provides `choose_action(observation)` and returns one of
 | --- | --- | --- |
 | `HitOrStay` | On a player's turn | `hit()`, `stay()` |
 | `ChooseTarget` | An action card needs a target; has the `card` and eligible `targets` | `choose(target)` |
-| `ChooseCard` | With A Vengeance: Swap, Steal, or Discard picks a card | `choose(owner, card_index)` |
+| `ChooseCard` | With a Vengeance: Swap, Steal, or Discard picks a card | `choose(owner, card_index)` |
 | `FlipSevenBonus` | Brutal Mode: a player got Flip 7; has eligible `targets` | `take()`, `penalize(target)` |
 
 Every decision also has an `actions` tuple. The decision is public, so every

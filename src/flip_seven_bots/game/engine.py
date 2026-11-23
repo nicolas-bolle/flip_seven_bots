@@ -1,4 +1,4 @@
-"""A turn-based, headless engine for the base and With A Vengeance games.
+"""A turn-based, headless engine for the base and With a Vengeance games.
 
 Automatic effects are queued as tasks. The engine executes them until a player
 decision is needed, then resumes the queue when ``Game.apply`` is called.

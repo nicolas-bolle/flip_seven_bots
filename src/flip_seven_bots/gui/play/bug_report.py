@@ -142,9 +142,9 @@ def report_markdown(
 
     rules = game.rules
     mode = (
-        "With A Vengeance (Brutal Mode)"
+        "With a Vengeance (Brutal Mode)"
         if isinstance(rules, VengeanceRules) and rules.brutal
-        else "With A Vengeance"
+        else "With a Vengeance"
         if isinstance(rules, VengeanceRules)
         else "Flip 7"
     )

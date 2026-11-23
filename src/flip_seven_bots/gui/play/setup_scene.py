@@ -197,7 +197,7 @@ class SetupScene:
         self._text(screen, self._title_font, "GAME SETUP", (90, 45), ACCENT)
         self._text(screen, self._heading_font, "Game mode", (90, 110))
         self._button(screen, BASE_BUTTON, "Flip 7", self.vengeance is False)
-        self._button(screen, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
+        self._button(screen, VENGEANCE_BUTTON, "With a Vengeance", self.vengeance)
         self._button(
             screen,
             BRUTAL_BUTTON,

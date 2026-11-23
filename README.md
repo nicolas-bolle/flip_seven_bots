@@ -1,6 +1,6 @@
 # Flip 7 bots
 
-A Python implementation of Flip 7 and Flip 7: With A Vengeance for building and
+A Python implementation of Flip 7 and Flip 7: With a Vengeance for building and
 comparing bots. It includes a headless rules engine, example bots, rated
 tournaments, and Pygame windows for playing games and watching tournaments.
 

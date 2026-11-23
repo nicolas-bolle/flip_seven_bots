@@ -154,10 +154,10 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
         help="number of parallel game workers (default: %(default)s)",
     )
     parser.add_argument(
-        "--vengeance", action="store_true", help="play With A Vengeance"
+        "--vengeance", action="store_true", help="play With a Vengeance"
     )
     parser.add_argument(
-        "--brutal", action="store_true", help="play With A Vengeance in Brutal Mode"
+        "--brutal", action="store_true", help="play With a Vengeance in Brutal Mode"
     )
     parser.add_argument(
         "--k-factor",

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class CardType(Enum):
-    """Kinds of cards in the base and With A Vengeance decks."""
+    """Kinds of cards in the base and With a Vengeance decks."""
 
     NUMBER = auto()
     ADD = auto()

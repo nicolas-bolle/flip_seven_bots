@@ -60,7 +60,7 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
 
     Seats follow option order, defaulting to a human and two bots. No
     arguments opens setup; any supplied options launch directly. ``--brutal``
-    implies With A Vengeance.
+    implies With a Vengeance.
     """
     parser = argparse.ArgumentParser(
         prog="flip7 play",
@@ -99,10 +99,10 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
         help="folder for bug and crash reports (default: %(default)s)",
     )
     parser.add_argument(
-        "--vengeance", action="store_true", help="play With A Vengeance"
+        "--vengeance", action="store_true", help="play With a Vengeance"
     )
     parser.add_argument(
-        "--brutal", action="store_true", help="play With A Vengeance in Brutal Mode"
+        "--brutal", action="store_true", help="play With a Vengeance in Brutal Mode"
     )
     setup = parser.add_mutually_exclusive_group()
     setup.add_argument("--setup", action="store_true", help="show the setup screen")

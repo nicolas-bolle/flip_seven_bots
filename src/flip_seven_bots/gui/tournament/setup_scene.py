@@ -216,7 +216,7 @@ class TournamentSetupScene:
         draw_text(screen, self._title_font, "TOURNAMENT SETUP", (90, 45), ACCENT)
         draw_text(screen, self._heading_font, "Game mode", (90, 95))
         draw_button(screen, font, BASE_BUTTON, "Flip 7", not self.vengeance)
-        draw_button(screen, font, VENGEANCE_BUTTON, "With A Vengeance", self.vengeance)
+        draw_button(screen, font, VENGEANCE_BUTTON, "With a Vengeance", self.vengeance)
         draw_button(
             screen,
             font,

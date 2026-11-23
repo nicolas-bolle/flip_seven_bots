@@ -61,7 +61,7 @@ class TournamentOptions:
         """A one-line description of the settings."""
         mode = "Flip 7"
         if self.vengeance:
-            mode = "With A Vengeance (Brutal)" if self.brutal else "With A Vengeance"
+            mode = "With a Vengeance (Brutal)" if self.brutal else "With a Vengeance"
         table = self.players_per_game or max_table_size(len(self.bots))
         return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
 
