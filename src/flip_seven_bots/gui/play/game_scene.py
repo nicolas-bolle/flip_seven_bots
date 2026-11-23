@@ -722,6 +722,11 @@ class GameScene:
                     message = f"{turn}: choose {choice} for {card_label(card)}"
                 case FlipSevenBonus():
                     message = f"{turn}: take the bonus or subtract it from a player"
+                case ChooseTarget(card=card) if card.kind is CardType.SECOND_CHANCE:
+                    message = (
+                        f"{turn}: you already have a Second Chance, "
+                        "so give this one to another player"
+                    )
                 case ChooseTarget(card=card):
                     message = f"{turn}: choose a player for {card_label(card)}"
                 case HitOrStay(can_stay=False):
