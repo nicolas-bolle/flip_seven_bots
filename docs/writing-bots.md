@@ -3,7 +3,7 @@
 A bot is any object with a `choose_action(observation)` method that returns
 one of `observation.legal_actions`. The observation contains everything public
 at the table, but not the order of the deck. The
-[reference](reference.md#writing-bots) describes decisions, observations and
+[reference](reference.md#writing-bots) describes decisions, observations, and
 the lookahead tools in full.
 
 ## 1. Write the bot
@@ -40,7 +40,7 @@ register(
 ```
 
 `observation.decision` says what is being decided: hit or stay, a target for an
-action card, a card to swap, steal or discard, or a Brutal Mode bonus. A good
+action card, a card to swap, steal, or discard, or a Brutal Mode bonus. A good
 structure is to match on it and hand each case to a function from
 `bots.policies` (simple rules) or `bots.rollouts` (simulation); see
 [Building a bot](reference.md#building-a-bot).
@@ -65,7 +65,7 @@ Registration makes the bot available as the spec `careful` or
   `Parameter("style", "safe", str)`. With several parameters, use
   `kind:name=value,other=value`; percent-encode reserved characters in text
   values, for example `%2C` for a comma.
-- The constructor, parsers and any `display_name` function must be defined at
+- The constructor, parsers, and any `display_name` function must be defined at
   module level, so that parallel tournament workers can import them.
 
 ## 3. Try it

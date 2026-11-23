@@ -36,8 +36,8 @@ uv run flip7 compare random threshold:25 --games 200 --seed 7
   same options, including `--gui`.
 - `--jobs N` sets the number of parallel game workers, in the terminal and the
   window. The tournament setup window also has a Workers field.
-- `--output DIR` saves `games.csv`, `summary.csv` and `settings.json` (bot
-  specs, seed, settings and source revision). Existing files are overwritten.
+- `--output DIR` saves `games.csv`, `summary.csv`, and `settings.json` (bot
+  specs, seed, settings, and source revision). Existing files are overwritten.
 - `--plots` also saves HTML plots, and requires `--output`. `--quiet` hides the
   terminal progress bar.
 - Supply `--seed` if the run must be repeatable.
@@ -50,7 +50,7 @@ other options. Any other options start immediately with those settings.
 `--no-setup` skips it.
 
 `--vengeance` and `--brutal` choose the game mode for `play`, `tournament`,
-`compare` and `trace`. In the game
+`compare`, and `trace`. In the game
 window, `--seed` controls the decks but not the bots' randomness; press F1 to
 save a bug report with replay data.
 
@@ -65,7 +65,7 @@ uv run flip7 replay bug_reports/report.md --moves 10
 - `trace` prints the decisions and actions of the bot at `--seat`. With
   `--step`, it waits for Enter after each decision.
 - `replay` rebuilds the reported game, optionally only its first `--moves`, and
-  prints the round, scores and current player.
+  prints the round, scores, and current player.
 
 See the [reference](reference.md#playing-games) for window controls, every
-option and the Python equivalents.
+option, and the Python equivalents.

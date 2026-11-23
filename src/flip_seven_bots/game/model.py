@@ -160,7 +160,7 @@ class ChooseTarget:
 
 @dataclass(frozen=True)
 class ChooseCard:
-    """Choose a card in someone's hand for a Vengeance Swap, Steal or Discard.
+    """Choose a card in someone's hand for a Vengeance Swap, Steal, or Discard.
 
     A Swap takes two such decisions, one per card.
     """

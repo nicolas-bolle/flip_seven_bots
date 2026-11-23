@@ -1,4 +1,4 @@
-"""Run a tournament in the background and show live progress, standings and ratings."""
+"""Run a tournament in the background and show live progress, standings, and ratings."""
 
 import math
 import queue

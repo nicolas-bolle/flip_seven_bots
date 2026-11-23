@@ -24,7 +24,7 @@ The summary has one row per bot, ranked by `rating`:
   indistinguishable, and add games to narrow the intervals.
 - `elo`: an online Elo updated after each game, useful for watching a run
   progress. It depends on game order, so prefer `rating` for conclusions.
-- `wins`, `win_rate`, `mean_place` and `mean_score`: raw results. Tied winners
+- `wins`, `win_rate`, `mean_place`, and `mean_score`: raw results. Tied winners
   each count a win; in the ratings, tied places count as draws.
 
 Ratings assume a bot's strength doesn't depend on its opponents or the table
@@ -37,14 +37,14 @@ Each game seats bots in a random order and builds a fresh bot for each seat
 from the tournament seed. Bots keep state between the rounds of a game, but
 not between games.
 
-With `--seed`, a tournament repeats exactly: the seed controls seating, decks
+With `--seed`, a tournament repeats exactly: the seed controls seating, decks,
 and every bot's seed. Changing `--jobs` doesn't change the results, because
 games are rated in schedule order rather than finishing order. This requires
 bots to draw all randomness from their seed; a bot that uses another random
 source must seed it itself. Without a seed, the run can't be repeated, even
 from saved settings.
 
-`--output` saves `settings.json` with the bot specs, seed, settings and source
+`--output` saves `settings.json` with the bot specs, seed, settings, and source
 revision, so a saved run records how to reproduce it.
 
 ## Parallel runs

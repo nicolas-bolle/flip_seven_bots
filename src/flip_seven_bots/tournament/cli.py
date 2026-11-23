@@ -141,7 +141,7 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
         metavar="N",
         help="bots seated in each game, chosen at random (default: all)",
     )
-    parser.add_argument("--seed", type=int, help="seed for seating, decks and bots")
+    parser.add_argument("--seed", type=int, help="seed for seating, decks, and bots")
     parser.add_argument(
         "--jobs",
         type=_positive_int,
@@ -249,7 +249,7 @@ def format_summary(summary: pd.DataFrame) -> str:
 
 
 def run(options: TournamentOptions) -> None:
-    """Run a tournament with a progress bar, print the summary and optionally save CSVs."""
+    """Run a tournament with a progress bar, print the summary, and optionally save CSVs."""
     print(options.describe())
     result = options.run(progress=not options.quiet)
     print(format_summary(result.summary))

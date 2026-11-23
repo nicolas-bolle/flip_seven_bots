@@ -7,7 +7,7 @@ tournaments, and Pygame windows for playing games and watching tournaments.
 This is an unofficial fan project, not affiliated with or endorsed by The Op.
 Flip 7 is a trademark of its owner; buy the game to play it with friends. The
 code is released under the [MIT License](LICENSE), which covers this project's
-code and docs only, not the Flip 7 game, name or artwork.
+code and docs only, not the Flip 7 game, name, or artwork.
 
 ## Get started
 
@@ -36,13 +36,13 @@ print(result.winners, [player.total_score for player in result.players])
 
 ## Guides
 
-- [Write and test a bot](docs/writing-bots.md): create, register, compare and
+- [Write and test a bot](docs/writing-bots.md): create, register, compare, and
   debug your own bot.
 - [Commands](docs/cli.md): every `flip7` command, in the terminal and in
   windows.
 - [Tournaments and ratings](docs/tournaments-and-ratings.md): run reproducible
   tournaments and read the results.
-- [Reference](docs/reference.md): game rules, window controls, options and
+- [Reference](docs/reference.md): game rules, window controls, options, and
   Python APIs. See its [project layout](docs/reference.md#project-layout) for a
   map of the code.
 

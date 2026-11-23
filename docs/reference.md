@@ -1,13 +1,13 @@
 # Flip 7 reference
 
-The complete description of the game rules, windows, options and Python APIs.
+The complete description of the game rules, windows, options, and Python APIs.
 For setup and step-by-step guides, start with the [README](../README.md).
 
 - [Interfaces at a glance](#interfaces-at-a-glance)
 - [Project layout](#project-layout)
 - [Game modes](#game-modes) and [included bots](#included-bots)
-- [Playing games](#playing-games): windows, options, Python and bug reports
-- [Writing bots](#writing-bots): decisions, observations and lookahead
+- [Playing games](#playing-games): windows, options, Python, and bug reports
+- [Writing bots](#writing-bots): decisions, observations, and lookahead
 - [Running tournaments](#running-tournaments) and
   [how ratings work](#how-ratings-work)
 
@@ -27,10 +27,10 @@ in the window. Run every command with `uv run`; each accepts `--help`. The
 
 | Package | Contents |
 | --- | --- |
-| `flip_seven_bots.game` | Headless rules engine: `Game`, `Rules`, `VengeanceRules`, cards, decisions and observations; `game.replay` rebuilds reported games |
+| `flip_seven_bots.game` | Headless rules engine: `Game`, `Rules`, `VengeanceRules`, cards, decisions, and observations; `game.replay` rebuilds reported games |
 | `flip_seven_bots.bots` | The `Bot` interface, the included bots, reusable `policies` and `rollouts`, and the bot `registry` |
 | `flip_seven_bots.simulation` | `play_game` and `run` for playing bots against each other |
-| `flip_seven_bots.tournament` | Tournaments, ratings, saved results and tournament option parsing |
+| `flip_seven_bots.tournament` | Tournaments, ratings, saved results, and tournament option parsing |
 | `flip_seven_bots.gui` | Pygame windows: `play`, `tournament`, and shared components in `common` |
 | `flip_seven_bots.cli` | The `flip7` command |
 
@@ -83,7 +83,7 @@ During play:
 
 - Use the buttons or their keyboard shortcuts to hit, stay, or choose a player
   when an action card needs a target.
-- For Swap, Steal and Discard, click a highlighted card. Swap needs two cards
+- For Swap, Steal, and Discard, click a highlighted card. Swap needs two cards
   from different players.
 - Press Escape or close the window to quit.
 
@@ -144,7 +144,7 @@ For finer control, create a `Game` and advance it with
 `stop(game)` becomes true. Options:
 
 - `Game(..., dealer=N)` chooses the dealer.
-- `Rules(...)` changes the target score, the Flip 7 bonus, the deck or the
+- `Rules(...)` changes the target score, the Flip 7 bonus, the deck, or the
   scoring.
 - `Game(..., deck=Deck.stacked(cards))` deals cards in a fixed order, which is
   useful in tests.
@@ -180,7 +180,7 @@ A bot provides `choose_action(observation)` and returns one of
 | --- | --- | --- |
 | `HitOrStay` | On a player's turn | `hit()`, `stay()` |
 | `ChooseTarget` | An action card needs a target; has the `card` and eligible `targets` | `choose(target)` |
-| `ChooseCard` | With A Vengeance: Swap, Steal or Discard picks a card | `choose(owner, card_index)` |
+| `ChooseCard` | With A Vengeance: Swap, Steal, or Discard picks a card | `choose(owner, card_index)` |
 | `FlipSevenBonus` | Brutal Mode: a player got Flip 7; has eligible `targets` | `take()`, `penalize(target)` |
 
 Every decision also has an `actions` tuple. The decision is public, so every
@@ -192,7 +192,7 @@ observation. Swap uses two such decisions; during the second,
 
 ### Observations
 
-Observations contain immutable snapshots of the public cards, scores and
+Observations contain immutable snapshots of the public cards, scores, and
 discard pile, but not the shuffled deck.
 
 - Cards still held after a player stays or busts remain visible, because they
@@ -200,7 +200,7 @@ discard pile, but not the shuffled deck.
 - A player's `round_score` is the in-progress score, without any Flip 7 bonus.
 - `last_round` has the most recently completed round's scores, including any
   Flip 7 bonus.
-- `events` has the current round's public draws, decisions and discard
+- `events` has the current round's public draws, decisions, and discard
   reshuffles, plus the final round result once the game ends.
 
 ### Building a bot
@@ -267,14 +267,14 @@ uv run flip7 tournament --bot random --bot careful=threshold:40 \
 ```
 
 This shows a progress bar, prints the summary with each rating's 95% interval,
-and, with `--output`, saves `games.csv`, `summary.csv` and `settings.json`.
+and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 
 | Option | Effect |
 | --- | --- |
 | `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: `random`, `threshold:30`, `expected` |
 | `--games N` | Number of games (default 100) |
 | `--players-per-game N` | Bots seated in each game (default: all) |
-| `--seed N` | Seed for seating, decks and bots |
+| `--seed N` | Seed for seating, decks, and bots |
 | `--jobs N` | Parallel game workers (default 1) |
 | `--gui` | Open the tournament window |
 | `--setup`, `--no-setup` | Show or skip setup explicitly (with `--gui`) |
@@ -290,10 +290,10 @@ uv run flip7 tournament --gui
 ```
 
 The setup screen lets you choose the game mode, number of games, players per
-game, seed and up to eight bots. Giving any of the tournament options above
+game, seed, and up to eight bots. Giving any of the tournament options above
 skips setup and starts immediately unless `--setup` is supplied.
 
-While it runs, the window shows a progress bar, live standings by Elo and an
+While it runs, the window shows a progress bar, live standings by Elo, and an
 Elo chart. **Stop** schedules no more games and waits for those in progress.
 The final standings rank bots by `rating` with its 95% interval. Afterwards:
 
@@ -326,7 +326,7 @@ In the Elo chart, each bot's final rating is a dotted line inside a shaded band
 for its interval; click a bot in the legend to hide or show all three.
 
 `run_tournament` takes the same settings as the command line:
-`players_per_game`, `rules`, `seed`, `jobs`, `k_factor`, `k_half_life` and
+`players_per_game`, `rules`, `seed`, `jobs`, `k_factor`, `k_half_life`, and
 `initial_rating`, plus `confidence` (default 0.95) for the rating intervals. A
 progress bar shows the current leader; pass `progress=False` to hide it.
 

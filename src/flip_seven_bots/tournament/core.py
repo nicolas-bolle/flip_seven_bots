@@ -74,7 +74,7 @@ class TournamentResult:
     Columns: ``game`` (numbered from one), ``seat`` (zero-based;
     seat 0 deals), ``player``, ``score`` (final total), ``place`` (1 is best;
     tied scores share a place), ``won``, ``elo_before``, ``elo`` (after the
-    game) and ``elo_change``.
+    game), and ``elo_change``.
     """
 
     summary: pd.DataFrame
@@ -266,7 +266,7 @@ def run_tournament(
     """Play ``games`` games between named bots and rate them.
 
     Each game seats ``players_per_game`` bots (default: all of them), chosen
-    and ordered at random. ``seed`` controls seating, decks and bot seeds.
+    and ordered at random. ``seed`` controls seating, decks, and bot seeds.
     Each game constructs fresh bots from factories accepting a seed. Registered
     bot instances are also accepted as configurations. Factories and rules
     must be picklable when ``jobs`` is greater than one.

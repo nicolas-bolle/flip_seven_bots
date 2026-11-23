@@ -132,7 +132,7 @@ def test_threshold_must_not_be_negative() -> None:
 def test_rollouts_target_self_with_flip_three_when_the_remaining_cards_are_safe() -> (
     None
 ):
-    # Player 1 holds a 7 and the unseen cards are 8, 9 and 10 in some order, so
+    # Player 1 holds a 7 and the unseen cards are 8, 9, and 10 in some order, so
     # flipping three for itself is worth more than giving the cards to player 0.
     game = Game(
         2,
