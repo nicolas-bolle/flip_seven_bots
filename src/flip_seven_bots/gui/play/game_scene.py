@@ -130,6 +130,14 @@ def _player_rects(count: int) -> list[pygame.Rect]:
     ]
 
 
+def _shown_cards(player: PlayerView) -> tuple[Card, ...]:
+    """Cards drawn in a player's panel: the hand, then cards awaiting resolution.
+
+    The hand comes first so that ``CHOOSE_CARD`` indices still address it.
+    """
+    return player.cards + player.unresolved
+
+
 def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
     """Lay out cards in sorted rows while returning rectangles in hand-index order.
 
@@ -269,7 +277,8 @@ class GameScene:
             return tuple(
                 Button(
                     _card_rects(
-                        observation.players[action.target].cards, panels[action.target]
+                        _shown_cards(observation.players[action.target]),
+                        panels[action.target],
                     )[action.card_index],
                     "",
                     action,
@@ -383,9 +392,9 @@ class GameScene:
         if before is not None and before.round_number != after.round_number:
             self._previous_round = before
         added = [
-            Counter(player.cards)
+            Counter(_shown_cards(player))
             - (
-                Counter(before.players[player.player].cards)
+                Counter(_shown_cards(before.players[player.player]))
                 if before is not None and before.round_number == after.round_number
                 else Counter()
             )
@@ -476,7 +485,7 @@ class GameScene:
         if self._swap_first is not None and not self._animating:
             owner, index = self._swap_first
             panel = _player_rects(len(observation.players))[owner]
-            rect = _card_rects(observation.players[owner].cards, panel)[index]
+            rect = _card_rects(_shown_cards(observation.players[owner]), panel)[index]
             pygame.draw.rect(
                 screen, ACCENT, rect.inflate(4, 4), width=2, border_radius=6
             )
@@ -541,7 +550,8 @@ class GameScene:
         score = f"Total: {player.total_score}    Live round: {live_score}"
         self._text(screen, self._font, score, (rect.x + 570, rect.y + 16))
 
-        if not player.cards:
+        cards = _shown_cards(player)
+        if not cards:
             self._text(
                 screen,
                 self._small_font,
@@ -558,8 +568,8 @@ class GameScene:
             and draw.event.round_number == observation.round_number
             and draw.event.player == player.player
         )
-        rects = _card_rects(player.cards, rect)
-        for card, card_rect in reversed(list(zip(player.cards, rects))):
+        rects = _card_rects(cards, rect)
+        for card, card_rect in reversed(list(zip(cards, rects))):
             if hidden[card]:
                 hidden[card] -= 1
             else:
@@ -581,7 +591,7 @@ class GameScene:
         event = draw.event
         player = observation.players[event.player]
         panel = _player_rects(len(observation.players))[event.player]
-        cards = player.cards
+        cards = _shown_cards(player)
         if draw.in_hand:
             hidden_count = sum(
                 queued.in_hand

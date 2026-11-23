@@ -199,6 +199,8 @@ discard pile, but not the shuffled deck.
 
 - Cards still held after a player stays or busts remain visible, because they
   were revealed earlier in the round.
+- Action and modifier cards a player has drawn but not yet resolved are in
+  that player's `unresolved`, not `cards`, and do not affect any score.
 - A player's `round_score` is the in-progress score, without any Flip 7 bonus.
 - `last_round` has the most recently completed round's scores, including any
   Flip 7 bonus.

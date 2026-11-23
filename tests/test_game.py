@@ -107,7 +107,7 @@ def test_resolved_action_cards_remain_with_their_recipients() -> None:
         [number(2), number(4), FLIP_THREE, FREEZE, number(5), number(6)]
     )
     game.apply(HIT)
-    assert FLIP_THREE in game.observe(1).players[1].cards
+    assert FLIP_THREE in game.observe(1).players[1].unresolved
     game.apply(target(0))
 
     observation = game.observe(0)
@@ -115,13 +115,13 @@ def test_resolved_action_cards_remain_with_their_recipients() -> None:
     assert observation.decision.card == FREEZE
     assert FLIP_THREE not in observation.discard
     assert FLIP_THREE in observation.players[0].cards
-    assert FREEZE in observation.players[0].cards
+    assert FREEZE in observation.players[0].unresolved
 
     game.apply(target(1))
     observation = game.observe(0)
     assert FREEZE not in observation.discard
     assert FREEZE in observation.players[1].cards
-    assert FREEZE not in observation.players[0].cards
+    assert FREEZE not in observation.players[0].unresolved
 
 
 def test_bust_keeps_cancelled_deferred_actions_until_round_end() -> None:
@@ -133,7 +133,7 @@ def test_bust_keeps_cancelled_deferred_actions_until_round_end() -> None:
     assert observation.players[1].status is PlayerStatus.BUSTED
     assert observation.discard == ()
     assert FLIP_THREE in observation.players[1].cards
-    assert FREEZE in observation.players[1].cards
+    assert FREEZE in observation.players[1].unresolved
 
 
 def test_bust_during_deferred_flip_keeps_remaining_deferred_actions() -> None:
@@ -149,7 +149,7 @@ def test_bust_during_deferred_flip_keeps_remaining_deferred_actions() -> None:
     observation = game.observe(0)
     assert observation.players[1].status is PlayerStatus.BUSTED
     assert observation.players[1].cards.count(FLIP_THREE) == 2
-    assert FREEZE in observation.players[1].cards
+    assert FREEZE in observation.players[1].unresolved
     assert observation.discard == ()
 
 

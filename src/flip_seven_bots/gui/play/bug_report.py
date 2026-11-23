@@ -159,16 +159,17 @@ def report_markdown(
             f"Flip 7 bonus {rules.flip_seven_bonus}"
         ),
         "",
-        "| Seat | Name | Player | Status | Cards | Round score | Total |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Seat | Name | Player | Status | Cards | Unresolved | Round score | Total |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for view in observation.players:
         seat = table.seats[view.player]
         cards = ", ".join(card_label(card) for card in view.cards) or "-"
+        unresolved = ", ".join(card_label(card) for card in view.unresolved) or "-"
         lines.append(
             f"| {view.player} | {_cell(seat.name)} | {describe_bot(seat.bot)} "
-            f"| {view.status.name.lower()} | {cards} | {view.round_score} "
-            f"| {view.total_score} |"
+            f"| {view.status.name.lower()} | {cards} | {unresolved} "
+            f"| {view.round_score} | {view.total_score} |"
         )
 
     lines += [

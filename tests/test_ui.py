@@ -499,6 +499,30 @@ def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None
     assert "Total: 0    Live round: 0" in texts
 
 
+def test_unresolved_card_shows_in_its_drawers_panel_without_changing_live_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    modifier = Card(CardType.SUBTRACT, 10)
+    scene, table = make_scene(
+        numbers(5, 12) + [modifier], player_count=2, rules=VengeanceRules()
+    )
+    press(scene, pygame.K_h)
+    texts: list[str] = []
+    drawn: list[Card] = []
+    monkeypatch.setattr(
+        scene,
+        "_text",
+        lambda _screen, _font, text, _position, _color=None: texts.append(text),
+    )
+    monkeypatch.setattr(
+        scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card)
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert isinstance(table.observation.decision, ChooseTarget)
+    assert modifier in drawn
+    assert "Total: 0    Live round: 5" in texts
+
+
 def test_sorted_number_cards_wrap_in_ascending_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -146,6 +146,18 @@ def test_just_one_more_can_target_a_stayed_player_and_they_remain_stayed() -> No
     assert game.current_player == 0
 
 
+def test_drawn_modifier_is_unresolved_and_unscored_until_a_player_receives_it() -> None:
+    game = game_with([number(5), number(12), subtract(10)])
+    game.apply(HIT)
+    drawer = game.observe(1).players[1]
+    assert drawer.unresolved == (subtract(10),)
+    assert (drawer.cards, drawer.round_score) == ((number(5),), 5)
+    game.apply(target(0))
+    receiver, drawer = game.observe(1).players
+    assert drawer.unresolved == ()
+    assert (receiver.cards, receiver.round_score) == ((number(12), subtract(10)), 2)
+
+
 def test_player_with_no_cards_can_stay_after_giving_away_initial_modifier() -> None:
     game = game_with([subtract(2), number(4)])
     game.apply(target(0))
@@ -401,6 +413,7 @@ def test_vengeance_card_conservation_through_a_game(brutal: bool) -> None:
         cards = Counter(game.hidden_deck()) + Counter(observation.discard)
         for player in observation.players:
             cards.update(player.cards)
+            cards.update(player.unresolved)
         assert cards == expected
         if game.is_finished:
             break
