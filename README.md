@@ -1,42 +1,55 @@
 # Flip 7 bots
 
-A headless implementation of Flip 7 and Flip 7: With A Vengeance, with bots,
-game windows and tools for comparing strategies. This project is private and
-unlicensed.
+A Python implementation of Flip 7 and Flip 7: With A Vengeance for building and
+comparing bots. It includes a headless rules engine, example bots, rated
+tournaments, and Pygame windows for playing games and watching tournaments.
+
+The project is private and unlicensed to avoid Flip 7 copyright issues.
 
 ## Get started
 
-Install [uv](https://docs.astral.sh/uv/), then run:
+Install [uv](https://docs.astral.sh/uv/). `uv sync` installs Python 3.14 and
+the dependencies:
 
 ```shell
 uv sync
-uv run flip7 bots
-uv run flip7 play
-uv run flip7 tournament --games 200 --seed 1 --jobs 2
-uv run flip7 tournament --gui
+uv run flip7 bots                    # list the available bots
+uv run flip7 play                    # play against bots in a window
+uv run flip7 tournament --gui        # watch a tournament in a window
+uv run flip7 tournament --games 200 --seed 1 --jobs 2   # rate bots in the terminal
 ```
 
-Use `uv run flip7 --help` for the commands, or `uv run flip7 tournament --help`
-for tournament options.
+Every command accepts `--help`, for example `uv run flip7 tournament --help`.
+
+The same tools are available from Python:
+
+```python
+from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
+from flip_seven_bots.simulation import play_game
+
+result = play_game([ThresholdBot(30), ExpectedValueBot()], seed=123)
+print(result.winners, [player.total_score for player in result.players])
+```
 
 ## Guides
 
-- [Write and test a bot](docs/writing-bots.md)
-- [Command-line and window interfaces](docs/cli.md)
-- [Tournaments and ratings](docs/tournaments-and-ratings.md)
-- [Full reference, game rules and Python APIs](docs/reference.md)
-
-The code is organized into `game/` (rules and observations), `bots/`
-(strategies and registry), `simulation.py`, `tournament/`, and `gui/`.
-The GUI contains `play/`, `tournament/`, and shared components in `common/`.
-Replay is available without the GUI through `game.replay`.
+- [Write and test a bot](docs/writing-bots.md): create, register, compare and
+  debug your own bot.
+- [Commands](docs/cli.md): every `flip7` command, in the terminal and in
+  windows.
+- [Tournaments and ratings](docs/tournaments-and-ratings.md): run reproducible
+  tournaments and read the results.
+- [Reference](docs/reference.md): game rules, window controls, options and
+  Python APIs. See its [project layout](docs/reference.md#project-layout) for a
+  map of the code.
 
 ## Development
 
 ```shell
-uv run pytest
-uv run ruff check
-uv run ruff format --check
+uv run pytest               # tests
+uv run ruff check           # lint
+uv run ruff format --check  # formatting
 ```
 
-CI checks lint and tests with at least 80% branch coverage.
+CI runs lint and the tests, and requires at least 80% branch coverage.
+Training integrations are not yet implemented.

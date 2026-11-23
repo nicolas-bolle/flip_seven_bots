@@ -1,55 +1,38 @@
 # Flip 7 reference
 
-An implementation of the card games Flip 7 and Flip 7: With A Vengeance, with
-bots to play them and tools to rate bots against each other. The project is
-kept private and unlicensed to avoid any Flip 7 copyright issues.
+The complete description of the game rules, windows, options and Python APIs.
+For setup and step-by-step guides, start with the [README](../README.md).
 
-## Quickstart
-
-Requires [uv](https://docs.astral.sh/uv/); `uv sync` installs Python 3.14 and
-the dependencies.
-
-```shell
-uv sync
-
-# Play against bots in a window
-uv run flip7 play
-
-# Watch bots play a tournament in a window
-uv run flip7 tournament --gui
-
-# Run a tournament in the terminal and print the ratings
-uv run flip7 tournament --games 200
-```
-
-Or from Python:
-
-```python
-from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
-from flip_seven_bots.simulation import play_game
-
-result = play_game([ThresholdBot(30), ExpectedValueBot()], seed=123)
-print(result.winners, [player.total_score for player in result.players])
-```
+- [Interfaces at a glance](#interfaces-at-a-glance)
+- [Project layout](#project-layout)
+- [Game modes](#game-modes) and [included bots](#included-bots)
+- [Playing games](#playing-games): windows, options, Python and bug reports
+- [Writing bots](#writing-bots): decisions, observations and lookahead
+- [Running tournaments](#running-tournaments) and
+  [how ratings work](#how-ratings-work)
 
 ## Interfaces at a glance
 
-| Task | Window (Pygame) | Command line | Python |
+| Task | Window (Pygame) | Terminal | Python |
 | --- | --- | --- | --- |
-| Play a game | `flip7 play` | Same command with options, which skip setup | `simulation.play_game`, `game.Game` |
-| Run a tournament | `flip7 tournament --gui` | `flip7 tournament` | `tournament.run_tournament`, `play_tournament` |
+| Play a game | `flip7 play` | `flip7 trace` (prints a game between bots) | `simulation.play_game`, `game.Game` |
+| Run a tournament | `flip7 tournament --gui` | `flip7 tournament`, `flip7 compare` | `tournament.run_tournament`, `play_tournament` |
+| Rebuild a reported game | | `flip7 replay` | `game.replay.replay` |
 
-Every command accepts `--help`. All commands are run with `uv run`.
+Options given to `flip7 play` configure the window; human players always play
+in the window. Run every command with `uv run`; each accepts `--help`. The
+[commands guide](cli.md) summarizes them all.
 
 ## Project layout
 
 | Package | Contents |
 | --- | --- |
-| `flip_seven_bots.game` | Headless rules engine: `Game`, `Rules`, `VengeanceRules`, cards, decisions and observations |
-| `flip_seven_bots.bots` | The `Bot` interface, the included bots, and reusable `policies` and `rollouts` |
+| `flip_seven_bots.game` | Headless rules engine: `Game`, `Rules`, `VengeanceRules`, cards, decisions and observations; `game.replay` rebuilds reported games |
+| `flip_seven_bots.bots` | The `Bot` interface, the included bots, reusable `policies` and `rollouts`, and the bot `registry` |
 | `flip_seven_bots.simulation` | `play_game` and `run` for playing bots against each other |
-| `flip_seven_bots.tournament` | Tournaments, ratings and the tournament command line |
-| `flip_seven_bots.gui` | Pygame windows for playing games and watching tournaments |
+| `flip_seven_bots.tournament` | Tournaments, ratings, saved results and tournament option parsing |
+| `flip_seven_bots.gui` | Pygame windows: `play`, `tournament`, and shared components in `common` |
+| `flip_seven_bots.cli` | The `flip7` command |
 
 ## Game modes
 
@@ -311,12 +294,12 @@ game, seed and up to eight bots. Giving any of the tournament options above
 skips setup and starts immediately unless `--setup` is supplied.
 
 While it runs, the window shows a progress bar, live standings by Elo and an
-Elo chart; Stop stops scheduling games and waits for in-flight work. The final
-standings rank bots by `rating` with its 95% interval. Afterwards:
+Elo chart. **Stop** schedules no more games and waits for those in progress.
+The final standings rank bots by `rating` with its 95% interval. Afterwards:
 
-- **Save results** writes the CSV files and settings to `--output` if given
-  (which also saves them automatically), or otherwise to a timestamped folder
-  in `tournament_results/`.
+- With `--output DIR`, results are saved there automatically. Otherwise,
+  **Save results** writes them to a timestamped folder in
+  `tournament_results/`.
 - **New tournament** returns to setup.
 
 ### From Python
@@ -335,7 +318,7 @@ print(result.summary)  # games, wins, win_rate, mean_place, mean_score,
 result.games  # per game and player: seat, score, place, won, Elo
 
 result.plot_ratings().show()  # each rating with its confidence interval
-result.plot_elo().show()  # Elo after each game, over each final rating and interval
+result.plot_elo().show()  # Elo history, with final ratings and intervals
 ```
 
 The plot methods return Plotly figures, which display directly in a notebook.
@@ -343,13 +326,14 @@ In the Elo chart, each bot's final rating is a dotted line inside a shaded band
 for its interval; click a bot in the legend to hide or show all three.
 
 `run_tournament` takes the same settings as the command line:
-`players_per_game`, `rules`, `seed`, `k_factor`,
-`k_half_life` and `initial_rating`, plus `confidence` (default 0.95) for the
-rating intervals.
-A progress bar shows the current leader; pass `progress=False` to hide it.
-The tournament creates a fresh bot for every game. Registered bot instances
-are treated as configurations; custom bots must be supplied as seeded factories.
-The tournament seed controls bot randomness as well as seating and decks.
+`players_per_game`, `rules`, `seed`, `jobs`, `k_factor`, `k_half_life` and
+`initial_rating`, plus `confidence` (default 0.95) for the rating intervals. A
+progress bar shows the current leader; pass `progress=False` to hide it.
+
+The tournament creates a fresh bot for every game, seeded from the tournament
+seed. Pass registered bots as instances, which serve only as configurations,
+and other bots as factories taking a seed (see
+[Write and test a bot](writing-bots.md#experiment-from-python)).
 
 `play_tournament` takes the same settings but returns an iterator yielding a
 `GameRecord` in game order, for showing progress or stopping early. Multiple
@@ -382,15 +366,3 @@ tied scores draw. Two ratings are computed from these, on the same Elo scale:
 Ratings assume a bot's strength doesn't depend on its opponents or the table
 size, which may not hold in Flip 7. Only compare ratings between tournaments
 that use the same number of players per game.
-
-## Development
-
-```shell
-uv run pytest      # tests
-uv run ruff check  # lint
-uv run ruff format # format
-```
-
-CI runs ruff and the tests, and requires at least 80% branch coverage.
-
-Training integrations are not yet implemented.

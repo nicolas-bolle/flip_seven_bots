@@ -1,24 +1,55 @@
 # Tournaments and ratings
 
-Each tournament game selects and orders bots, constructs a fresh instance for
-each seat, and plays a complete game to the target score. State can persist
-between rounds of that game, but not between games.
+A tournament plays many complete games between named bots and rates them.
 
-The tournament seed controls seating, decks and each bot's seed. With the same
-configuration, deterministic seeded factories and runtime, changing `jobs`
-does not change game records: games are rated in scheduled order, not
-completion order. An omitted seed is random and cannot be reproduced from the
-saved settings. A bot using an external random source must seed that source
-itself. Registered bot instances passed to the Python API provide configuration
-only; their existing random state is not used.
+## Run a tournament
 
-Parallel work uses processes. Only a bounded number of games are in flight.
-Stopping the window stops scheduling new work and waits for in-flight work to
-finish; only completed records delivered before stopping appear in the result.
-Errors from workers are surfaced rather than silently retried.
+```shell
+uv run flip7 tournament --bot random --bot careful=threshold:25 \
+    --games 500 --seed 7 --jobs 4 --output results
+uv run flip7 compare expected threshold:30 --games 500 --seed 7
+uv run flip7 tournament --gui
+```
 
-Results contain an order-independent Bradley–Terry rating with a confidence
-interval and a game-by-game online Elo. Ties count as shared wins. Ratings
-assume strength is independent of opponents and table size, so compare runs
-with the same table size. For the calculation and its limitations, see
-[How ratings work](reference.md#how-ratings-work).
+From Python, use `run_tournament`, or `play_tournament` to receive games as
+they finish; see the [reference](reference.md#running-tournaments) for every
+setting.
+
+## Read the results
+
+The summary has one row per bot, ranked by `rating`:
+
+- `rating`, with its 95% interval: the main result. It considers all games at
+  once, so game order doesn't matter. Treat bots whose intervals overlap as
+  indistinguishable, and add games to narrow the intervals.
+- `elo`: an online Elo updated after each game, useful for watching a run
+  progress. It depends on game order, so prefer `rating` for conclusions.
+- `wins`, `win_rate`, `mean_place` and `mean_score`: raw results. Tied winners
+  each count a win; in the ratings, tied places count as draws.
+
+Ratings assume a bot's strength doesn't depend on its opponents or the table
+size, so only compare ratings from tournaments with the same players per game.
+See [How ratings work](reference.md#how-ratings-work) for the calculations.
+
+## Reproducibility
+
+Each game seats bots in a random order and builds a fresh bot for each seat
+from the tournament seed. Bots keep state between the rounds of a game, but
+not between games.
+
+With `--seed`, a tournament repeats exactly: the seed controls seating, decks
+and every bot's seed. Changing `--jobs` doesn't change the results, because
+games are rated in schedule order rather than finishing order. This requires
+bots to draw all randomness from their seed; a bot that uses another random
+source must seed it itself. Without a seed, the run can't be repeated, even
+from saved settings.
+
+`--output` saves `settings.json` with the bot specs, seed, settings and source
+revision, so a saved run records how to reproduce it.
+
+## Parallel runs
+
+`--jobs N` (or `jobs=N` in Python) plays games in `N` worker processes, with
+only a few games in flight at a time. Errors in a worker stop the tournament
+and are reported rather than retried. Stopping the window waits for games in
+progress, and the results include only the games finished before stopping.

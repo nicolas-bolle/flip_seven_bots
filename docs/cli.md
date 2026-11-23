@@ -1,36 +1,71 @@
-# Interfaces
+# Commands
 
-All commands below use `uv run`. `flip7 --help` lists commands.
+All tools run through one command, `flip7`. Run it with `uv run`; add `--help`
+to any command for its full options.
+
+| Command | Purpose |
+| --- | --- |
+| `flip7 play` | Play a game in a window |
+| `flip7 tournament` | Rate bots in the terminal, or in a window with `--gui` |
+| `flip7 compare A B` | Rate two bots against each other |
+| `flip7 bots` | List the available bots and their parameters |
+| `flip7 trace` | Print one bot's decisions during a game |
+| `flip7 replay REPORT` | Rebuild a game from a bug report |
+
+Bots are given as specs such as `random`, `threshold:25` or
+`rival=threshold:25`; see [Included bots](reference.md#included-bots).
+
+## Play
 
 ```shell
-uv run flip7 play                         # game setup window
+uv run flip7 play                                  # setup window
 uv run flip7 play --human Ann --bot rival=threshold:25 --seed 7
-uv run flip7 tournament --gui             # tournament setup window
+uv run flip7 play --vengeance --human Ann --bot random
+```
+
+## Tournament and compare
+
+```shell
+uv run flip7 tournament --gui                      # setup window
 uv run flip7 tournament --bot random --bot careful=threshold:25 \
     --games 200 --seed 7 --jobs 2 --output results --plots
 uv run flip7 compare random threshold:25 --games 200 --seed 7
+```
+
+- `compare A B` is shorthand for `tournament --bot A --bot B` and accepts the
+  same options, including `--gui`.
+- `--jobs N` sets the number of parallel game workers, in the terminal and the
+  window. The tournament setup window also has a Workers field.
+- `--output DIR` saves `games.csv`, `summary.csv` and `settings.json` (bot
+  specs, seed, settings and source revision). Existing files are overwritten.
+- `--plots` also saves HTML plots, and requires `--output`. `--quiet` hides the
+  terminal progress bar.
+- Supply `--seed` if the run must be repeatable.
+
+## Windows and setup screens
+
+`flip7 play` and `flip7 tournament --gui` open a setup screen when given no
+other options. Any other options start immediately with those settings.
+`--setup` shows the setup screen anyway, prefilled with the options, and
+`--no-setup` skips it.
+
+`--vengeance` and `--brutal` choose the game mode for `play`, `tournament`,
+`compare` and `trace`. In the game
+window, `--seed` controls the decks but not the bots' randomness; press F1 to
+save a bug report with replay data.
+
+## Inspect and debug
+
+```shell
 uv run flip7 bots
 uv run flip7 trace --bot threshold:25 --bot random --seat 0 --seed 7 --step
 uv run flip7 replay bug_reports/report.md --moves 10
 ```
 
-`--setup` explicitly opens a window's setup screen; `--no-setup` starts with
-the supplied settings. Without either flag, no options opens setup, while
-supplying options starts immediately. Use `--vengeance` or `--brutal` for
-alternate game modes. The game-window seed controls decks, not bot randomness.
+- `trace` prints the decisions and actions of the bot at `--seat`. With
+  `--step`, it waits for Enter after each decision.
+- `replay` rebuilds the reported game, optionally only its first `--moves`, and
+  prints the round, scores and current player.
 
-`compare A B` is shorthand for `tournament --bot A --bot B` and accepts the
-same options, including `--gui`.
-
-`trace` prints the selected seat's decisions and actions. With `--step`, it
-waits for Enter after each decision.
-
-Tournament `--jobs N` sets the number of game workers in the terminal and
-window. The setup window also has a Workers field. `--quiet` hides the terminal
-progress bar; `--plots` saves HTML plots and requires `--output`. Output includes
-`games.csv`, `summary.csv`, and `settings.json`, including bot specifications,
-seed, settings and source revision. Supply a seed if the run must be repeatable.
-Output paths are overwritten if the files already exist.
-
-In the game window F1 saves a report with replay data. See the
-[reference](reference.md#playing-games) for controls and full Python examples.
+See the [reference](reference.md#playing-games) for window controls, every
+option and the Python equivalents.
