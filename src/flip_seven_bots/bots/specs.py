@@ -4,12 +4,7 @@ from collections import Counter
 from collections.abc import Sequence
 
 from .base import Bot
-from .simple import ExpectedValueBot, RandomBot, ThresholdBot
-
-BOT_KINDS = ("random", "threshold[:SCORE]", "expected")
-"""Accepted specifications; bracketed parts are optional."""
-
-DEFAULT_THRESHOLD = 30
+from .registry import config_for, parse_config
 
 
 def parse_bot(spec: str) -> tuple[str, Bot]:
@@ -17,22 +12,19 @@ def parse_bot(spec: str) -> tuple[str, Bot]:
 
     Raises ``ValueError`` with a user-facing message for an invalid specification.
     """
-    kind, _, value = spec.partition(":")
-    try:
-        number = int(value) if value else None
-    except ValueError:
-        raise ValueError(f"{value!r} is not a whole number") from None
-    match kind, number:
-        case "random", None:
-            return "Random bot", RandomBot()
-        case "threshold", _:
-            threshold = DEFAULT_THRESHOLD if number is None else number
-            if threshold < 0:
-                raise ValueError("threshold must not be negative")
-            return f"Threshold {threshold}", ThresholdBot(threshold)
-        case "expected", None:
-            return "Expected value bot", ExpectedValueBot()
-    raise ValueError(f"unknown bot {spec!r}; choose from {', '.join(BOT_KINDS)}")
+    config = parse_config(spec)
+    return config.name, config(None)
+
+
+def parse_named_bot(spec: str) -> tuple[str, Bot]:
+    """Parse ``[NAME=]KIND`` with optional parameters."""
+    prefix, colon, parameters = spec.partition(":")
+    name, separator, kind = prefix.partition("=")
+    if separator and not name.strip():
+        raise ValueError("a bot name must not be blank")
+    kind = (kind if separator else name) + (colon + parameters if colon else "")
+    default_name, bot = parse_bot(kind)
+    return (name.strip() if separator else default_name), bot
 
 
 def bot_spec(bot: Bot) -> str:
@@ -40,14 +32,7 @@ def bot_spec(bot: Bot) -> str:
 
     Raises ``ValueError`` for bots that have no specification.
     """
-    match bot:
-        case RandomBot():
-            return "random"
-        case ThresholdBot(threshold=threshold):
-            return f"threshold:{threshold}"
-        case ExpectedValueBot():
-            return "expected"
-    raise ValueError(f"no specification for {bot!r}")
+    return config_for(bot).spec
 
 
 def number_duplicates(names: Sequence[str]) -> list[str]:

@@ -4,96 +4,32 @@ The same options configure the tournament window, ``python -m flip_seven_bots.ui
 """
 
 import argparse
-from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from flip_seven_bots.bots.specs import BOT_KINDS, number_duplicates, parse_bot
-from flip_seven_bots.game import Rules, VengeanceRules
+from flip_seven_bots.bots.registry import kinds
+from flip_seven_bots.bots.specs import number_duplicates, parse_named_bot
 
-from .core import GameRecord, TournamentResult, play_tournament, run_tournament
+from .config import DEFAULT_K_HALF_LIFE
+from .config import TournamentOptions as TournamentOptions  # noqa: PLC0414
+from .storage import save_results as save_results  # noqa: PLC0414
 
 if TYPE_CHECKING:
     from flip_seven_bots.bots.base import Bot
 
 DEFAULT_BOTS = ("random", "threshold:30", "expected")
 DEFAULT_GAMES = 100
-DEFAULT_K_HALF_LIFE = 50.0
-
-
-@dataclass(frozen=True)
-class TournamentOptions:
-    """Validated tournament settings."""
-
-    bots: dict[str, Bot]
-    """Bots by unique display name."""
-
-    games: int
-    players_per_game: int | None
-    """Bots seated per game, or ``None`` for all of them."""
-
-    seed: int | None
-    vengeance: bool
-    brutal: bool
-    k_factor: float
-    initial_rating: float
-    output: Path | None
-    """Folder to save ``games.csv`` and ``summary.csv`` in, if any."""
-
-    k_half_life: float | None = DEFAULT_K_HALF_LIFE
-    """Games after which the Elo K-factor halves, or ``None`` for a constant K."""
-
-    @property
-    def rules(self) -> Rules | None:
-        return VengeanceRules(brutal=self.brutal) if self.vengeance else None
-
-    def start(self) -> Iterator[GameRecord]:
-        """Validate and return an iterator that plays one game per step."""
-        return play_tournament(self.bots, **self._settings())
-
-    def run(self, *, progress: bool = True) -> TournamentResult:
-        """Play the whole tournament, optionally showing a terminal progress bar."""
-        return run_tournament(self.bots, **self._settings(), progress=progress)
-
-    def result(self, records: Sequence[GameRecord]) -> TournamentResult:
-        """Build the result tables for games played with ``start``."""
-        return TournamentResult.from_records(
-            records, list(self.bots), initial_rating=self.initial_rating
-        )
-
-    def describe(self) -> str:
-        """A one-line description of the settings."""
-        mode = "Flip 7"
-        if self.vengeance:
-            mode = "With A Vengeance (Brutal)" if self.brutal else "With A Vengeance"
-        table = self.players_per_game or len(self.bots)
-        return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
-
-    def _settings(self) -> dict:
-        return {
-            "games": self.games,
-            "players_per_game": self.players_per_game,
-            "rules": self.rules,
-            "seed": self.seed,
-            "k_factor": self.k_factor,
-            "k_half_life": self.k_half_life,
-            "initial_rating": self.initial_rating,
-        }
 
 
 def named_bot(spec: str) -> tuple[str, Bot]:
     """Parse ``[NAME=]KIND``; without a name, the kind's display name is used."""
-    name, separator, kind = spec.rpartition("=")
-    if separator and not name.strip():
-        raise argparse.ArgumentTypeError("a bot name must not be blank")
     try:
-        default_name, bot = parse_bot(kind)
+        return parse_named_bot(spec)
     except ValueError as error:
         raise argparse.ArgumentTypeError(str(error)) from None
-    return (name.strip() if separator else default_name), bot
 
 
 def _positive_int(value: str) -> int:
@@ -136,7 +72,7 @@ def parse_options(
         type=named_bot,
         metavar="[NAME=]KIND",
         help=(
-            f"add a bot: {', '.join(BOT_KINDS)} (default lineup: "
+            f"add a bot: {', '.join(kind.kind for kind in kinds())} (default lineup: "
             f"{', '.join(DEFAULT_BOTS)})"
         ),
     )
@@ -153,7 +89,14 @@ def parse_options(
         metavar="N",
         help="bots seated in each game, chosen at random (default: all)",
     )
-    parser.add_argument("--seed", type=int, help="seed for seating and decks")
+    parser.add_argument("--seed", type=int, help="seed for seating, decks and bots")
+    parser.add_argument(
+        "--jobs",
+        type=_positive_int,
+        default=1,
+        metavar="N",
+        help="number of parallel game workers (default: %(default)s)",
+    )
     parser.add_argument(
         "--vengeance", action="store_true", help="play With A Vengeance"
     )
@@ -191,7 +134,13 @@ def parse_options(
         metavar="DIR",
         help="save games.csv and summary.csv in this folder",
     )
+    parser.add_argument("--quiet", action="store_true", help="hide the progress bar")
+    parser.add_argument(
+        "--plots", action="store_true", help="save HTML plots (requires --output)"
+    )
     args = parser.parse_args(argv)
+    if args.plots and args.output is None:
+        parser.error("--plots requires --output")
 
     named = args.bots or [named_bot(spec) for spec in DEFAULT_BOTS]
     if len(named) < 2:
@@ -213,6 +162,9 @@ def parse_options(
         initial_rating=args.initial_rating,
         output=args.output,
         k_half_life=None if args.constant_k else args.k_half_life,
+        jobs=args.jobs,
+        quiet=args.quiet,
+        plots=args.plots,
     )
 
 
@@ -239,21 +191,12 @@ def format_summary(summary: pd.DataFrame) -> str:
     )
 
 
-def save_results(result: TournamentResult, directory: Path) -> tuple[Path, Path]:
-    """Write ``games.csv`` and ``summary.csv`` to ``directory``, creating it if needed."""
-    directory.mkdir(parents=True, exist_ok=True)
-    games, summary = directory / "games.csv", directory / "summary.csv"
-    result.games.to_csv(games, index=False)
-    result.summary.to_csv(summary)
-    return games, summary
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     """Run a tournament with a progress bar, print the summary and optionally save CSVs."""
     options = parse_options(argv)
     print(options.describe())
-    result = options.run()
+    result = options.run(progress=not options.quiet)
     print(format_summary(result.summary))
     if options.output is not None:
-        games, summary = save_results(result, options.output)
+        games, summary = save_results(result, options.output, options)
         print(f"Saved {games} and {summary}")

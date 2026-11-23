@@ -7,7 +7,7 @@ import pygame
 
 from flip_seven_bots.tournament.cli import parse_options
 
-from ..widgets import make_icon
+from ..common.widgets import make_icon
 from .run_scene import TournamentScene
 from .setup_scene import TournamentSetupScene
 
@@ -18,15 +18,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     Options are the same as for ``python -m flip_seven_bots.tournament``. A
     running tournament is stopped when the window closes.
     """
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--setup" in args and "--no-setup" in args:
+        raise SystemExit("--setup and --no-setup cannot be combined")
+    show_setup = "--setup" in args or (not args)
+    args = [arg for arg in args if arg not in ("--setup", "--no-setup")]
     options = parse_options(
-        argv,
+        args,
         prog="python -m flip_seven_bots.ui.tournament",
         description=(
             "Watch a tournament between bots. With no options, configure it on the "
             "setup screen; any options start it immediately."
         ),
     )
-    show_setup = not (sys.argv[1:] if argv is None else argv)
     pygame.init()
     scene: TournamentSetupScene | TournamentScene | None = None
     try:

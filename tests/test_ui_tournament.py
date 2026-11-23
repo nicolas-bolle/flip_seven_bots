@@ -20,6 +20,7 @@ from flip_seven_bots.ui.tournament.run_scene import (
 from flip_seven_bots.ui.tournament.setup_scene import (
     ADD_BUTTON,
     GAMES_FIELD,
+    JOBS_FIELD,
     MAX_BOTS,
     SEED_FIELD,
     START_BUTTON,
@@ -88,6 +89,7 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     replace_field(scene, GAMES_FIELD, "12")
     replace_field(scene, TABLE_FIELD, "2")
     replace_field(scene, SEED_FIELD, "7x")  # non-digits are ignored
+    replace_field(scene, JOBS_FIELD, "2")
     click(scene, _row_rects(0)[1])  # random -> threshold
     replace_field(scene, _row_rects(0)[2], "15")
     replace_field(scene, _row_rects(2)[0], "Threshold 30")
@@ -106,6 +108,7 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     assert result.bots["Random bot"].threshold == 15
     assert isinstance(result.bots["Threshold 30 2"], ExpectedValueBot)
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
+    assert result.jobs == 2
     assert result.vengeance and not result.brutal and result.k_factor == 16
 
 
@@ -160,6 +163,12 @@ def test_tournament_runs_in_the_background_and_shows_results(tmp_path: Path) -> 
     assert scene.restart
 
 
+def test_tournament_window_runs_with_parallel_workers() -> None:
+    scene = TournamentScene(quick_options(seed=3, jobs=2))
+    wait_until(scene, lambda: scene.finished)
+    assert scene.error is None and len(scene.records) == 5
+
+
 def test_tournament_saves_automatically_to_the_output_folder(tmp_path: Path) -> None:
     scene = TournamentScene(quick_options(output=tmp_path))
     wait_until(scene, lambda: scene.finished)
@@ -181,7 +190,7 @@ def test_bot_errors_are_shown_instead_of_crashing() -> None:
             raise RuntimeError("boom")
 
     scene = TournamentScene(
-        quick_options(bots={"broken": Broken(), "random": RandomBot()})
+        quick_options(bots={"broken": lambda seed: Broken(), "random": RandomBot()})
     )
     wait_until(scene, lambda: scene.finished)
     scene.render(pygame.Surface((1280, 900)))

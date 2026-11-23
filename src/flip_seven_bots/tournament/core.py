@@ -1,7 +1,9 @@
 """Rate bots against each other over a series of games."""
 
 from collections import Counter
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterator, Mapping, Sequence
+from concurrent.futures import Future, ProcessPoolExecutor
+from contextlib import closing
 from dataclasses import dataclass
 from random import Random
 from typing import TYPE_CHECKING
@@ -11,6 +13,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from tqdm.auto import tqdm
 
+from flip_seven_bots.bots.base import Bot
+from flip_seven_bots.bots.registry import config_for
 from flip_seven_bots.game import Rules
 from flip_seven_bots.simulation import play_game
 
@@ -18,7 +22,23 @@ from . import plots
 from .ratings import PairwiseResults, elo_update
 
 if TYPE_CHECKING:
-    from flip_seven_bots.bots.base import Bot
+    from flip_seven_bots.bots.base import BotFactory
+
+
+@dataclass(frozen=True)
+class _GamePlan:
+    game: int
+    order: tuple[str, ...]
+    deck_seed: int
+    bot_seeds: tuple[int, ...]
+    factories: tuple[BotFactory, ...]
+    rules: Rules | None
+
+
+def _play_plan(plan: _GamePlan) -> tuple[int, ...]:
+    bots = [factory(seed) for factory, seed in zip(plan.factories, plan.bot_seeds)]
+    final = play_game(bots, seed=plan.deck_seed, rules=plan.rules)
+    return tuple(view.total_score for view in final.players)
 
 
 @dataclass(frozen=True)
@@ -139,7 +159,7 @@ class TournamentResult:
 
 
 def play_tournament(
-    bots: Mapping[str, Bot],
+    bots: Mapping[str, Bot | BotFactory],
     *,
     games: int,
     players_per_game: int | None = None,
@@ -148,11 +168,12 @@ def play_tournament(
     k_factor: float = 32.0,
     k_half_life: float | None = 50.0,
     initial_rating: float = 1500.0,
-) -> Iterator[GameRecord]:
-    """Validate the settings, then return an iterator that plays one game per step.
+    jobs: int = 1,
+) -> Generator[GameRecord]:
+    """Validate the settings, then return an iterator of games in scheduled order.
 
-    Takes the same settings as ``run_tournament``. Games are only played as the
-    iterator is advanced, so a caller can show progress or stop early.
+    With multiple workers, up to ``jobs`` games may be in flight. Close the
+    iterator when stopping early to wait for workers and release resources.
     """
     names = list(bots)
     table_size = len(names) if players_per_game is None else players_per_game
@@ -162,39 +183,74 @@ def play_tournament(
         raise ValueError("players_per_game must be between two and the number of bots")
     if k_half_life is not None and k_half_life <= 0:
         raise ValueError("k_half_life must be positive")
+    if jobs < 1:
+        raise ValueError("jobs must be at least one")
+    factories = {
+        name: config_for(bot)
+        if isinstance(bot, Bot) and not isinstance(bot, type)
+        else bot
+        for name, bot in bots.items()
+    }
 
     def k(games_played: int) -> float:
         if k_half_life is None:
             return k_factor
         return k_factor * k_half_life / (k_half_life + games_played)
 
-    def generate() -> Iterator[GameRecord]:
+    def generate() -> Generator[GameRecord]:
         rng = Random(seed)
         elo = dict.fromkeys(names, float(initial_rating))
         played: Counter[str] = Counter()
-        for game in range(1, games + 1):
-            order = rng.sample(names, table_size)
-            final = play_game(
-                [bots[name] for name in order],
-                seed=rng.getrandbits(64),
-                rules=rules,
-            )
-            scores = tuple(view.total_score for view in final.players)
-            places = tuple(
-                1 + sum(other > score for other in scores) for score in scores
-            )
-            before = tuple(elo[name] for name in order)
-            factors = [k(played[name]) for name in order]
-            after = tuple(elo_update(before, places, k_factor=factors))
-            elo.update(zip(order, after))
-            played.update(order)
-            yield GameRecord(game, tuple(order), scores, places, before, after)
+
+        def plans() -> Iterator[_GamePlan]:
+            for game in range(1, games + 1):
+                order = tuple(rng.sample(names, table_size))
+                yield _GamePlan(
+                    game,
+                    order,
+                    rng.getrandbits(64),
+                    tuple(rng.getrandbits(64) for _ in order),
+                    tuple(factories[name] for name in order),
+                    rules,
+                )
+
+        def results() -> Generator[tuple[_GamePlan, tuple[int, ...]]]:
+            if jobs == 1:
+                for plan in plans():
+                    yield plan, _play_plan(plan)
+                return
+            with ProcessPoolExecutor(max_workers=jobs) as pool:
+                pending: list[tuple[_GamePlan, Future[tuple[int, ...]]]] = []
+                source = iter(plans())
+                for _ in range(min(jobs, games)):
+                    plan = next(source)
+                    pending.append((plan, pool.submit(_play_plan, plan)))
+                while pending:
+                    plan, future = pending.pop(0)
+                    scores = future.result()
+                    yield plan, scores
+                    next_plan = next(source, None)
+                    if next_plan is not None:
+                        pending.append((next_plan, pool.submit(_play_plan, next_plan)))
+
+        with closing(results()) as outcomes:
+            for plan, scores in outcomes:
+                order = plan.order
+                places = tuple(
+                    1 + sum(other > score for other in scores) for score in scores
+                )
+                before = tuple(elo[name] for name in order)
+                factors = [k(played[name]) for name in order]
+                after = tuple(elo_update(before, places, k_factor=factors))
+                elo.update(zip(order, after))
+                played.update(order)
+                yield GameRecord(plan.game, order, scores, places, before, after)
 
     return generate()
 
 
 def run_tournament(
-    bots: Mapping[str, Bot],
+    bots: Mapping[str, Bot | BotFactory],
     *,
     games: int,
     players_per_game: int | None = None,
@@ -205,13 +261,15 @@ def run_tournament(
     initial_rating: float = 1500.0,
     confidence: float = 0.95,
     progress: bool = True,
+    jobs: int = 1,
 ) -> TournamentResult:
     """Play ``games`` games between named bots and rate them.
 
     Each game seats ``players_per_game`` bots (default: all of them), chosen
-    and ordered at random. ``seed`` controls seating and decks; bots remain
-    responsible for their own randomness, and each bot object keeps its state
-    across games.
+    and ordered at random. ``seed`` controls seating, decks and bot seeds.
+    Each game constructs fresh bots from factories accepting a seed. Registered
+    bot instances are also accepted as configurations. Factories and rules
+    must be picklable when ``jobs`` is greater than one.
 
     The summary's ``rating`` is fitted to all games at once (see
     ``TournamentResult``), with a ``confidence`` interval. An online Elo rating
@@ -229,6 +287,7 @@ def run_tournament(
         k_factor=k_factor,
         k_half_life=k_half_life,
         initial_rating=initial_rating,
+        jobs=jobs,
     )
     elo = dict.fromkeys(bots, float(initial_rating))
     played = []

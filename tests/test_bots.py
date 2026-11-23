@@ -10,6 +10,7 @@ from flip_seven_bots.bots import (
     policies,
     rollouts,
 )
+from flip_seven_bots.bots.registry import kinds, parse_config
 from flip_seven_bots.game import (
     Action,
     ActionType,
@@ -20,12 +21,42 @@ from flip_seven_bots.game import (
     Game,
     HitOrStay,
     Observation,
+    Rules,
+    VengeanceRules,
 )
 
 HIT = Action(ActionType.HIT)
 STAY = Action(ActionType.STAY)
 FLIP_THREE = Card(CardType.FLIP_THREE)
 FREEZE = Card(CardType.FREEZE)
+
+
+@pytest.mark.parametrize("kind", [kind.kind for kind in kinds()])
+@pytest.mark.parametrize("mode", ["base", "vengeance", "brutal"])
+def test_registered_bots_play_legal_reproducible_games(kind: str, mode: str) -> None:
+    config = parse_config(kind)
+    rules = (
+        Rules(target_score=25)
+        if mode == "base"
+        else VengeanceRules(target_score=25, brutal=mode == "brutal")
+    )
+
+    def play() -> list[Action]:
+        game = Game(2, seed=13, rules=rules)
+        bots = [config(1), config(2)]
+        actions = []
+        while not game.is_finished:
+            assert len(actions) < 1000
+            player = game.current_player
+            assert player is not None
+            observation = game.observe(player)
+            action = bots[player].choose_action(observation)
+            assert action in observation.legal_actions
+            actions.append(action)
+            game.apply(action)
+        return actions
+
+    assert play() == play()
 
 
 def number(value: int) -> Card:

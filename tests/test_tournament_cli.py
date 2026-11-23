@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import pandas as pd
 import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
+from flip_seven_bots.bots.registry import BotKind, Parameter, register
 from flip_seven_bots.bots.specs import bot_spec, parse_bot
 from flip_seven_bots.game import VengeanceRules
 from flip_seven_bots.tournament import TournamentResult, play_tournament, run_tournament
@@ -92,6 +94,7 @@ def test_main_prints_progress_and_summary_and_saves_csvs(
             "1",
             "--output",
             str(tmp_path / "out"),
+            "--plots",
         ]
     )
     out, err = capsys.readouterr()
@@ -101,6 +104,15 @@ def test_main_prints_progress_and_summary_and_saves_csvs(
     games = pd.read_csv(tmp_path / "out" / "games.csv")
     summary = pd.read_csv(tmp_path / "out" / "summary.csv", index_col="player")
     assert len(games) == 6 and len(summary) == 2
+    settings = json.loads((tmp_path / "out" / "settings.json").read_text())
+    assert settings["seed"] == 1 and settings["games_played"] == 3
+    assert settings["bots"] == {
+        "Threshold 10": "threshold:10",
+        "Threshold 30": "threshold:30",
+    }
+    assert "git_commit" in settings
+    assert (tmp_path / "out" / "ratings.html").exists()
+    assert (tmp_path / "out" / "elo.html").exists()
 
 
 def test_play_tournament_validates_eagerly_and_plays_lazily() -> None:
@@ -142,3 +154,61 @@ def test_rating_options_reach_the_tournament() -> None:
     assert result.games["game"].max() == 9
     assert (result.summary["rating_low"] < result.summary["rating"]).all()
     assert fast.result(list(fast.start())).games.equals(result.games)
+
+
+def test_registered_multi_parameter_bot_parses_named_spec(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flip_seven_bots.bots import registry
+
+    class Configurable(ThresholdBot):
+        def __init__(self, *, seed: int | None, threshold: int, bonus: int) -> None:
+            super().__init__(threshold)
+            self.bonus = bonus
+
+    monkeypatch.setattr(registry, "_KINDS", dict(registry._KINDS))
+    register(
+        BotKind(
+            "configurable",
+            "Configurable",
+            Configurable,
+            Configurable,
+            (Parameter("threshold", 30), Parameter("bonus", 1)),
+        )
+    )
+    options = parse_options(
+        ["--bot", "example=configurable:threshold=12,bonus=3", "--bot", "random"]
+    )
+    bot = options.bots["example"]
+    assert isinstance(bot, Configurable)
+    assert (bot.threshold, bot.bonus) == (12, 3)
+    assert bot_spec(bot) == "configurable:threshold=12,bonus=3"
+
+
+def test_trace_reports_seeded_bot_decisions(capsys: pytest.CaptureFixture[str]) -> None:
+    from flip_seven_bots.cli import main
+
+    args = ["trace", "--bot", "threshold:0", "--bot", "random", "--seed", "7"]
+    main(args)
+    first = capsys.readouterr().out
+    main(args)
+    assert capsys.readouterr().out == first
+    assert "seat 0:" in first and "Winners:" in first
+
+
+def test_bot_spec_round_trips_reserved_text_characters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flip_seven_bots.bots import registry
+
+    class TextBot(ThresholdBot):
+        def __init__(self, *, seed: int | None, label: str) -> None:
+            super().__init__(0)
+            self.label = label
+
+    monkeypatch.setattr(registry, "_KINDS", dict(registry._KINDS))
+    register(BotKind("text", "Text", TextBot, TextBot, (Parameter("label", "", str),)))
+    bot = parse_bot("text:hello%2Cworld%3Dyes")[1]
+    assert isinstance(bot, TextBot) and bot.label == "hello,world=yes"
+    assert bot_spec(bot) == "text:hello%2Cworld%3Dyes"
+    assert bot_spec(parse_bot("text:")[1]) == "text:"

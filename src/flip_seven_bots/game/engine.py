@@ -50,6 +50,20 @@ _ROUND_ACTIONS = frozenset((CardType.FREEZE, CardType.FLIP_THREE))
 _SINGLE_USE = _VENGEANCE_ACTIONS | _ROUND_ACTIONS
 
 
+def _sample_observation(
+    snapshot: Game,
+    version: list[int],
+    expected: int,
+    rng: Random,
+    next_draws: Sequence[Card],
+) -> Game:
+    if version[0] != expected:
+        raise RuntimeError("observation is out of date; the game has advanced")
+    clone = snapshot.determinize(rng)
+    clone._deck.stack(next_draws)
+    return clone
+
+
 @dataclass
 class _Player:
     total_score: int = 0
@@ -159,6 +173,7 @@ class Game:
         self._events: list[GameEvent] = []
         self._recent_draws: list[CardDrawn] = []
         self._version = 0
+        self._version_token = [0]
         self._start_round()
         self._advance()
 
@@ -232,8 +247,29 @@ class Game:
             last_round=self._last_round,
             winners=self._winners,
             events=tuple(self._events),
-            _sampler=partial(self._sample, self._version),
+            _sampler=partial(
+                _sample_observation,
+                self._public_snapshot(),
+                self._version_token,
+                self._version,
+            ),
         )
+
+    def _public_snapshot(self) -> Game:
+        snapshot = copy.copy(self)
+        snapshot._deck = copy.copy(self._deck)
+        snapshot._deck._cards = list(self._deck.composition)
+        snapshot._deck._discard = list(self._deck.discard_pile)
+        snapshot._deck._random = Random(0)
+        snapshot._players = [
+            _Player(player.total_score, player.status, list(player.cards))
+            for player in self._players
+        ]
+        snapshot._tasks = copy.deepcopy(self._tasks)
+        snapshot._events = list(self._events)
+        snapshot._recent_draws = list(self._recent_draws)
+        snapshot._version_token = [self._version]
+        return snapshot
 
     def determinize(self, rng: Random) -> Game:
         """Return an independent copy with the hidden deck order resampled from ``rng``."""
@@ -252,6 +288,7 @@ class Game:
             raise ValueError(f"illegal action: {action!r}")
         self._pending = None
         self._version += 1
+        self._version_token[0] = self._version
         self._events.append(ActionChosen(self._round_number, decision.player, action))
 
         match decision:
@@ -270,13 +307,6 @@ class Game:
                 else:
                     self._tasks.appendleft(_Draw(player))
         self._advance()
-
-    def _sample(self, version: int, rng: Random, next_draws: Sequence[Card]) -> Game:
-        if version != self._version:
-            raise RuntimeError("observation is out of date; the game has advanced")
-        clone = self.determinize(rng)
-        clone._deck.stack(next_draws)
-        return clone
 
     def _start_round(self) -> None:
         self._round_number += 1

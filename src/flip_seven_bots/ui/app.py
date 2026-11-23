@@ -10,11 +10,11 @@ import pygame
 from flip_seven_bots.game import VengeanceRules
 
 from .bug_report import write_report
+from .common.widgets import make_icon
 from .game_scene import GameScene
 from .options import parse_options
 from .setup_scene import SetupScene
 from .table import Table
-from .widgets import make_icon
 
 
 def _report_crash(table: Table, directory: Path) -> None:
@@ -47,7 +47,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         pygame.display.set_caption("Flip 7")
         clock = pygame.time.Clock()
         if options.show_setup:
-            scene: SetupScene | GameScene = SetupScene()
+            scene: SetupScene | GameScene = SetupScene(
+                options.seats, vengeance=options.vengeance, brutal=options.brutal
+            )
         else:
             rules = VengeanceRules(brutal=options.brutal) if options.vengeance else None
             table = Table(options.seats, seed=options.seed, rules=rules)

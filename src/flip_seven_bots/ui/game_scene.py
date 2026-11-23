@@ -25,19 +25,20 @@ from flip_seven_bots.game import (
 )
 
 from .bug_report import write_report
+from .common.text import card_label, event_text
+from .common.theme import (
+    ACCENT,
+    ACTIVE,
+    BACKGROUND,
+    BUTTON,
+    BUTTON_HOVER,
+    MUTED,
+    PANEL,
+    PANEL_ALT,
+    TEXT,
+)
 from .options import default_seats
 from .table import Table
-from .text import card_label, event_text
-
-BACKGROUND = (15, 30, 35)
-PANEL = (28, 52, 55)
-PANEL_ALT = (34, 62, 63)
-TEXT = (240, 244, 229)
-MUTED = (174, 193, 184)
-ACCENT = (233, 196, 106)
-ACTIVE = (113, 207, 165)
-BUTTON = (53, 109, 91)
-BUTTON_HOVER = (67, 139, 112)
 
 PLAYER_AREA = pygame.Rect(30, 112, 895, 570)
 PANEL_GAP = 12

@@ -87,6 +87,13 @@ def test_seed_and_bug_folder_can_be_set() -> None:
     assert not options.show_setup
 
 
+def test_explicit_setup_flag_and_named_bot() -> None:
+    options = parse_options(["--setup", "--bot", "rival=threshold:25", "--seed", "7"])
+    assert options.show_setup
+    assert options.seats[0].name == "rival"
+    assert not parse_options(["--no-setup"]).show_setup
+
+
 @pytest.mark.parametrize(
     ("flag", "brutal"), [("--vengeance", False), ("--brutal", True)]
 )

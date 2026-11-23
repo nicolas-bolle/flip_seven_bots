@@ -49,5 +49,23 @@ def play_game(
     zero's perspective and contains the final scores and winners.
     """
     game = Game(len(bots), rules=rules, seed=seed, dealer=dealer)
+    start_bots(game, bots)
     run(game, bots)
+    end_bots(game, bots)
     return game.observe(0)
+
+
+def start_bots(game: Game, bots: Sequence[Bot | None]) -> None:
+    """Notify bots implementing the optional game-start hook."""
+    for seat, bot in enumerate(bots):
+        hook = getattr(bot, "on_game_start", None)
+        if hook is not None:
+            hook(seat, len(bots), game.rules)
+
+
+def end_bots(game: Game, bots: Sequence[Bot | None]) -> None:
+    """Notify bots implementing the optional game-end hook."""
+    for seat, bot in enumerate(bots):
+        hook = getattr(bot, "on_game_end", None)
+        if hook is not None:
+            hook(game.observe(seat))
