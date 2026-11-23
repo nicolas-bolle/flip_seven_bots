@@ -49,7 +49,7 @@ Every command accepts `--help`. All commands are run with `uv run`.
 | `flip_seven_bots.bots` | The `Bot` interface, the included bots, and reusable `policies` and `rollouts` |
 | `flip_seven_bots.simulation` | `play_game` and `run` for playing bots against each other |
 | `flip_seven_bots.tournament` | Tournaments, ratings and the tournament command line |
-| `flip_seven_bots.ui` | Pygame windows for playing games and watching tournaments |
+| `flip_seven_bots.gui` | Pygame windows for playing games and watching tournaments |
 
 ## Game modes
 
@@ -181,7 +181,7 @@ automatically.
 Each report ends with replay data, so the game can be rebuilt in a test:
 
 ```python
-from flip_seven_bots.ui.bug_report import replay
+from flip_seven_bots.game.replay import replay
 
 game = replay("bug_reports/2026-11-21_16-30-05.md")
 ```

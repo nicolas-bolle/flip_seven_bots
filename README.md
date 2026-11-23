@@ -27,9 +27,9 @@ for tournament options.
 - [Full reference, game rules and Python APIs](docs/reference.md)
 
 The code is organized into `game/` (rules and observations), `bots/`
-(strategies and registry), `simulation.py`, `tournament/`, and `ui/`.
-Shared window components live in `ui/common/`. Replay is available without
-the UI through `game.replay`.
+(strategies and registry), `simulation.py`, `tournament/`, and `gui/`.
+The GUI contains `play/`, `tournament/`, and shared components in `common/`.
+Replay is available without the GUI through `game.replay`.
 
 ## Development
 

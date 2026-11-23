@@ -26,15 +26,15 @@ from flip_seven_bots.game import (
     Rules,
     VengeanceRules,
 )
-from flip_seven_bots.ui.game_scene import (
+from flip_seven_bots.gui.common.text import card_label, event_text
+from flip_seven_bots.gui.play.game_scene import (
     CARD_ANIMATION_MS,
     Button,
     Command,
     GameScene,
     _card_rects,
 )
-from flip_seven_bots.ui.table import Seat, Table
-from flip_seven_bots.ui.text import card_label, event_text
+from flip_seven_bots.gui.play.table import Seat, Table
 
 NAMES = ("You", "Random bot", "Threshold bot")
 FREEZE = Card(CardType.FREEZE)

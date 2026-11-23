@@ -24,9 +24,8 @@ from flip_seven_bots.game import (
     RoundResult,
 )
 
-from .bug_report import write_report
-from .common.text import card_label, event_text
-from .common.theme import (
+from ..common.text import card_label, event_text
+from ..common.theme import (
     ACCENT,
     ACTIVE,
     BACKGROUND,
@@ -37,6 +36,7 @@ from .common.theme import (
     PANEL_ALT,
     TEXT,
 )
+from .bug_report import write_report
 from .options import default_seats
 from .table import Table
 

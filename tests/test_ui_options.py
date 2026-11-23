@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
-from flip_seven_bots.ui.options import MAX_PLAYERS, parse_options
+from flip_seven_bots.gui.play.options import MAX_PLAYERS, parse_options
 
 
 def test_no_options_gives_the_default_table() -> None:

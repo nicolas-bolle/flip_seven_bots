@@ -9,8 +9,8 @@ import pygame
 
 from flip_seven_bots.game import VengeanceRules
 
+from ..common.widgets import make_icon
 from .bug_report import write_report
-from .common.widgets import make_icon
 from .game_scene import GameScene
 from .options import parse_options
 from .setup_scene import SetupScene

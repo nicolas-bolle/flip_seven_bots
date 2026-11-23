@@ -25,7 +25,7 @@ from flip_seven_bots.game.rules import (
 )
 from flip_seven_bots.provenance import git_commit
 
-from .common.text import card_label, event_text
+from ..common.text import card_label, event_text
 from .table import Move, Table
 
 
@@ -224,7 +224,7 @@ def report_markdown(
         lines += [
             (
                 f"{len(table.moves)} moves so far. Rebuild the game with "
-                "`flip_seven_bots.ui.bug_report.replay(path)`."
+                "`flip_seven_bots.game.replay.replay(path)`."
             ),
             "",
             "```json",

@@ -7,8 +7,8 @@ import pygame
 
 from flip_seven_bots.bots.registry import config_for, default_parameters, kinds
 
-from .common.theme import ACCENT, BACKGROUND, MUTED, TEXT
-from .common.widgets import draw_button, draw_field, draw_text
+from ..common.theme import ACCENT, BACKGROUND, MUTED, TEXT
+from ..common.widgets import draw_button, draw_field, draw_text
 from .options import (
     MAX_PLAYERS,
     _bot_seat,

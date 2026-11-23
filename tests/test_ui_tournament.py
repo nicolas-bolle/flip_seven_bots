@@ -9,15 +9,14 @@ import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.game import Action, Observation
-from flip_seven_bots.tournament.cli import TournamentOptions, parse_options
-from flip_seven_bots.ui.tournament import app
-from flip_seven_bots.ui.tournament.run_scene import (
+from flip_seven_bots.gui.tournament import app
+from flip_seven_bots.gui.tournament.run_scene import (
     NEW_BUTTON,
     SAVE_BUTTON,
     STOP_BUTTON,
     TournamentScene,
 )
-from flip_seven_bots.ui.tournament.setup_scene import (
+from flip_seven_bots.gui.tournament.setup_scene import (
     ADD_BUTTON,
     GAMES_FIELD,
     JOBS_FIELD,
@@ -29,6 +28,7 @@ from flip_seven_bots.ui.tournament.setup_scene import (
     TournamentSetupScene,
     _row_rects,
 )
+from flip_seven_bots.tournament.cli import TournamentOptions, parse_options
 
 
 @pytest.fixture(autouse=True)

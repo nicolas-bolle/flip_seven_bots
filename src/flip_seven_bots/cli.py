@@ -40,12 +40,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     trace.add_argument("--brutal", action="store_true")
     args, rest = parser.parse_known_args(argv)
     if args.command == "play":
-        from .ui.app import main as play
+        from .gui.play.app import main as play
 
         play(rest)
     elif args.command == "tournament":
         if args.gui:
-            from .ui.tournament.app import main as tournament_main
+            from .gui.tournament.app import main as tournament_main
         else:
             from .tournament.cli import main as tournament_main
         tournament_main(rest)

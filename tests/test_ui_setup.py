@@ -4,8 +4,8 @@ import pygame
 import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
-from flip_seven_bots.ui.options import MAX_PLAYERS
-from flip_seven_bots.ui.setup_scene import (
+from flip_seven_bots.gui.play.options import MAX_PLAYERS
+from flip_seven_bots.gui.play.setup_scene import (
     ADD_BUTTON,
     BRUTAL_BUTTON,
     START_BUTTON,

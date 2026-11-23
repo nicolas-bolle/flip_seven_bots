@@ -229,20 +229,33 @@ def test_unified_cli_help(
     "module",
     [
         "flip_seven_bots.tournament.__main__",
-        "flip_seven_bots.ui.__main__",
-        "flip_seven_bots.ui.tournament.__main__",
+        "flip_seven_bots.gui.__main__",
+        "flip_seven_bots.gui.play.__main__",
+        "flip_seven_bots.gui.tournament.__main__",
     ],
 )
-def test_legacy_module_entry_points_are_removed(module: str) -> None:
+def test_packages_are_not_cli_entry_points(module: str) -> None:
     assert find_spec(module) is None
+
+
+def test_unified_play_dispatches_to_game_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flip_seven_bots.cli import main
+    from flip_seven_bots.gui.play import app
+
+    calls = []
+    monkeypatch.setattr(app, "main", lambda argv: calls.append(argv))
+    main(["play", "--bot", "random"])
+    assert calls == [["--bot", "random"]]
 
 
 def test_unified_tournament_dispatches_gui_and_terminal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from flip_seven_bots.cli import main
+    from flip_seven_bots.gui.tournament import app
     from flip_seven_bots.tournament import cli
-    from flip_seven_bots.ui.tournament import app
 
     calls = []
     monkeypatch.setattr(cli, "main", lambda argv: calls.append(("terminal", argv)))

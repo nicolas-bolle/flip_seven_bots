@@ -5,7 +5,7 @@ import pygame
 import pytest
 
 from flip_seven_bots.game import VengeanceRules
-from flip_seven_bots.ui import app
+from flip_seven_bots.gui.play import app
 
 
 @pytest.mark.parametrize(
@@ -139,7 +139,7 @@ def test_setup_transitions_to_selected_game(monkeypatch: pytest.MonkeyPatch) -> 
     pygame.font.init()
     try:
         scene = Mock(dialog_open=False)
-        from flip_seven_bots.ui.setup_scene import (
+        from flip_seven_bots.gui.play.setup_scene import (
             BRUTAL_BUTTON,
             START_BUTTON,
             VENGEANCE_BUTTON,
