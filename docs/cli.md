@@ -19,6 +19,9 @@ the supplied settings. Without either flag, no options opens setup, while
 supplying options starts immediately. Use `--vengeance` or `--brutal` for
 alternate game modes. The game-window seed controls decks, not bot randomness.
 
+`compare A B` is shorthand for `tournament --bot A --bot B` and accepts the
+same options, including `--gui`.
+
 `trace` prints the selected seat's decisions and actions. With `--step`, it
 waits for Enter after each decision.
 

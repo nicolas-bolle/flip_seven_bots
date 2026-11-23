@@ -1,7 +1,14 @@
-"""Options and output for ``flip7 tournament`` and its window."""
+"""Options and terminal output for ``flip7 tournament``.
+
+Unlike ``flip7 play``, which only has a window, a tournament runs in the
+terminal or the window with the same options, so they are parsed here once and
+the window receives the resulting :class:`TournamentOptions`.
+"""
 
 import argparse
+import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -49,25 +56,67 @@ def _positive_float(value: str) -> float:
     return number
 
 
-def parse_options(
-    argv: Sequence[str] | None = None,
-    *,
-    prog: str = "flip7 tournament",
-    description: str = "Play a tournament between bots and print their Elo ratings.",
-) -> TournamentOptions:
-    """Parse tournament options; ``None`` reads the process command line.
+@dataclass(frozen=True)
+class TournamentLaunch:
+    """Parsed ``flip7 tournament`` command: settings plus where to show them."""
+
+    options: TournamentOptions
+    gui: bool = False
+    show_setup: bool = False
+
+
+def parse_options(argv: Sequence[str] | None = None) -> TournamentOptions:
+    """Parse tournament settings; ``None`` reads the process command line.
 
     Bots keep the order given and duplicate names are numbered. Without
     ``--bot`` options, the default lineup is used. ``--brutal`` implies With A
-    Vengeance.
+    Vengeance. Window flags are rejected; use :func:`parse_launch` for those.
     """
-    parser = argparse.ArgumentParser(prog=prog, description=description)
-    parser.add_argument("--gui", action="store_true", help="show the tournament window")
-    setup = parser.add_mutually_exclusive_group()
-    setup.add_argument("--setup", action="store_true", help="show setup (with --gui)")
-    setup.add_argument(
-        "--no-setup", action="store_true", help="skip setup (with --gui)"
+    parser = _parser(launch=False)
+    return _options(parser, parser.parse_args(argv))
+
+
+def parse_launch(argv: Sequence[str] | None = None) -> TournamentLaunch:
+    """Parse the full ``flip7 tournament`` command, including window flags.
+
+    With ``--gui`` and no other options, the setup screen is shown; any other
+    options start the tournament immediately unless ``--setup`` is given.
+    """
+    args_list = list(sys.argv[1:] if argv is None else argv)
+    parser = _parser(launch=True)
+    args = parser.parse_args(args_list)
+    if (args.setup or args.no_setup) and not args.gui:
+        parser.error("--setup and --no-setup require --gui")
+    options = _options(parser, args)
+    settings_given = any(arg != "--gui" for arg in args_list)
+    return TournamentLaunch(
+        options,
+        gui=args.gui,
+        show_setup=args.gui
+        and (args.setup or (not args.no_setup and not settings_given)),
     )
+
+
+def _parser(*, launch: bool) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="flip7 tournament",
+        description=(
+            "Play a tournament between bots and print their Elo ratings, or watch "
+            "it with --gui. With --gui and no other options, configure it on the "
+            "setup screen."
+        ),
+    )
+    if launch:
+        parser.add_argument(
+            "--gui", action="store_true", help="show the tournament window"
+        )
+        setup = parser.add_mutually_exclusive_group()
+        setup.add_argument(
+            "--setup", action="store_true", help="show setup (with --gui)"
+        )
+        setup.add_argument(
+            "--no-setup", action="store_true", help="skip setup (with --gui)"
+        )
     parser.add_argument(
         "--bot",
         dest="bots",
@@ -141,11 +190,12 @@ def parse_options(
     parser.add_argument(
         "--plots", action="store_true", help="save HTML plots (requires --output)"
     )
-    args = parser.parse_args(argv)
-    if args.gui:
-        parser.error("--gui must be handled by flip7 tournament")
-    if args.setup or args.no_setup:
-        parser.error("--setup and --no-setup require --gui")
+    return parser
+
+
+def _options(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> TournamentOptions:
     if args.plots and args.output is None:
         parser.error("--plots requires --output")
 
@@ -198,9 +248,8 @@ def format_summary(summary: pd.DataFrame) -> str:
     )
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+def run(options: TournamentOptions) -> None:
     """Run a tournament with a progress bar, print the summary and optionally save CSVs."""
-    options = parse_options(argv)
     print(options.describe())
     result = options.run(progress=not options.quiet)
     print(format_summary(result.summary))

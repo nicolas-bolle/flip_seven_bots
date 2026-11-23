@@ -8,18 +8,27 @@ if TYPE_CHECKING:
     from .game import Action, Observation, Rules
 
 
+def _tournament(argv: list[str]) -> None:
+    from .tournament.cli import parse_launch
+
+    launch = parse_launch(argv)
+    if launch.gui:
+        from .gui.tournament.app import main as window
+
+        window(launch.options, show_setup=launch.show_setup)
+    else:
+        from .tournament.cli import run
+
+        run(launch.options)
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="flip7", description="Flip 7 games and bot experiments"
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("play", help="play in a window", add_help=False)
-    tournament = commands.add_parser(
-        "tournament", help="run a tournament", add_help=False
-    )
-    tournament.add_argument(
-        "--gui", action="store_true", help="show the tournament window"
-    )
+    commands.add_parser("tournament", help="run a tournament", add_help=False)
     commands.add_parser("bots", help="list available bots")
     replay = commands.add_parser("replay", help="rebuild a game from a bug report")
     replay.add_argument("report")
@@ -44,15 +53,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         play(rest)
     elif args.command == "tournament":
-        if args.gui:
-            from .gui.tournament.app import main as tournament_main
-        else:
-            from .tournament.cli import main as tournament_main
-        tournament_main(rest)
+        _tournament(rest)
     elif args.command == "compare":
-        from .tournament.cli import main as tournament_main
-
-        tournament_main(["--bot", args.first, "--bot", args.second, *rest])
+        _tournament(["--bot", args.first, "--bot", args.second, *rest])
     elif args.command == "bots":
         if rest:
             parser.error(f"unrecognized arguments: {' '.join(rest)}")

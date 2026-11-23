@@ -228,7 +228,7 @@ def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(
     monkeypatch.setattr(pygame.event, "get", lambda: next(frames))
     monkeypatch.setattr(app, "TournamentScene", Recording)
 
-    app.main([])
+    app.main(parse_options([]), show_setup=True)
 
     assert len(scenes) == 1 and scenes[0]._stop.is_set()
     cleanup.assert_called_once_with()

@@ -11,7 +11,11 @@ from flip_seven_bots.bots.registry import BotKind, Parameter, register
 from flip_seven_bots.bots.specs import bot_spec, parse_bot
 from flip_seven_bots.game import VengeanceRules
 from flip_seven_bots.tournament import TournamentResult, play_tournament, run_tournament
-from flip_seven_bots.tournament.cli import main, parse_options
+from flip_seven_bots.tournament.cli import (
+    parse_launch,
+    parse_options,
+    run,
+)
 
 
 def test_default_lineup_and_settings() -> None:
@@ -83,20 +87,22 @@ def test_invalid_options_are_rejected(argv: list[str]) -> None:
 def test_main_prints_progress_and_summary_and_saves_csvs(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    main(
-        [
-            "--bot",
-            "threshold:10",
-            "--bot",
-            "threshold:30",
-            "--games",
-            "3",
-            "--seed",
-            "1",
-            "--output",
-            str(tmp_path / "out"),
-            "--plots",
-        ]
+    run(
+        parse_options(
+            [
+                "--bot",
+                "threshold:10",
+                "--bot",
+                "threshold:30",
+                "--games",
+                "3",
+                "--seed",
+                "1",
+                "--output",
+                str(tmp_path / "out"),
+                "--plots",
+            ]
+        )
     )
     out, err = capsys.readouterr()
     assert out.startswith("2 bots, 3 games of 2 players, Flip 7\n")
@@ -258,23 +264,58 @@ def test_unified_tournament_dispatches_gui_and_terminal(
     from flip_seven_bots.tournament import cli
 
     calls = []
-    monkeypatch.setattr(cli, "main", lambda argv: calls.append(("terminal", argv)))
-    monkeypatch.setattr(app, "main", lambda argv: calls.append(("gui", argv)))
+    monkeypatch.setattr(cli, "run", lambda options: calls.append(("terminal", options)))
+    monkeypatch.setattr(
+        app,
+        "main",
+        lambda options, *, show_setup: calls.append(("gui", options, show_setup)),
+    )
     main(["tournament", "--games", "2"])
-    main(["tournament", "--gui", "--setup", "--games", "2"])
-    assert calls == [
-        ("terminal", ["--games", "2"]),
-        ("gui", ["--setup", "--games", "2"]),
-    ]
+    main(["tournament", "--gui", "--setup", "--games", "3"])
+    main(["compare", "random", "threshold:20", "--gui", "--games", "4"])
+    assert [call[0] for call in calls] == ["terminal", "gui", "gui"]
+    assert [call[1].games for call in calls] == [2, 3, 4]
+    assert calls[1][2] and not calls[2][2]
+    assert list(calls[2][1].bots) == ["Random bot", "Threshold 20"]
 
 
-def test_tournament_setup_requires_gui(capsys: pytest.CaptureFixture[str]) -> None:
-    from flip_seven_bots.cli import main
+@pytest.mark.parametrize(
+    ("argv", "show_setup"),
+    [
+        (["--gui"], True),
+        (["--gui", "--games", "5"], False),
+        (["--gui", "--setup", "--games", "5"], True),
+        (["--gui", "--no-setup"], False),
+        ([], False),
+    ],
+)
+def test_launch_shows_setup_only_when_requested_or_unconfigured(
+    argv: list[str], show_setup: bool
+) -> None:
+    launch = parse_launch(argv)
+    assert launch.show_setup == show_setup
+    assert launch.gui == ("--gui" in argv)
 
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["--setup"], "require --gui"),
+        (["--gui", "--setup", "--no-setup"], "not allowed with argument"),
+    ],
+)
+def test_invalid_launch_flags_are_rejected(
+    argv: list[str], message: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     with pytest.raises(SystemExit) as result:
-        main(["tournament", "--setup"])
+        parse_launch(argv)
     assert result.value.code == 2
-    assert "require --gui" in capsys.readouterr().err
+    assert message in capsys.readouterr().err
+
+
+def test_settings_parser_rejects_window_flags() -> None:
+    with pytest.raises(SystemExit):
+        parse_options(["--gui"])
 
 
 def test_bot_spec_round_trips_reserved_text_characters(
