@@ -48,6 +48,12 @@ Rules notes:
 
 - Player IDs are zero-based seat indices. The dealer defaults to player 0, and
   the player to their left is dealt first.
+- During the initial deal, a player frozen (or, in With A Vengeance, forced to
+  stay by Just One More) before their turn to be dealt gets no deal card; they
+  are already out of the round. A player hit with Flip Three or Flip Four
+  before their turn is still active, so they are dealt a card as well. The
+  rulebook allows for this, noting that after the deal some players may have
+  no cards and others three or four.
 - Ties for the highest final score produce multiple winners. One- and
   two-player games use the same rules and goal.
 - A game seats at most 10 players, so the deck can never run out. The draw

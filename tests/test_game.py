@@ -430,6 +430,7 @@ def test_draw_fails_if_deck_and_discard_are_exhausted() -> None:
 
 
 def test_freezing_player_during_initial_deal_skips_their_deal() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = stacked_game([FREEZE, number(9)])
     decision = game.observe(1).decision
     assert isinstance(decision, ChooseTarget) and decision.card == FREEZE
@@ -444,3 +445,13 @@ def test_freezing_player_during_initial_deal_skips_their_deal() -> None:
 
     game.apply(HIT)
     assert game.observe(1).players[1].cards == (number(9),)
+
+
+def test_flip_three_before_a_players_deal_still_deals_them_a_card() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = stacked_game([FLIP_THREE, *(number(n) for n in (1, 2, 3, 4))])
+    game.apply(target(0))
+    observation = game.observe(1)
+    hand = (FLIP_THREE, number(1), number(2), number(3), number(4))
+    assert observation.players[0].cards == hand
+    assert observation.players[0].status is PlayerStatus.ACTIVE

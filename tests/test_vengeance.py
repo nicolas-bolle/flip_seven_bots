@@ -158,6 +158,16 @@ def test_drawn_modifier_is_unresolved_and_unscored_until_a_player_receives_it() 
     assert (receiver.cards, receiver.round_score) == ((number(12), subtract(10)), 2)
 
 
+def test_just_one_more_before_a_players_deal_replaces_their_deal() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
+    game = game_with([ONE_MORE, number(4), number(9)])
+    game.apply(target(0))
+    observation = game.observe(1)
+    assert observation.players[0].cards == (number(4),)
+    assert observation.players[0].status is PlayerStatus.STAYED
+    assert game.hidden_deck() == (number(9),)
+
+
 def test_player_with_no_cards_must_hit_after_giving_away_initial_modifier() -> None:
     """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([subtract(2), number(4)])
