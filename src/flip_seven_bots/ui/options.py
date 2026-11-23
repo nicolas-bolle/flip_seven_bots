@@ -63,7 +63,7 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     implies With A Vengeance.
     """
     parser = argparse.ArgumentParser(
-        prog="python -m flip_seven_bots.ui",
+        prog="flip7 play",
         description=(
             "Play Flip 7 at one screen. Seats are filled in the order the options "
             "are given; players take turns at the same keyboard and mouse. With no "

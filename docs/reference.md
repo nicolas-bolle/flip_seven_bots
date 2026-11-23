@@ -13,13 +13,13 @@ the dependencies.
 uv sync
 
 # Play against bots in a window
-uv run python -m flip_seven_bots.ui
+uv run flip7 play
 
 # Watch bots play a tournament in a window
-uv run python -m flip_seven_bots.ui.tournament
+uv run flip7 tournament --gui
 
 # Run a tournament in the terminal and print the ratings
-uv run python -m flip_seven_bots.tournament --games 200
+uv run flip7 tournament --games 200
 ```
 
 Or from Python:
@@ -36,8 +36,8 @@ print(result.winners, [player.total_score for player in result.players])
 
 | Task | Window (Pygame) | Command line | Python |
 | --- | --- | --- | --- |
-| Play a game | `python -m flip_seven_bots.ui` | Same command with options, which skip setup | `simulation.play_game`, `game.Game` |
-| Run a tournament | `python -m flip_seven_bots.ui.tournament` | `python -m flip_seven_bots.tournament` | `tournament.run_tournament`, `play_tournament` |
+| Play a game | `flip7 play` | Same command with options, which skip setup | `simulation.play_game`, `game.Game` |
+| Run a tournament | `flip7 tournament --gui` | `flip7 tournament` | `tournament.run_tournament`, `play_tournament` |
 
 Every command accepts `--help`. All commands are run with `uv run`.
 
@@ -88,7 +88,7 @@ All of them support every decision in every game mode.
 ### In a window
 
 ```shell
-uv run python -m flip_seven_bots.ui
+uv run flip7 play
 ```
 
 The setup screen starts with a human (Me), a bot that stays at 30 points, and
@@ -115,13 +115,14 @@ and decisions, and a summary appears after each round.
 
 ### From the command line
 
-Giving any options to the same command skips the setup screen and starts the
-game immediately:
+By default, giving options to the same command skips the setup screen and
+starts the game immediately. Use `--setup` to configure the supplied settings
+in the window, or `--no-setup` to skip setup explicitly:
 
 ```shell
-uv run python -m flip_seven_bots.ui --human Ann --human Ben --bot threshold:25
-uv run python -m flip_seven_bots.ui --vengeance --human Ann --bot random
-uv run python -m flip_seven_bots.ui --brutal --seed 7
+uv run flip7 play --human Ann --human Ben --bot threshold:25
+uv run flip7 play --vengeance --human Ann --bot random
+uv run flip7 play --brutal --seed 7
 ```
 
 | Option | Effect |
@@ -131,6 +132,7 @@ uv run python -m flip_seven_bots.ui --brutal --seed 7
 | `--vengeance`, `--brutal` | Choose the game mode |
 | `--seed N` | Make the decks repeatable (bots keep their own randomness) |
 | `--bug-dir PATH` | Folder for bug and crash reports (default `bug_reports`) |
+| `--setup`, `--no-setup` | Show or skip the setup screen explicitly |
 
 Seats are filled in the order given, up to six players. With only a mode flag,
 the default players are used.
@@ -277,7 +279,7 @@ seats a number of bots (default: all of them), chosen and ordered at random.
 ### From the command line
 
 ```shell
-uv run python -m flip_seven_bots.tournament --bot random --bot careful=threshold:40 \
+uv run flip7 tournament --bot random --bot careful=threshold:40 \
     --bot expected --games 200 --players-per-game 3 --seed 1 --output results
 ```
 
@@ -291,6 +293,8 @@ and, with `--output`, saves `games.csv`, `summary.csv` and `settings.json`.
 | `--players-per-game N` | Bots seated in each game (default: all) |
 | `--seed N` | Seed for seating, decks and bots |
 | `--jobs N` | Parallel game workers (default 1) |
+| `--gui` | Open the tournament window |
+| `--setup`, `--no-setup` | Show or skip setup explicitly (with `--gui`) |
 | `--vengeance`, `--brutal` | Choose the game mode |
 | `--output DIR` | Save results and settings in this folder |
 | `--quiet`, `--plots` | Hide progress or save HTML plots (`--plots` requires `--output`) |
@@ -299,15 +303,15 @@ and, with `--output`, saves `games.csv`, `summary.csv` and `settings.json`.
 ### In a window
 
 ```shell
-uv run python -m flip_seven_bots.ui.tournament
+uv run flip7 tournament --gui
 ```
 
 The setup screen lets you choose the game mode, number of games, players per
-game, seed and up to eight bots. Giving any of the command-line
-options above skips setup and starts immediately.
+game, seed and up to eight bots. Giving any of the tournament options above
+skips setup and starts immediately unless `--setup` is supplied.
 
 While it runs, the window shows a progress bar, live standings by Elo and an
-Elo chart; Stop ends the tournament after the current game. The final
+Elo chart; Stop stops scheduling games and waits for in-flight work. The final
 standings rank bots by `rating` with its 95% interval. Afterwards:
 
 - **Save results** writes the CSV files and settings to `--output` if given

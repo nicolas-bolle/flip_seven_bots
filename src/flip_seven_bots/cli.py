@@ -130,7 +130,3 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(
             f"Current player: {observation.current_player}; winners: {observation.winners}"
         )
-
-
-if __name__ == "__main__":
-    main()

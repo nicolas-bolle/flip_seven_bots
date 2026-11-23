@@ -1,7 +1,4 @@
-"""Command-line tournaments: ``python -m flip_seven_bots.tournament``.
-
-The same options configure the tournament window, ``python -m flip_seven_bots.ui.tournament``.
-"""
+"""Options and output for ``flip7 tournament`` and its window."""
 
 import argparse
 from collections.abc import Sequence
@@ -55,7 +52,7 @@ def _positive_float(value: str) -> float:
 def parse_options(
     argv: Sequence[str] | None = None,
     *,
-    prog: str = "python -m flip_seven_bots.tournament",
+    prog: str = "flip7 tournament",
     description: str = "Play a tournament between bots and print their Elo ratings.",
 ) -> TournamentOptions:
     """Parse tournament options; ``None`` reads the process command line.
@@ -65,6 +62,12 @@ def parse_options(
     Vengeance.
     """
     parser = argparse.ArgumentParser(prog=prog, description=description)
+    parser.add_argument("--gui", action="store_true", help="show the tournament window")
+    setup = parser.add_mutually_exclusive_group()
+    setup.add_argument("--setup", action="store_true", help="show setup (with --gui)")
+    setup.add_argument(
+        "--no-setup", action="store_true", help="skip setup (with --gui)"
+    )
     parser.add_argument(
         "--bot",
         dest="bots",
@@ -139,6 +142,10 @@ def parse_options(
         "--plots", action="store_true", help="save HTML plots (requires --output)"
     )
     args = parser.parse_args(argv)
+    if args.gui:
+        parser.error("--gui must be handled by flip7 tournament")
+    if args.setup or args.no_setup:
+        parser.error("--setup and --no-setup require --gui")
     if args.plots and args.output is None:
         parser.error("--plots requires --output")
 

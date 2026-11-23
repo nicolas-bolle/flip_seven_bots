@@ -15,8 +15,8 @@ from .setup_scene import TournamentSetupScene
 def main(argv: Sequence[str] | None = None) -> None:
     """Open tournament setup, or run a tournament directly if any options are given.
 
-    Options are the same as for ``python -m flip_seven_bots.tournament``. A
-    running tournament is stopped when the window closes.
+    Options are the same as for ``flip7 tournament``. A running tournament is
+    stopped when the window closes.
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if "--setup" in args and "--no-setup" in args:
@@ -25,7 +25,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = [arg for arg in args if arg not in ("--setup", "--no-setup")]
     options = parse_options(
         args,
-        prog="python -m flip_seven_bots.ui.tournament",
+        prog="flip7 tournament",
         description=(
             "Watch a tournament between bots. With no options, configure it on the "
             "setup screen; any options start it immediately."

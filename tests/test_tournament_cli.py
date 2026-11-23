@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from importlib.util import find_spec
 from pathlib import Path
 
 import pandas as pd
@@ -194,6 +195,73 @@ def test_trace_reports_seeded_bot_decisions(capsys: pytest.CaptureFixture[str]) 
     main(args)
     assert capsys.readouterr().out == first
     assert "seat 0:" in first and "Winners:" in first
+
+
+@pytest.mark.parametrize(
+    ("argv", "usage", "flags"),
+    [
+        (["play", "--help"], "flip7 play", ("--human", "--setup")),
+        (["tournament", "--help"], "flip7 tournament", ("--gui", "--jobs")),
+        (
+            ["tournament", "--gui", "--help"],
+            "flip7 tournament",
+            ("--gui", "--setup", "--no-setup"),
+        ),
+    ],
+)
+def test_unified_cli_help(
+    argv: list[str],
+    usage: str,
+    flags: tuple[str, ...],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from flip_seven_bots.cli import main
+
+    with pytest.raises(SystemExit) as result:
+        main(argv)
+    assert result.value.code == 0
+    help_text = capsys.readouterr().out
+    assert f"usage: {usage}" in help_text
+    assert all(flag in help_text for flag in flags)
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "flip_seven_bots.tournament.__main__",
+        "flip_seven_bots.ui.__main__",
+        "flip_seven_bots.ui.tournament.__main__",
+    ],
+)
+def test_legacy_module_entry_points_are_removed(module: str) -> None:
+    assert find_spec(module) is None
+
+
+def test_unified_tournament_dispatches_gui_and_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flip_seven_bots.cli import main
+    from flip_seven_bots.tournament import cli
+    from flip_seven_bots.ui.tournament import app
+
+    calls = []
+    monkeypatch.setattr(cli, "main", lambda argv: calls.append(("terminal", argv)))
+    monkeypatch.setattr(app, "main", lambda argv: calls.append(("gui", argv)))
+    main(["tournament", "--games", "2"])
+    main(["tournament", "--gui", "--setup", "--games", "2"])
+    assert calls == [
+        ("terminal", ["--games", "2"]),
+        ("gui", ["--setup", "--games", "2"]),
+    ]
+
+
+def test_tournament_setup_requires_gui(capsys: pytest.CaptureFixture[str]) -> None:
+    from flip_seven_bots.cli import main
+
+    with pytest.raises(SystemExit) as result:
+        main(["tournament", "--setup"])
+    assert result.value.code == 2
+    assert "require --gui" in capsys.readouterr().err
 
 
 def test_bot_spec_round_trips_reserved_text_characters(

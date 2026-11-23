@@ -17,8 +17,7 @@ uv run flip7 tournament --gui
 ```
 
 Use `uv run flip7 --help` for the commands, or `uv run flip7 tournament --help`
-for tournament options. The previous `python -m flip_seven_bots.ui` and
-`python -m flip_seven_bots.tournament` commands remain available.
+for tournament options.
 
 ## Guides
 

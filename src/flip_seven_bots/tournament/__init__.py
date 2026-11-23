@@ -1,4 +1,4 @@
-"""Rate bots against each other: a Python API and ``python -m flip_seven_bots.tournament``."""
+"""Rate bots against each other through the Python API and ``flip7 tournament``."""
 
 from .core import GameRecord, TournamentResult, play_tournament, run_tournament
 from .ratings import PairwiseResults, elo_update, fit_bradley_terry
