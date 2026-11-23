@@ -112,7 +112,7 @@ def press(scene: GameScene, key: int) -> None:
         finish_animations(scene)
 
 
-def test_vengeance_cards_sort_and_render() -> None:
+def test_vengeance_cards_sort_into_number_and_modifier_rows_and_render() -> None:
     cards = [
         Card(CardType.NUMBER, 13),
         Card(CardType.ZERO),
@@ -176,7 +176,7 @@ def test_vengeance_card_selection_uses_highlighted_cards(kind: CardType) -> None
         Card(CardType.FLIP_FOUR),
     ],
 )
-def test_vengeance_player_target_buttons(card: Card) -> None:
+def test_vengeance_targeted_cards_offer_player_buttons(card: Card) -> None:
     scene, table = make_scene(
         numbers(9, 2, 4) + [card] + numbers(5, 6, 7, 8, 10),
         rules=VengeanceRules(),
@@ -222,7 +222,7 @@ def test_swap_uses_two_card_clicks_and_blocks_selection_during_dialog() -> None:
 
 
 @pytest.mark.parametrize("take_bonus", [True, False])
-def test_brutal_flip_seven_bonus_choice(
+def test_brutal_flip_seven_can_take_or_subtract_the_bonus(
     take_bonus: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -781,7 +781,7 @@ def test_long_report_messages_wrap_in_the_dialog() -> None:
         (Card(CardType.SECOND_CHANCE), "SECOND CHANCE"),
     ],
 )
-def test_card_labels(card: Card, label: str) -> None:
+def test_card_labels_show_values_signs_and_action_names(card: Card, label: str) -> None:
     assert card_label(card) == label
 
 
@@ -803,5 +803,5 @@ def test_card_labels(card: Card, label: str) -> None:
         (RoundEnded(2, RoundResult(2, (0, 0, 0), (0, 0, 0), None)), "Round 2 ended"),
     ],
 )
-def test_activity_messages(event: GameEvent, message: str) -> None:
+def test_events_are_described_with_seat_names(event: GameEvent, message: str) -> None:
     assert event_text(event, NAMES) == message

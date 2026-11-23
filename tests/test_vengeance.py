@@ -80,6 +80,7 @@ def test_vengeance_scoring_applies_division_then_subtractions_and_clamps() -> No
 
 
 def test_zero_forces_hit_and_only_zeroes_the_round_score() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([ZERO, number(4), number(5)])
     observation = game.observe(1)
     assert observation.legal_actions == (HIT,)
@@ -233,6 +234,7 @@ def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
 
 
 def test_stealing_duplicate_busts_the_recipient() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([number(2), number(2), STEAL])
     game.apply(HIT)
     choose_card(game, 0, number(2))
@@ -299,6 +301,7 @@ def test_untargetable_action_is_discarded(card: Card) -> None:
 
 
 def test_brutal_mode_modifier_can_give_busted_player_negative_score() -> None:
+    """Our reading of an unclear rule; see Rules notes in docs/reference.md."""
     game = game_with([number(2), number(3), number(2), subtract(4)], brutal=True)
     game.apply(HIT)
     game.apply(HIT)
@@ -340,7 +343,7 @@ def test_brutal_mode_can_keep_flip_seven_bonus() -> None:
 
 
 @pytest.mark.parametrize("brutal", [False, True])
-def test_complete_seeded_vengeance_game(brutal: bool) -> None:
+def test_seeded_vengeance_game_finishes_with_a_winner(brutal: bool) -> None:
     result = play_game(
         [ThresholdBot(25), ThresholdBot(25), ThresholdBot(25)],
         seed=42,

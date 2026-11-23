@@ -84,7 +84,7 @@ def test_invalid_options_are_rejected(argv: list[str]) -> None:
         parse_options(argv)
 
 
-def test_main_prints_progress_and_summary_and_saves_csvs(
+def test_run_prints_progress_and_summary_and_saves_results(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     run(
@@ -215,7 +215,7 @@ def test_trace_reports_seeded_bot_decisions(capsys: pytest.CaptureFixture[str]) 
         ),
     ],
 )
-def test_unified_cli_help(
+def test_help_lists_each_commands_options(
     argv: list[str],
     usage: str,
     flags: tuple[str, ...],

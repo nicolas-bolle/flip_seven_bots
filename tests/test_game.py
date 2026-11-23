@@ -82,7 +82,7 @@ def test_dealer_rotates_and_player_left_of_dealer_starts() -> None:
     assert game.current_player == 2
 
 
-def test_deferred_action_and_second_chance_during_flip_three() -> None:
+def test_flip_three_defers_freeze_but_second_chance_saves_a_duplicate_at_once() -> None:
     draws = [number(2), number(4), FLIP_THREE, FREEZE, CHANCE, number(2)]
     game = stacked_game(draws)
     game.apply(HIT)
@@ -408,7 +408,7 @@ def test_match_ends_after_round_reaching_target(
         (2, 0, 1, "deck or a seed"),
     ],
 )
-def test_invalid_game_setup(
+def test_game_rejects_bad_player_count_dealer_or_seeded_stacked_deck(
     player_count: int, dealer: int, seed: int | None, message: str
 ) -> None:
     with pytest.raises(ValueError, match=message):
@@ -416,7 +416,7 @@ def test_invalid_game_setup(
 
 
 @pytest.mark.parametrize("player", [-1, 2])
-def test_invalid_observer(player: int) -> None:
+def test_observe_rejects_a_seat_outside_the_game(player: int) -> None:
     game = Game(2, seed=42)
     with pytest.raises(ValueError, match="player"):
         game.observe(player)
