@@ -383,9 +383,7 @@ class Game:
 
     def _can_stay(self, player_index: int) -> bool:
         cards = self._players[player_index].cards
-        if any(card.kind is CardType.ZERO for card in cards):
-            return False
-        return isinstance(self._rules, VengeanceRules) or bool(cards)
+        return bool(cards) and not any(card.kind is CardType.ZERO for card in cards)
 
     def _draw(self, player_index: int, sequence: _FlipSequence | None) -> None:
         card, reshuffled = self._deck.draw()

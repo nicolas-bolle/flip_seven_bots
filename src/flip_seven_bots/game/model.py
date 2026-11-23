@@ -116,8 +116,8 @@ class HitOrStay:
     can_stay: bool
     """Whether ``STAY`` is legal in addition to ``HIT``.
 
-    Staying is unavailable with an empty hand in the base game, or while holding
-    a Vengeance Zero.
+    Staying is unavailable with an empty hand, or while holding a Vengeance
+    Zero.
     """
 
     @property

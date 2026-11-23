@@ -55,13 +55,20 @@ Rules notes:
   holds at most seven number cards. With 12 or more players, the table could
   hold every number card and leave nothing to draw. The rulebooks allow up to
   18 players with one deck.
+- Staying requires at least one card in your hand, in both games. The base
+  rulebook says so; the With A Vengeance rulebook doesn't repeat it, but its
+  definition of staying (turning your leftmost card sideways) assumes it.
 - In With A Vengeance, the Zero affects the round score, not accumulated
   points. A duplicate number received through a swap or steal causes a bust.
   A modifier drawn during a Flip Four that nobody has received when a Flip 7
   ends the round is discarded and affects no score.
+- A busted player's cards are face down and out of play, so Swap, Steal, and
+  Discard cannot choose them. Stayed players' cards can still be chosen.
 - In Brutal Mode, a player who gets Flip 7 can take the bonus or subtract it
-  from another player, and modifiers can give a busted player a negative round
-  score.
+  from another player. A busted player scores only their modifiers, so
+  modifiers can make their round score negative, whether received before or
+  after the bust. A player holding the Zero who hasn't busted still scores
+  zero, even with negative modifiers.
 
 ## Included bots
 
