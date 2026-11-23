@@ -3,6 +3,8 @@ name = "flip-seven-bots"
 version = "0.1.0"
 description = "Bots for the game Flip 7"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "nicolas-bolle", email = "nicolasbolle@gmail.com" }
 ]

@@ -4,7 +4,10 @@ A Python implementation of Flip 7 and Flip 7: With A Vengeance for building and
 comparing bots. It includes a headless rules engine, example bots, rated
 tournaments, and Pygame windows for playing games and watching tournaments.
 
-The project is private and unlicensed to avoid Flip 7 copyright issues.
+This is an unofficial fan project, not affiliated with or endorsed by The Op.
+Flip 7 is a trademark of its owner; buy the game to play it with friends. The
+code is released under the [MIT License](LICENSE), which covers this project's
+code and docs only, not the Flip 7 game, name or artwork.
 
 ## Get started
 
