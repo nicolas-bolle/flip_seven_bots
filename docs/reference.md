@@ -50,6 +50,11 @@ Rules notes:
   the player to their left is dealt first.
 - Ties for the highest final score produce multiple winners. One- and
   two-player games use the same rules and goal.
+- A game seats at most 10 players, so the deck can never run out. The draw
+  pile runs out only if every card is in front of a player, and each player
+  holds at most seven number cards. With 12 or more players, the table could
+  hold every number card and leave nothing to draw. The rulebooks allow up to
+  18 players with one deck.
 - In With A Vengeance, the Zero affects the round score, not accumulated
   points. A duplicate number received through a swap or steal causes a bust.
   A modifier drawn during a Flip Four that nobody has received when a Flip 7
@@ -152,8 +157,8 @@ For finer control, create a `Game` and advance it with
   useful in tests.
 
 A game raises an error if it exceeds 100,000 decisions (for example, with
-custom rules that make the target score unreachable), or if the deck runs out
-with no discarded cards to reshuffle.
+custom rules that make the target score unreachable), or if a custom deck runs
+out with no discarded cards to reshuffle.
 
 ### Bug reports
 
@@ -261,7 +266,8 @@ it for Flip Three targets.
 ## Running tournaments
 
 A tournament plays many games between named bots and rates them. Each game
-seats a number of bots (default: all of them), chosen and ordered at random.
+seats a number of bots (default: all of them, up to the 10-player limit in
+[Rules notes](#game-modes)), chosen and ordered at random.
 
 ### From the command line
 
@@ -277,7 +283,7 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 | --- | --- |
 | `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: `random`, `threshold:30`, `expected` |
 | `--games N` | Number of games (default 100) |
-| `--players-per-game N` | Bots seated in each game (default: all) |
+| `--players-per-game N` | Bots seated in each game (default: all, up to 10) |
 | `--seed N` | Seed for seating, decks, and bots |
 | `--jobs N` | Parallel game workers (default 1) |
 | `--gui` | Open the tournament window |

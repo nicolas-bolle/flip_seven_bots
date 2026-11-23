@@ -19,6 +19,7 @@ from flip_seven_bots.bots.specs import number_duplicates, parse_named_bot
 
 from .config import DEFAULT_K_HALF_LIFE
 from .config import TournamentOptions as TournamentOptions  # noqa: PLC0414
+from .core import MAX_PLAYERS, max_table_size
 from .storage import save_results as save_results  # noqa: PLC0414
 
 if TYPE_CHECKING:
@@ -139,7 +140,10 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
         "--players-per-game",
         type=_positive_int,
         metavar="N",
-        help="bots seated in each game, chosen at random (default: all)",
+        help=(
+            "bots seated in each game, chosen at random "
+            f"(default: all, up to {MAX_PLAYERS})"
+        ),
     )
     parser.add_argument("--seed", type=int, help="seed for seating, decks, and bots")
     parser.add_argument(
@@ -204,10 +208,9 @@ def _options(
         parser.error("a tournament needs at least two bots")
     names = number_duplicates([name for name, _ in named])
     bots = {name: bot for name, (_, bot) in zip(names, named)}
-    if args.players_per_game is not None and not 2 <= args.players_per_game <= len(
-        bots
-    ):
-        parser.error(f"--players-per-game must be between 2 and {len(bots)}")
+    largest = max_table_size(len(bots))
+    if args.players_per_game is not None and not 2 <= args.players_per_game <= largest:
+        parser.error(f"--players-per-game must be between 2 and {largest}")
     return TournamentOptions(
         bots=bots,
         games=args.games,

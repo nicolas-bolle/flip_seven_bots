@@ -164,6 +164,11 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
     assert result.summary["rating"].dropna().mean() == pytest.approx(1000)
 
 
+def test_default_table_seats_every_bot_up_to_the_player_limit() -> None:
+    result = run_tournament(threshold_bots(*range(11)), games=1, seed=0, progress=False)
+    assert len(result.games) == 10
+
+
 @pytest.mark.parametrize(
     ("bots", "options", "message"),
     [
@@ -179,6 +184,11 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
             {"games": 1, "players_per_game": 1},
             "players_per_game",
         ),
+        (
+            threshold_bots(*range(11)),
+            {"games": 1, "players_per_game": 11},
+            "players_per_game",
+        ),
         (threshold_bots(10, 20), {"games": 2, "k_half_life": 0}, "k_half_life"),
     ],
     ids=[
@@ -186,6 +196,7 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
         "one-bot",
         "table-too-big",
         "table-too-small",
+        "table-over-player-limit",
         "half-life",
     ],
 )

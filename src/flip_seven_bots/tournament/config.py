@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from flip_seven_bots.game import Rules, VengeanceRules
 
-from .core import GameRecord, TournamentResult, play_tournament, run_tournament
+from .core import (
+    GameRecord,
+    TournamentResult,
+    max_table_size,
+    play_tournament,
+    run_tournament,
+)
 
 if TYPE_CHECKING:
     from flip_seven_bots.bots.base import Bot, BotFactory
@@ -56,7 +62,7 @@ class TournamentOptions:
         mode = "Flip 7"
         if self.vengeance:
             mode = "With A Vengeance (Brutal)" if self.brutal else "With A Vengeance"
-        table = self.players_per_game or len(self.bots)
+        table = self.players_per_game or max_table_size(len(self.bots))
         return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
 
     def _settings(self) -> dict:

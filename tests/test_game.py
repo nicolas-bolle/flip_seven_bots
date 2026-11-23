@@ -403,6 +403,7 @@ def test_match_ends_after_round_reaching_target(
     ("player_count", "dealer", "seed", "message"),
     [
         (0, 0, None, "player_count"),
+        (11, 0, None, "player_count"),
         (2, -1, None, "dealer"),
         (2, 2, None, "dealer"),
         (2, 0, 1, "deck or a seed"),

@@ -49,6 +49,13 @@ _VENGEANCE_MODIFIERS = frozenset((CardType.SUBTRACT, CardType.DIVIDE))
 _ROUND_ACTIONS = frozenset((CardType.FREEZE, CardType.FLIP_THREE))
 _SINGLE_USE = _VENGEANCE_ACTIONS | _ROUND_ACTIONS
 
+MAX_PLAYERS = 10
+"""Most seats a game allows, so the draw and discard piles can never both run out.
+
+Each player holds at most seven number cards, and the one drawing at most six,
+so with more seats every number card could be on the table with none to draw.
+"""
+
 
 def _sample_observation(
     snapshot: Game,
@@ -139,7 +146,8 @@ class Game:
     ``observe`` exposes public information, never the shuffled deck. Use
     ``VengeanceRules`` to select the alternate game.
 
-    ``player_count`` must be positive and ``dealer`` must identify a seat.
+    ``player_count`` must be between one and ``MAX_PLAYERS`` and ``dealer``
+    must identify a seat.
     ``seed`` controls the shuffled deck; alternatively, pass a prepared
     ``deck`` (but not both). Initial dealing occurs during construction and
     may itself stop at an action-card decision.
@@ -154,8 +162,8 @@ class Game:
         seed: int | None = None,
         dealer: int = 0,
     ):
-        if player_count < 1:
-            raise ValueError("player_count must be at least one")
+        if not 1 <= player_count <= MAX_PLAYERS:
+            raise ValueError(f"player_count must be between 1 and {MAX_PLAYERS}")
         if not 0 <= dealer < player_count:
             raise ValueError("dealer must be a valid player index")
         if deck is not None and seed is not None:

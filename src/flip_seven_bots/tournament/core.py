@@ -15,7 +15,7 @@ from tqdm.auto import tqdm
 
 from flip_seven_bots.bots.base import Bot
 from flip_seven_bots.bots.registry import config_for
-from flip_seven_bots.game import Rules
+from flip_seven_bots.game import MAX_PLAYERS, Rules
 from flip_seven_bots.simulation import play_game
 
 from . import plots
@@ -158,6 +158,11 @@ class TournamentResult:
         return cls(played, _summarize(played, list(players), fitted, elo))
 
 
+def max_table_size(bot_count: int) -> int:
+    """Largest table for ``bot_count`` bots, which is also the default table size."""
+    return min(bot_count, MAX_PLAYERS)
+
+
 def play_tournament(
     bots: Mapping[str, Bot | BotFactory],
     *,
@@ -176,11 +181,15 @@ def play_tournament(
     iterator when stopping early to wait for workers and release resources.
     """
     names = list(bots)
-    table_size = len(names) if players_per_game is None else players_per_game
+    largest = max_table_size(len(names))
+    table_size = largest if players_per_game is None else players_per_game
     if games < 1:
         raise ValueError("games must be at least one")
-    if not 2 <= table_size <= len(names):
-        raise ValueError("players_per_game must be between two and the number of bots")
+    if not 2 <= table_size <= largest:
+        raise ValueError(
+            "players_per_game must be between two and the number of bots, "
+            f"up to {MAX_PLAYERS}"
+        )
     if k_half_life is not None and k_half_life <= 0:
         raise ValueError("k_half_life must be positive")
     if jobs < 1:
@@ -265,8 +274,9 @@ def run_tournament(
 ) -> TournamentResult:
     """Play ``games`` games between named bots and rate them.
 
-    Each game seats ``players_per_game`` bots (default: all of them), chosen
-    and ordered at random. ``seed`` controls seating, decks, and bot seeds.
+    Each game seats ``players_per_game`` bots (default: all of them, up to
+    ``MAX_PLAYERS``), chosen and ordered at random. ``seed`` controls seating,
+    decks, and bot seeds.
     Each game constructs fresh bots from factories accepting a seed. Registered
     bot instances are also accepted as configurations. Factories and rules
     must be picklable when ``jobs`` is greater than one.
