@@ -571,7 +571,22 @@ class Game:
         self._players[player].cards.remove(card)
         self._deck.discard((card,))
 
+    def _discard_unplayed_modifiers(self) -> None:
+        """Discard modifiers drawn but not yet given to anyone, so they affect no score."""
+        for task in self._tasks:
+            match task:
+                case _Resolve():
+                    effects = [task]
+                case _FinishFlip(sequence=sequence):
+                    effects = sequence.deferred
+                case _:
+                    continue
+            for effect in effects:
+                if effect.card.kind in _VENGEANCE_MODIFIERS:
+                    self._discard_action(effect.player, effect.card)
+
     def _end_round(self, flip_seven_player: int | None) -> None:
+        self._discard_unplayed_modifiers()
         if (
             flip_seven_player is not None
             and isinstance(self._rules, VengeanceRules)

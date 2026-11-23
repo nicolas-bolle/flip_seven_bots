@@ -208,6 +208,43 @@ def test_flip_four_stops_on_bust_and_discards_deferred_effects() -> None:
     assert game.hidden_deck() == (number(9),)
 
 
+def test_flip_seven_during_flip_four_does_not_score_a_modifier_not_yet_played() -> None:
+    low = [number(value) for value in range(2, 7)]
+    game = game_with([number(1), number(12), *low, FLIP_FOUR, subtract(10), number(8)])
+    game.apply(HIT)
+    game.apply(STAY)
+    for _ in range(4):
+        game.apply(HIT)
+    game.apply(HIT)
+    game.apply(target(1))
+    assert game.last_round is not None
+    assert game.last_round.flip_seven_player == 1
+    assert game.last_round.scores == (12, 29 + 15)
+
+
+def test_flip_seven_before_a_deferred_modifier_resolves_does_not_score_it() -> None:
+    game = game_with(
+        [
+            *(number(value) for value in (1, 12, 2, 3, 4)),
+            FLIP_FOUR,
+            STEAL,
+            subtract(10),
+            number(5),
+            number(6),
+        ]
+    )
+    game.apply(HIT)
+    game.apply(STAY)
+    game.apply(HIT)
+    game.apply(HIT)
+    game.apply(HIT)
+    game.apply(target(1))
+    choose_card(game, 0, number(12))
+    assert game.last_round is not None
+    assert game.last_round.flip_seven_player == 1
+    assert game.last_round.scores == (0, 33 + 15)
+
+
 def test_swapped_unlucky_seven_does_not_discard_unresolved_modifier() -> None:
     game = game_with(
         [UNLUCKY, number(3), FLIP_FOUR, SWAP, subtract(2), number(4), number(5)]

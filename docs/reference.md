@@ -52,6 +52,8 @@ Rules notes:
   two-player games use the same rules and goal.
 - In With A Vengeance, the Zero affects the round score, not accumulated
   points. A duplicate number received through a swap or steal causes a bust.
+  A modifier drawn during a Flip Four that nobody has received when a Flip 7
+  ends the round is discarded and affects no score.
 - In Brutal Mode, a player who gets Flip 7 can take the bonus or subtract it
   from another player, and modifiers can give a busted player a negative round
   score.
