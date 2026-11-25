@@ -101,5 +101,5 @@ def draw_field(
     if focused:
         pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=8)
     draw_text(
-        screen, font, value + ("|" if focused else ""), (rect.x + 12, rect.y + 13)
+        screen, font, value + ('|' if focused else ''), (rect.x + 12, rect.y + 13)
     )

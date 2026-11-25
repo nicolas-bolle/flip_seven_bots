@@ -97,10 +97,10 @@ class _AnimatedDraw:
 def _wrap(text: str, font: pygame.font.Font, width: int) -> list[str]:
     """Split text into lines that fit ``width``, keeping explicit line breaks."""
     lines = []
-    for paragraph in text.split("\n"):
-        line = ""
-        for word in paragraph.split(" "):
-            candidate = f"{line} {word}" if line else word
+    for paragraph in text.split('\n'):
+        line = ''
+        for word in paragraph.split(' '):
+            candidate = f'{line} {word}' if line else word
             if font.size(candidate)[0] <= width:
                 line = candidate
                 continue
@@ -179,18 +179,18 @@ def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
 def _action_button(action: Action, names: Sequence[str], rect: pygame.Rect) -> Button:
     match action:
         case Action(kind=ActionType.HIT):
-            return Button(rect, "Hit  [H]", action, pygame.K_h)
+            return Button(rect, 'Hit  [H]', action, pygame.K_h)
         case Action(kind=ActionType.STAY):
-            return Button(rect, "Stay  [S]", action, pygame.K_s)
+            return Button(rect, 'Stay  [S]', action, pygame.K_s)
         case Action(kind=ActionType.TAKE_BONUS):
-            return Button(rect, "Take bonus  [B]", action, pygame.K_b)
+            return Button(rect, 'Take bonus  [B]', action, pygame.K_b)
         case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)) if target < 9:
             return Button(
-                rect, f"{names[target]}  [{target + 1}]", action, pygame.K_1 + target
+                rect, f'{names[target]}  [{target + 1}]', action, pygame.K_1 + target
             )
         case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)):
             return Button(rect, names[target], action)
-    raise ValueError(f"unsupported action: {action}")
+    raise ValueError(f'unsupported action: {action}')
 
 
 class GameScene:
@@ -202,7 +202,7 @@ class GameScene:
     """
 
     def __init__(
-        self, table: Table | None = None, *, report_dir: Path = Path("bug_reports")
+        self, table: Table | None = None, *, report_dir: Path = Path('bug_reports')
     ) -> None:
         self._table = table if table is not None else Table(default_seats())
         self._report_dir = report_dir
@@ -240,19 +240,19 @@ class GameScene:
             return (
                 Button(
                     pygame.Rect(DIALOG.x + 28, y, 195, 50),
-                    "Submit  [Enter]",
+                    'Submit  [Enter]',
                     Command.SUBMIT_REPORT,
                     pygame.K_RETURN,
                 ),
                 Button(
                     pygame.Rect(DIALOG.x + 238, y, 195, 50),
-                    "Cancel  [Esc]",
+                    'Cancel  [Esc]',
                     Command.CANCEL_REPORT,
                     pygame.K_ESCAPE,
                 ),
             )
         report = Button(
-            REPORT_BUTTON, "Report bug  [F1]", Command.REPORT_BUG, pygame.K_F1
+            REPORT_BUTTON, 'Report bug  [F1]', Command.REPORT_BUG, pygame.K_F1
         )
         return (*self._play_buttons(), report)
 
@@ -264,10 +264,10 @@ class GameScene:
         corner = pygame.Rect(OVERLAY.x + 28, OVERLAY.bottom - 76, 195, 50)
         if table.round_summary is not None:
             return (
-                Button(corner, "Continue  [Enter]", Command.CONTINUE, pygame.K_RETURN),
+                Button(corner, 'Continue  [Enter]', Command.CONTINUE, pygame.K_RETURN),
             )
         if table.game.is_finished:
-            return (Button(corner, "Play again  [R]", Command.RESTART, pygame.K_r),)
+            return (Button(corner, 'Play again  [R]', Command.RESTART, pygame.K_r),)
         if table.human_to_act is None:
             return ()
         actions = table.observation.legal_actions
@@ -280,7 +280,7 @@ class GameScene:
                         _shown_cards(observation.players[action.target]),
                         panels[action.target],
                     )[action.card_index],
-                    "",
+                    '',
                     action,
                 )
                 for action in actions
@@ -324,7 +324,7 @@ class GameScene:
                 self._previous_round = None
                 self._queue_draws(None)
             case Button(action=Command.REPORT_BUG):
-                self._report_text = ""
+                self._report_text = ''
                 self._report_hint = None
                 self._pause_started = self._now
                 self._table.pause()
@@ -423,10 +423,10 @@ class GameScene:
         if event.key == pygame.K_BACKSPACE:
             self._report_text = self._report_text[:-1]
             return True
-        shift = getattr(event, "mod", 0) & pygame.KMOD_SHIFT
+        shift = getattr(event, 'mod', 0) & pygame.KMOD_SHIFT
         if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and shift:
             if len(self._report_text) < MAX_REPORT_LENGTH:
-                self._report_text += "\n"
+                self._report_text += '\n'
             return True
         if event.key == pygame.K_KP_ENTER:
             self._submit_report()
@@ -436,15 +436,15 @@ class GameScene:
     def _submit_report(self) -> None:
         assert self._report_text is not None
         if not self._report_text.strip():
-            self._report_hint = "Please describe the problem first."
+            self._report_hint = 'Please describe the problem first.'
             return
         try:
             path = write_report(self._table, self._report_text, self._report_dir)
         except OSError as error:
-            self._report_hint = f"Could not save the report: {error}"
+            self._report_hint = f'Could not save the report: {error}'
             return
         self._close_report()
-        self._notice = f"Bug report saved to {path}"
+        self._notice = f'Bug report saved to {path}'
         self._notice_until = self._now + NOTICE_MS
 
     def _close_report(self) -> None:
@@ -467,12 +467,12 @@ class GameScene:
         ):
             observation = self._previous_round
         screen.fill(BACKGROUND)
-        self._text(screen, self._title_font, "FLIP 7", (35, 24), ACCENT)
+        self._text(screen, self._title_font, 'FLIP 7', (35, 24), ACCENT)
         self._text(
             screen,
             self._font,
-            f"Round {observation.round_number}  |  Dealer: {table.names[observation.dealer]}"
-            f"  |  Deck: {observation.cards_remaining}  |  Discard: {len(observation.discard)}",
+            f'Round {observation.round_number}  |  Dealer: {table.names[observation.dealer]}'
+            f'  |  Deck: {observation.cards_remaining}  |  Discard: {len(observation.discard)}',
             (35, 69),
             MUTED,
         )
@@ -530,9 +530,9 @@ class GameScene:
             pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=12)
 
         status = {
-            PlayerStatus.ACTIVE: "ACTIVE",
-            PlayerStatus.STAYED: "STAYED",
-            PlayerStatus.BUSTED: "BUSTED",
+            PlayerStatus.ACTIVE: 'ACTIVE',
+            PlayerStatus.STAYED: 'STAYED',
+            PlayerStatus.BUSTED: 'BUSTED',
         }[player.status]
         waiting = any(
             draw.event.player == player.player
@@ -540,14 +540,14 @@ class GameScene:
             for draw in self._draws
         )
         if waiting:
-            status = "..."
+            status = '...'
         name = self._table.names[player.player]
         self._text(screen, self._heading_font, name, (rect.x + 16, rect.y + 13))
         self._text(
             screen, self._small_font, status, (rect.x + 200, rect.y + 19), ACCENT
         )
-        live_score = "..." if waiting else str(player.round_score)
-        score = f"Total: {player.total_score}    Live round: {live_score}"
+        live_score = '...' if waiting else str(player.round_score)
+        score = f'Total: {player.total_score}    Live round: {live_score}'
         self._text(screen, self._font, score, (rect.x + 570, rect.y + 16))
 
         cards = _shown_cards(player)
@@ -555,7 +555,7 @@ class GameScene:
             self._text(
                 screen,
                 self._small_font,
-                "No cards yet",
+                'No cards yet',
                 (rect.x + 18, rect.y + 50),
                 MUTED,
             )
@@ -581,7 +581,7 @@ class GameScene:
         self._text(
             screen,
             self._compact_card_font,
-            "DECK",
+            'DECK',
             (DECK_RECT.x + 6, DECK_RECT.y + 23),
             TEXT,
         )
@@ -646,13 +646,13 @@ class GameScene:
             color = (147, 205, 196)
         pygame.draw.rect(screen, color, rect, border_radius=6)
         if card.kind is CardType.SECOND_CHANCE and rect.height >= 40:
-            for index, line in enumerate(("SECOND", "CHANCE")):
+            for index, line in enumerate(('SECOND', 'CHANCE')):
                 label = self._small_font.render(line, True, (25, 45, 46))
                 center = (rect.centerx, rect.centery - 9 + index * 19)
                 screen.blit(label, label.get_rect(center=center))
         else:
             text = (
-                "2ND CH." if card.kind is CardType.SECOND_CHANCE else card_label(card)
+                '2ND CH.' if card.kind is CardType.SECOND_CHANCE else card_label(card)
             )
             font = self._compact_card_font if rect.height < 22 else self._card_font
             label = font.render(text, True, (25, 45, 46))
@@ -664,7 +664,7 @@ class GameScene:
         rect = pygame.Rect(945, 112, 305, 558)
         pygame.draw.rect(screen, PANEL, rect, border_radius=12)
         self._text(
-            screen, self._heading_font, "Recent activity", (rect.x + 16, rect.y + 16)
+            screen, self._heading_font, 'Recent activity', (rect.x + 16, rect.y + 16)
         )
         pending = Counter(
             draw.event
@@ -690,7 +690,7 @@ class GameScene:
             self._text(
                 screen,
                 self._small_font,
-                f"Last round: {observation.last_round.round_number}",
+                f'Last round: {observation.last_round.round_number}',
                 (rect.x + 16, rect.bottom - 34),
                 ACCENT,
             )
@@ -700,46 +700,46 @@ class GameScene:
         table = self._table
         player = observation.current_player
         if self._animating:
-            message = "Dealing cards..."
+            message = 'Dealing cards...'
         elif table.game.is_finished:
-            message = "Game over"
+            message = 'Game over'
         elif player is None or player not in table.humans:
             assert player is not None  # unfinished games await a decision
-            message = f"{table.names[player]} is deciding..."
+            message = f'{table.names[player]} is deciding...'
         else:
             # With several humans sharing the screen, say whose turn it is.
             turn = (
-                "Your turn"
+                'Your turn'
                 if len(table.humans) == 1
                 else f"{table.names[player]}'s turn"
             )
             match observation.decision:
                 case ChooseCard(card=card, first=first):
-                    step = "second" if first is not None else "first"
+                    step = 'second' if first is not None else 'first'
                     choice = (
-                        f"the {step} card" if card.kind is CardType.SWAP else "a card"
+                        f'the {step} card' if card.kind is CardType.SWAP else 'a card'
                     )
-                    message = f"{turn}: choose {choice} for {card_label(card)}"
+                    message = f'{turn}: choose {choice} for {card_label(card)}'
                 case FlipSevenBonus():
-                    message = f"{turn}: take the bonus or subtract it from a player"
+                    message = f'{turn}: take the bonus or subtract it from a player'
                 case ChooseTarget(card=card) if card.kind is CardType.SECOND_CHANCE:
                     message = (
-                        f"{turn}: you already have a Second Chance, "
-                        "so give this one to another player"
+                        f'{turn}: you already have a Second Chance, '
+                        'so give this one to another player'
                     )
                 case ChooseTarget(card=card):
-                    message = f"{turn}: choose a player for {card_label(card)}"
+                    message = f'{turn}: choose a player for {card_label(card)}'
                 case HitOrStay(can_stay=False):
-                    message = f"{turn}: you must hit"
+                    message = f'{turn}: you must hit'
                 case _:
-                    message = f"{turn}: hit or stay"
+                    message = f'{turn}: hit or stay'
         self._text(
             screen, self._heading_font, message, (CONTROLS.x + 20, CONTROLS.y + 18)
         )
         self._text(
             screen,
             self._small_font,
-            "Click a button or highlighted card, or use a shortcut. Esc quits.",
+            'Click a button or highlighted card, or use a shortcut. Esc quits.',
             (CONTROLS.x + 20, CONTROLS.y + 52),
             MUTED,
         )
@@ -755,28 +755,28 @@ class GameScene:
         return OVERLAY
 
     def _draw_round_summary(self, screen: pygame.Surface, result: RoundResult) -> None:
-        rect = self._overlay(screen, f"Round {result.round_number} complete")
+        rect = self._overlay(screen, f'Round {result.round_number} complete')
         names = self._table.names
         if result.flip_seven_player is not None:
-            message = f"{names[result.flip_seven_player]} got Flip 7!"
+            message = f'{names[result.flip_seven_player]} got Flip 7!'
             self._text(screen, self._font, message, (rect.x + 28, rect.y + 75), ACTIVE)
         spacing = min(45, 190 // len(names))
         for index, (score, total) in enumerate(zip(result.scores, result.totals)):
             self._text(
                 screen,
                 self._heading_font,
-                f"{names[index]}:  {score:+d}    total {total}",
+                f'{names[index]}:  {score:+d}    total {total}',
                 (rect.x + 28, rect.y + 120 + index * spacing),
             )
 
     def _draw_game_over(self, screen: pygame.Surface, observation: Observation) -> None:
-        rect = self._overlay(screen, "Game over")
+        rect = self._overlay(screen, 'Game over')
         names = self._table.names
-        winners = ", ".join(names[index] for index in observation.winners)
+        winners = ', '.join(names[index] for index in observation.winners)
         self._text(
             screen,
             self._heading_font,
-            f"Winner: {winners}",
+            f'Winner: {winners}',
             (rect.x + 28, rect.y + 90),
             ACTIVE,
         )
@@ -785,7 +785,7 @@ class GameScene:
             self._text(
                 screen,
                 self._font,
-                f"{names[index]}: {player.total_score} points",
+                f'{names[index]}: {player.total_score} points',
                 (rect.x + 28, rect.y + 145 + index * spacing),
             )
 
@@ -795,7 +795,7 @@ class GameScene:
         screen.blit(shade, (0, 0))
         pygame.draw.rect(screen, PANEL_ALT, DIALOG, border_radius=15)
         x = DIALOG.x + 28
-        self._text(screen, self._title_font, "Report a bug", (x, DIALOG.y + 25), ACCENT)
+        self._text(screen, self._title_font, 'Report a bug', (x, DIALOG.y + 25), ACCENT)
         self._text(
             screen,
             self._small_font,
@@ -806,7 +806,7 @@ class GameScene:
         self._text(
             screen,
             self._small_font,
-            "Enter submits, Shift+Enter starts a new line, Esc cancels.",
+            'Enter submits, Shift+Enter starts a new line, Esc cancels.',
             (x, DIALOG.y + 94),
             MUTED,
         )
@@ -814,7 +814,7 @@ class GameScene:
         pygame.draw.rect(screen, BACKGROUND, box, border_radius=8)
         line_height = self._font.get_linesize()
         visible = (box.height - 20) // line_height
-        lines = _wrap(message + "|", self._font, box.width - 24)
+        lines = _wrap(message + '|', self._font, box.width - 24)
         for index, line in enumerate(lines[-visible:]):
             position = (box.x + 12, box.y + 10 + index * line_height)
             self._text(screen, self._font, line, position)

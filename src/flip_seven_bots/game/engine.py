@@ -65,7 +65,7 @@ def _sample_observation(
     next_draws: Sequence[Card],
 ) -> Game:
     if version[0] != expected:
-        raise RuntimeError("observation is out of date; the game has advanced")
+        raise RuntimeError('observation is out of date; the game has advanced')
     clone = snapshot.determinize(rng)
     clone._deck.stack(next_draws)
     return clone
@@ -163,11 +163,11 @@ class Game:
         dealer: int = 0,
     ):
         if not 1 <= player_count <= MAX_PLAYERS:
-            raise ValueError(f"player_count must be between 1 and {MAX_PLAYERS}")
+            raise ValueError(f'player_count must be between 1 and {MAX_PLAYERS}')
         if not 0 <= dealer < player_count:
-            raise ValueError("dealer must be a valid player index")
+            raise ValueError('dealer must be a valid player index')
         if deck is not None and seed is not None:
-            raise ValueError("pass either a deck or a seed, not both")
+            raise ValueError('pass either a deck or a seed, not both')
 
         self._rules = rules if rules is not None else Rules()
         self._deck = (
@@ -234,7 +234,7 @@ class Game:
         seat. The returned snapshot can be sampled only until the game advances.
         """
         if not 0 <= player < len(self._players):
-            raise ValueError("player must be a valid player index")
+            raise ValueError('player must be a valid player index')
         views = tuple(
             PlayerView(
                 player=index,
@@ -301,7 +301,7 @@ class Game:
         """
         decision = self._pending
         if decision is None or action not in decision.actions:
-            raise ValueError(f"illegal action: {action!r}")
+            raise ValueError(f'illegal action: {action!r}')
         self._pending = None
         self._version += 1
         self._version_token[0] = self._version

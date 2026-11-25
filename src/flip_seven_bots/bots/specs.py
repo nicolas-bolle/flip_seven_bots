@@ -18,11 +18,11 @@ def parse_bot(spec: str) -> tuple[str, Bot]:
 
 def parse_named_bot(spec: str) -> tuple[str, Bot]:
     """Parse ``[NAME=]KIND`` with optional parameters."""
-    prefix, colon, parameters = spec.partition(":")
-    name, separator, kind = prefix.partition("=")
+    prefix, colon, parameters = spec.partition(':')
+    name, separator, kind = prefix.partition('=')
     if separator and not name.strip():
-        raise ValueError("a bot name must not be blank")
-    kind = (kind if separator else name) + (colon + parameters if colon else "")
+        raise ValueError('a bot name must not be blank')
+    kind = (kind if separator else name) + (colon + parameters if colon else '')
     default_name, bot = parse_bot(kind)
     return (name.strip() if separator else default_name), bot
 
@@ -43,6 +43,6 @@ def number_duplicates(names: Sequence[str]) -> list[str]:
     for name in names:
         if counts[name] > 1:
             seen[name] += 1
-            name = f"{name} {seen[name]}"
+            name = f'{name} {seen[name]}'
         numbered.append(name)
     return numbered

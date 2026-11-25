@@ -30,11 +30,11 @@ class CarefulBot:
 
 register(
     BotKind(
-        kind="careful",
-        label="Careful bot",
+        kind='careful',
+        label='Careful bot',
         constructor=CarefulBot,
         bot_type=CarefulBot,
-        parameters=(Parameter("threshold", int),),
+        parameters=(Parameter('threshold', int),),
     )
 )
 ```
@@ -107,9 +107,9 @@ def make_careful(seed):
     return CarefulBot(seed=seed, threshold=25)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     result = run_tournament(
-        {"careful": make_careful, "baseline": ThresholdBot(30)},
+        {'careful': make_careful, 'baseline': ThresholdBot(30)},
         games=100,
         seed=42,
         jobs=2,

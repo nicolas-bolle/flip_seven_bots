@@ -57,7 +57,7 @@ class Deck:
         reshuffled, self._reshuffled = self._reshuffled, False
         if not self._cards:
             if not self._discard:
-                raise RuntimeError("cannot draw: no cards are available to reshuffle")
+                raise RuntimeError('cannot draw: no cards are available to reshuffle')
             self._reshuffle()
             reshuffled = True
         return self._cards.pop(), reshuffled
@@ -75,7 +75,7 @@ class Deck:
         remaining = list(self._cards)
         for card in cards:
             if card not in remaining:
-                raise ValueError(f"{card!r} is not available to draw")
+                raise ValueError(f'{card!r} is not available to draw')
             remaining.remove(card)
         self._cards = remaining + list(reversed(cards))
 

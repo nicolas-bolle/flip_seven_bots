@@ -34,7 +34,7 @@ CHART = pygame.Rect(680, 230, 510, 520)
 STOP_BUTTON = pygame.Rect(90, 790, 200, 56)
 SAVE_BUTTON = pygame.Rect(90, 790, 220, 56)
 NEW_BUTTON = pygame.Rect(330, 790, 240, 56)
-DEFAULT_SAVE_DIR = Path("tournament_results")
+DEFAULT_SAVE_DIR = Path('tournament_results')
 LINE_COLORS = (
     (233, 196, 106),
     (113, 207, 165),
@@ -85,7 +85,7 @@ class TournamentScene:
         self.result: TournamentResult | None = None
         """Final tables, available once ``finished`` if any game was played."""
         self._save_dir = options.output or save_dir / datetime.now().strftime(
-            "%Y-%m-%d_%H-%M-%S"
+            '%Y-%m-%d_%H-%M-%S'
         )
         self._standings = {
             name: _Standing(
@@ -157,7 +157,7 @@ class TournamentScene:
                 case _Finished(result=result):
                     self._finish(result)
                 case BaseException():
-                    self.error = f"{type(item).__name__}: {item}"
+                    self.error = f'{type(item).__name__}: {item}'
                     self._finish(None)
         if not self.finished and len(self.records) < self.options.games:
             self._elapsed = time.monotonic() - self._started
@@ -183,29 +183,29 @@ class TournamentScene:
     ) -> None:
         """Draw progress, standings, the rating chart, and the available buttons."""
         screen.fill(BACKGROUND)
-        draw_text(screen, self._title_font, "TOURNAMENT", (90, 45), ACCENT)
+        draw_text(screen, self._title_font, 'TOURNAMENT', (90, 45), ACCENT)
         draw_text(screen, self._font, self.options.describe(), (420, 58), MUTED)
         self._draw_progress(screen)
         self._draw_standings(screen)
         self._draw_chart(screen)
         if not self.finished:
             draw_button(
-                screen, self._font, STOP_BUTTON, "Stop", disabled=self._stop.is_set()
+                screen, self._font, STOP_BUTTON, 'Stop', disabled=self._stop.is_set()
             )
         else:
-            label = "Saved" if self.saved else "Save results"
+            label = 'Saved' if self.saved else 'Save results'
             disabled = bool(self.saved or self.result is None)
             draw_button(screen, self._font, SAVE_BUTTON, label, disabled=disabled)
-            draw_button(screen, self._font, NEW_BUTTON, "New tournament", selected=True)
+            draw_button(screen, self._font, NEW_BUTTON, 'New tournament', selected=True)
         if self.saved is not None:
             draw_text(
                 screen,
                 self._small_font,
-                f"Saved to {self.saved[0].parent}",
+                f'Saved to {self.saved[0].parent}',
                 (600, 810),
                 MUTED,
             )
-        draw_text(screen, self._small_font, "Esc quits.", (1110, 810), MUTED)
+        draw_text(screen, self._small_font, 'Esc quits.', (1110, 810), MUTED)
 
     def _draw_progress(self, screen: pygame.Surface) -> None:
         played, total = len(self.records), self.options.games
@@ -220,24 +220,24 @@ class TournamentScene:
                 border_radius=8,
             )
         label = self._font.render(
-            f"{played} / {total} games  ({played / total:.0%})", True, TEXT
+            f'{played} / {total} games  ({played / total:.0%})', True, TEXT
         )
         screen.blit(label, label.get_rect(center=PROGRESS_BAR.center))
 
         rate = played / self._elapsed if self._elapsed > 0 else 0.0
         if self.error is not None:
-            status = f"Stopped by an error: {self.error}"
+            status = f'Stopped by an error: {self.error}'
         elif not self.finished:
-            remaining = f", about {(total - played) / rate:.0f} s left" if rate else ""
-            status = f"Running: {rate:.1f} games/s{remaining}"
+            remaining = f', about {(total - played) / rate:.0f} s left' if rate else ''
+            status = f'Running: {rate:.1f} games/s{remaining}'
             if played == total:
-                status = "Computing ratings..."
+                status = 'Computing ratings...'
             elif self._stop.is_set():
-                status = "Stopping after the current game, then computing ratings..."
+                status = 'Stopping after the current game, then computing ratings...'
         elif played < total:
-            status = f"Stopped after {played} games in {self._elapsed:.1f} s"
+            status = f'Stopped after {played} games in {self._elapsed:.1f} s'
         else:
-            status = f"Finished in {self._elapsed:.1f} s ({rate:.1f} games/s)"
+            status = f'Finished in {self._elapsed:.1f} s ({rate:.1f} games/s)'
         draw_text(
             screen,
             self._font,
@@ -250,15 +250,15 @@ class TournamentScene:
         pygame.draw.rect(screen, PANEL, STANDINGS, border_radius=10)
         x, y = STANDINGS.x + 18, STANDINGS.y + 16
         summary = self.result.summary if self.result is not None else None
-        title = "Final standings" if summary is not None else "Standings (live Elo)"
+        title = 'Final standings' if summary is not None else 'Standings (live Elo)'
         draw_text(screen, self._heading_font, title, (x, y))
-        rating_label = "RATING (95%)" if summary is not None else "ELO"
+        rating_label = 'RATING (95%)' if summary is not None else 'ELO'
         columns = (
-            ("BOT", 18),
+            ('BOT', 18),
             (rating_label, 190),
-            ("GAMES", 300),
-            ("WINS", 360),
-            ("AVG PLACE", 455),
+            ('GAMES', 300),
+            ('WINS', 360),
+            ('AVG PLACE', 455),
         )
         for label, offset in columns:
             draw_text(screen, self._small_font, label, (x + offset, y + 44), MUTED)
@@ -273,18 +273,18 @@ class TournamentScene:
                 pygame.draw.rect(screen, PANEL_ALT, stripe, border_radius=6)
             pygame.draw.rect(screen, standing.color, (x, row_y + 3, 10, 14))
             win_rate = (
-                f" ({standing.wins / standing.games:.0%})" if standing.games else ""
+                f' ({standing.wins / standing.games:.0%})' if standing.games else ''
             )
             average = (
-                f"{standing.place_total / standing.games:.2f}"
+                f'{standing.place_total / standing.games:.2f}'
                 if standing.games
-                else "-"
+                else '-'
             )
             cells = (
                 (self._fit(standing.name, 165), 18),
                 (self._rating_text(standing, summary), 190),
                 (str(standing.games), 300),
-                (f"{standing.wins}{win_rate}", 360),
+                (f'{standing.wins}{win_rate}', 360),
                 (average, 455),
             )
             for text, offset in cells:
@@ -293,28 +293,28 @@ class TournamentScene:
     @staticmethod
     def _rating_text(standing: _Standing, summary: pd.DataFrame | None) -> str:
         if summary is None:
-            return f"{standing.elo:.0f}"
+            return f'{standing.elo:.0f}'
         rating, low, high = summary.loc[
-            standing.name, ["rating", "rating_low", "rating_high"]
+            standing.name, ['rating', 'rating_low', 'rating_high']
         ].to_numpy(dtype=float)
         if math.isnan(rating):  # never played
-            return "-"
+            return '-'
         if math.isnan(low):  # fewer than two deals
-            return f"{rating:.0f}"
-        return f"{rating:.0f} \u00b1{(high - low) / 2:.0f}"
+            return f'{rating:.0f}'
+        return f'{rating:.0f} \u00b1{(high - low) / 2:.0f}'
 
     def _fit(self, text: str, width: int) -> str:
         """Shorten ``text`` with an ellipsis until it fits in ``width`` pixels."""
         if self._font.size(text)[0] <= width:
             return text
-        while text and self._font.size(text + "...")[0] > width:
+        while text and self._font.size(text + '...')[0] > width:
             text = text[:-1]
-        return text.rstrip() + "..."
+        return text.rstrip() + '...'
 
     def _draw_chart(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(screen, PANEL, CHART, border_radius=10)
         draw_text(
-            screen, self._heading_font, "Elo by game", (CHART.x + 18, CHART.y + 16)
+            screen, self._heading_font, 'Elo by game', (CHART.x + 18, CHART.y + 16)
         )
         plot = pygame.Rect(
             CHART.x + 60, CHART.y + 64, CHART.width - 84, CHART.height - 110
@@ -336,9 +336,9 @@ class TournamentScene:
             y = point(0, rating)[1]
             pygame.draw.line(screen, PANEL_ALT, (plot.x, y), (plot.right, y))
             draw_text(
-                screen, self._small_font, f"{rating:.0f}", (CHART.x + 12, y - 7), MUTED
+                screen, self._small_font, f'{rating:.0f}', (CHART.x + 12, y - 7), MUTED
             )
-        draw_text(screen, self._small_font, "0", (plot.x - 4, plot.bottom + 10), MUTED)
+        draw_text(screen, self._small_font, '0', (plot.x - 4, plot.bottom + 10), MUTED)
         draw_text(
             screen,
             self._small_font,

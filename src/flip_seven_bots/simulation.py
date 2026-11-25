@@ -28,7 +28,7 @@ def run(
     decisions = 0
     while not game.is_finished and not (stop is not None and stop(game)):
         if decisions == _MAX_DECISIONS:
-            raise RuntimeError(f"game exceeded {_MAX_DECISIONS} decisions")
+            raise RuntimeError(f'game exceeded {_MAX_DECISIONS} decisions')
         player = game.current_player
         assert player is not None  # an unfinished game always awaits a decision
         game.apply(bots[player].choose_action(game.observe(player)))
@@ -58,7 +58,7 @@ def play_game(
 def start_bots(game: Game, bots: Sequence[Bot | None]) -> None:
     """Notify bots implementing the optional game-start hook."""
     for seat, bot in enumerate(bots):
-        hook = getattr(bot, "on_game_start", None)
+        hook = getattr(bot, 'on_game_start', None)
         if hook is not None:
             hook(seat, len(bots), game.rules)
 
@@ -66,6 +66,6 @@ def start_bots(game: Game, bots: Sequence[Bot | None]) -> None:
 def end_bots(game: Game, bots: Sequence[Bot | None]) -> None:
     """Notify bots implementing the optional game-end hook."""
     for seat, bot in enumerate(bots):
-        hook = getattr(bot, "on_game_end", None)
+        hook = getattr(bot, 'on_game_end', None)
         if hook is not None:
             hook(game.observe(seat))

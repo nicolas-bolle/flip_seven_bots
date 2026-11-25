@@ -191,7 +191,7 @@ Each report ends with replay data, so the game can be rebuilt in a test:
 ```python
 from flip_seven_bots.game.replay import replay
 
-game = replay("bug_reports/2026-11-21_16-30-05.md")
+game = replay('bug_reports/2026-11-21_16-30-05.md')
 ```
 
 ## Writing bots
@@ -338,7 +338,7 @@ from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.tournament import run_tournament
 
 result = run_tournament(
-    {"random": RandomBot(1), "t25": ThresholdBot(25), "ev": ExpectedValueBot()},
+    {'random': RandomBot(1), 't25': ThresholdBot(25), 'ev': ExpectedValueBot()},
     games=100,
     seed=0,
 )

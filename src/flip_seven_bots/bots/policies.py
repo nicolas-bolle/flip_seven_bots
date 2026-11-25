@@ -26,7 +26,7 @@ def acting_decision(observation: Observation) -> Decision:
     """
     decision = observation.decision
     if decision is None or decision.player != observation.player:
-        raise ValueError("the observation has no legal actions")
+        raise ValueError('the observation has no legal actions')
     return decision
 
 
@@ -71,7 +71,7 @@ def expected_hit_score(observation: Observation, decision: HitOrStay) -> float:
     """
     pool = observation.draw_pile or observation.discard
     if not pool:
-        raise ValueError("no cards are available to draw")
+        raise ValueError('no cards are available to draw')
     total = 0
     for card, count in Counter(pool).items():
         # Only the forced card is drawn, so the sampled order of the rest is irrelevant.

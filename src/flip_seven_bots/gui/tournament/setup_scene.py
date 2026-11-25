@@ -29,12 +29,12 @@ MAX_NUMBER_LENGTH = 6
 class _BotSetting:
     name: str
     kind: str
-    parameter: str = ""
+    parameter: str = ''
 
     @property
     def spec(self) -> str:
         if self.parameter:
-            return f"{self.kind}:{self.parameter}"
+            return f'{self.kind}:{self.parameter}'
         return self.kind
 
 
@@ -60,17 +60,17 @@ class TournamentSetupScene:
         self._defaults = defaults
         self.bots = []
         for name, bot in defaults.bots.items():
-            kind, _, parameter = bot_spec(bot).partition(":")
+            kind, _, parameter = bot_spec(bot).partition(':')
             self.bots.append(_BotSetting(name, kind, parameter))
         self.vengeance = defaults.vengeance
         self.brutal = defaults.brutal
         self.numbers = {
-            "games": str(defaults.games),
-            "table": ""
+            'games': str(defaults.games),
+            'table': ''
             if defaults.players_per_game is None
             else str(defaults.players_per_game),
-            "seed": "" if defaults.seed is None else str(defaults.seed),
-            "jobs": str(defaults.jobs),
+            'seed': '' if defaults.seed is None else str(defaults.seed),
+            'jobs': str(defaults.jobs),
         }
         self.result: TournamentOptions | None = None
         self.error: str | None = None
@@ -95,9 +95,9 @@ class TournamentSetupScene:
             elif self._focus is None:
                 return
             elif (
-                event.key == pygame.K_a and getattr(event, "mod", 0) & pygame.KMOD_CTRL
+                event.key == pygame.K_a and getattr(event, 'mod', 0) & pygame.KMOD_CTRL
             ):
-                self._set_focused("")
+                self._set_focused('')
             elif event.key == pygame.K_BACKSPACE:
                 self._set_focused(self._focused_value()[:-1])
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -109,15 +109,15 @@ class TournamentSetupScene:
         if field in self.numbers:
             return self.numbers[field]
         bot = self.bots[index]
-        return bot.name if field == "name" else bot.parameter
+        return bot.name if field == 'name' else bot.parameter
 
     def _set_focused(self, value: str) -> None:
         assert self._focus is not None
         field, index = self._focus
-        if field == "name":
+        if field == 'name':
             self.bots[index].name = value[:MAX_NAME_LENGTH]
         elif field in self.numbers:
-            digits = "".join(char for char in value if char.isdigit())[
+            digits = ''.join(char for char in value if char.isdigit())[
                 :MAX_NUMBER_LENGTH
             ]
             self.numbers[field] = digits
@@ -129,10 +129,10 @@ class TournamentSetupScene:
         self._focus = None
         self.error = None
         fields = {
-            "games": GAMES_FIELD,
-            "table": TABLE_FIELD,
-            "seed": SEED_FIELD,
-            "jobs": JOBS_FIELD,
+            'games': GAMES_FIELD,
+            'table': TABLE_FIELD,
+            'seed': SEED_FIELD,
+            'jobs': JOBS_FIELD,
         }
         clicked = next(
             (name for name, rect in fields.items() if rect.collidepoint(pos)), None
@@ -146,23 +146,23 @@ class TournamentSetupScene:
         elif BRUTAL_BUTTON.collidepoint(pos) and self.vengeance:
             self.brutal = not self.brutal
         elif ADD_BUTTON.collidepoint(pos) and len(self.bots) < MAX_BOTS:
-            self.bots.append(_BotSetting("Threshold 30", "threshold", "30"))
+            self.bots.append(_BotSetting('Threshold 30', 'threshold', '30'))
         elif START_BUTTON.collidepoint(pos):
             self._start()
         else:
             for index, bot in enumerate(self.bots):
                 name, kind, parameter, remove = _row_rects(index)
                 if name.collidepoint(pos):
-                    self._focus = ("name", index)
+                    self._focus = ('name', index)
                 elif kind.collidepoint(pos):
                     names = tuple(kind.kind for kind in kinds())
                     bot.kind = names[(names.index(bot.kind) + 1) % len(names)]
-                    bot.parameter = ""
+                    bot.parameter = ''
                 elif (
                     parameter.collidepoint(pos)
                     and next(k for k in kinds() if k.kind == bot.kind).parameters
                 ):
-                    self._focus = ("parameter", index)
+                    self._focus = ('parameter', index)
                 elif remove.collidepoint(pos) and len(self.bots) > 2:
                     self.bots.pop(index)
                 else:
@@ -177,26 +177,26 @@ class TournamentSetupScene:
 
     def _validate(self) -> TournamentOptions:
         if any(not bot.name.strip() for bot in self.bots):
-            raise ValueError("every bot needs a name")
+            raise ValueError('every bot needs a name')
         names = number_duplicates([bot.name.strip() for bot in self.bots])
         bots = {
             name: parse_bot(setting.spec)[1] for name, setting in zip(names, self.bots)
         }
-        games = int(self.numbers["games"] or 0)
+        games = int(self.numbers['games'] or 0)
         if games < 1:
-            raise ValueError("play at least one game")
-        table = int(self.numbers["table"]) if self.numbers["table"] else None
+            raise ValueError('play at least one game')
+        table = int(self.numbers['table']) if self.numbers['table'] else None
         if table is not None and not 2 <= table <= len(bots):
-            raise ValueError(f"players per game must be between 2 and {len(bots)}")
-        jobs = int(self.numbers["jobs"] or 0)
+            raise ValueError(f'players per game must be between 2 and {len(bots)}')
+        jobs = int(self.numbers['jobs'] or 0)
         if jobs < 1:
-            raise ValueError("use at least one worker")
+            raise ValueError('use at least one worker')
         return replace(
             self._defaults,
             bots=bots,
             games=games,
             players_per_game=table,
-            seed=int(self.numbers["seed"]) if self.numbers["seed"] else None,
+            seed=int(self.numbers['seed']) if self.numbers['seed'] else None,
             vengeance=self.vengeance,
             brutal=self.vengeance and self.brutal,
             jobs=jobs,
@@ -211,23 +211,23 @@ class TournamentSetupScene:
         """Draw the current settings and any validation error."""
         font, small = self._font, self._small_font
         screen.fill(BACKGROUND)
-        draw_text(screen, self._title_font, "TOURNAMENT SETUP", (90, 45), ACCENT)
-        draw_text(screen, self._heading_font, "Game mode", (90, 95))
-        draw_button(screen, font, BASE_BUTTON, "Flip 7", not self.vengeance)
-        draw_button(screen, font, VENGEANCE_BUTTON, "With a Vengeance", self.vengeance)
+        draw_text(screen, self._title_font, 'TOURNAMENT SETUP', (90, 45), ACCENT)
+        draw_text(screen, self._heading_font, 'Game mode', (90, 95))
+        draw_button(screen, font, BASE_BUTTON, 'Flip 7', not self.vengeance)
+        draw_button(screen, font, VENGEANCE_BUTTON, 'With a Vengeance', self.vengeance)
         draw_button(
             screen,
             font,
             BRUTAL_BUTTON,
-            f"Brutal: {'on' if self.brutal else 'off'}",
+            f'Brutal: {"on" if self.brutal else "off"}',
             self.brutal,
             disabled=not self.vengeance,
         )
         labels = (
-            ("games", GAMES_FIELD, "GAMES"),
-            ("table", TABLE_FIELD, "PER GAME (BLANK = ALL)"),
-            ("seed", SEED_FIELD, "SEED (BLANK = RANDOM)"),
-            ("jobs", JOBS_FIELD, "WORKERS"),
+            ('games', GAMES_FIELD, 'GAMES'),
+            ('table', TABLE_FIELD, 'PER GAME (BLANK = ALL)'),
+            ('seed', SEED_FIELD, 'SEED (BLANK = RANDOM)'),
+            ('jobs', JOBS_FIELD, 'WORKERS'),
         )
         for field, rect, label in labels:
             draw_text(screen, small, label, (rect.x, rect.y - 23), MUTED)
@@ -235,31 +235,31 @@ class TournamentSetupScene:
                 screen, font, rect, self.numbers[field], self._focus == (field, 0)
             )
 
-        draw_text(screen, self._heading_font, "Bots", (90, 310))
-        draw_text(screen, small, "NAME", (90, 342), MUTED)
-        draw_text(screen, small, "TYPE (CLICK TO CHANGE)", (425, 342), MUTED)
-        draw_text(screen, small, "PARAMETERS", (690, 342), MUTED)
+        draw_text(screen, self._heading_font, 'Bots', (90, 310))
+        draw_text(screen, small, 'NAME', (90, 342), MUTED)
+        draw_text(screen, small, 'TYPE (CLICK TO CHANGE)', (425, 342), MUTED)
+        draw_text(screen, small, 'PARAMETERS', (690, 342), MUTED)
         for index, bot in enumerate(self.bots):
             name, kind, parameter, remove = _row_rects(index)
-            draw_field(screen, font, name, bot.name, self._focus == ("name", index))
+            draw_field(screen, font, name, bot.name, self._focus == ('name', index))
             definition = next(k for k in kinds() if k.kind == bot.kind)
             draw_button(screen, font, kind, definition.label)
             if definition.parameters:
-                focused = self._focus == ("parameter", index)
+                focused = self._focus == ('parameter', index)
                 draw_field(screen, font, parameter, bot.parameter, focused)
             else:
                 draw_text(
-                    screen, font, "-", (parameter.x + 12, parameter.y + 10), MUTED
+                    screen, font, '-', (parameter.x + 12, parameter.y + 10), MUTED
                 )
-            draw_button(screen, font, remove, "Remove", disabled=len(self.bots) <= 2)
+            draw_button(screen, font, remove, 'Remove', disabled=len(self.bots) <= 2)
         draw_button(
-            screen, font, ADD_BUTTON, "Add bot", disabled=len(self.bots) >= MAX_BOTS
+            screen, font, ADD_BUTTON, 'Add bot', disabled=len(self.bots) >= MAX_BOTS
         )
-        draw_button(screen, font, START_BUTTON, "Start  [Enter]", selected=True)
+        draw_button(screen, font, START_BUTTON, 'Start  [Enter]', selected=True)
         draw_text(
             screen,
             small,
-            "Click a field to edit; Ctrl+A clears it. Esc quits.",
+            'Click a field to edit; Ctrl+A clears it. Esc quits.',
             (340, 816),
             MUTED,
         )

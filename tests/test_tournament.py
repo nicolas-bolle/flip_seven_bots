@@ -19,12 +19,12 @@ from flip_seven_bots.tournament.ratings import ELO_SCALE
 
 
 def threshold_bots(*thresholds: int) -> dict[str, ThresholdBot]:
-    return {f"t{threshold}": ThresholdBot(threshold) for threshold in thresholds}
+    return {f't{threshold}': ThresholdBot(threshold) for threshold in thresholds}
 
 
 class BrokenBot:
     def choose_action(self, observation: Observation) -> Action:
-        raise RuntimeError("worker bot failed")
+        raise RuntimeError('worker bot failed')
 
 
 def broken_factory(seed: int | None) -> BrokenBot:
@@ -33,7 +33,7 @@ def broken_factory(seed: int | None) -> BrokenBot:
 
 def traces(figure: go.Figure) -> tuple[Any, ...]:
     # plotly leaves Figure.data untyped, so Pylance can't infer the trace type.
-    return cast("tuple[Any, ...]", figure.data)
+    return cast('tuple[Any, ...]', figure.data)
 
 
 def test_two_player_elo_is_standard_elo() -> None:
@@ -53,9 +53,9 @@ def test_multiplayer_elo_rewards_places_and_conserves_rating() -> None:
 
 
 def test_elo_rejects_mismatched_or_solo_games() -> None:
-    with pytest.raises(ValueError, match="same length"):
+    with pytest.raises(ValueError, match='same length'):
         elo_update([1500, 1500], [1])
-    with pytest.raises(ValueError, match="two players"):
+    with pytest.raises(ValueError, match='two players'):
         elo_update([1500], [1])
 
 
@@ -64,27 +64,27 @@ def test_tournament_records_games_and_chains_ratings() -> None:
     games = result.games
 
     assert len(games) == 12
-    assert list(games.groupby("game")["seat"].apply(list)) == [[0, 1, 2]] * 4
-    assert (games.groupby("game")["place"].min() == 1).all()
-    assert (games["won"] == (games["place"] == 1)).all()
-    assert games["elo"].sub(games["elo_before"]).equals(games["elo_change"])
-    for _, history in games.groupby("player"):
+    assert list(games.groupby('game')['seat'].apply(list)) == [[0, 1, 2]] * 4
+    assert (games.groupby('game')['place'].min() == 1).all()
+    assert (games['won'] == (games['place'] == 1)).all()
+    assert games['elo'].sub(games['elo_before']).equals(games['elo_change'])
+    for _, history in games.groupby('player'):
         assert (
-            history["elo_before"].iloc[1:].tolist() == history["elo"].iloc[:-1].tolist()
+            history['elo_before'].iloc[1:].tolist() == history['elo'].iloc[:-1].tolist()
         )
 
     summary = result.summary
-    assert summary["rating"].is_monotonic_decreasing
-    assert summary["rating"].sum() == pytest.approx(
+    assert summary['rating'].is_monotonic_decreasing
+    assert summary['rating'].sum() == pytest.approx(
         4500
     )  # centred on the initial rating
-    assert (summary["rating_low"] <= summary["rating"]).all()
-    assert (summary["rating"] <= summary["rating_high"]).all()
-    last = games.groupby("player")["elo"].last()
-    assert summary["elo"].to_dict() == pytest.approx(last.to_dict())
-    assert summary["games"].tolist() == [4, 4, 4]
-    assert summary["wins"].sum() >= 4
-    assert summary["win_rate"]["t20"] == summary["wins"]["t20"] / 4
+    assert (summary['rating_low'] <= summary['rating']).all()
+    assert (summary['rating'] <= summary['rating_high']).all()
+    last = games.groupby('player')['elo'].last()
+    assert summary['elo'].to_dict() == pytest.approx(last.to_dict())
+    assert summary['games'].tolist() == [4, 4, 4]
+    assert summary['wins'].sum() >= 4
+    assert summary['win_rate']['t20'] == summary['wins']['t20'] / 4
 
 
 def test_tournament_is_reproducible_with_a_seed() -> None:
@@ -95,7 +95,7 @@ def test_tournament_is_reproducible_with_a_seed() -> None:
 
 
 def test_random_bots_are_reproducible_across_worker_counts() -> None:
-    bots = {"random": RandomBot(), "threshold": ThresholdBot(25)}
+    bots = {'random': RandomBot(), 'threshold': ThresholdBot(25)}
     sequential = run_tournament(bots, games=8, seed=42, jobs=1, progress=False)
     parallel = run_tournament(bots, games=8, seed=42, jobs=2, progress=False)
     pd.testing.assert_frame_equal(sequential.games, parallel.games)
@@ -110,7 +110,7 @@ def test_factory_gets_fresh_seed_and_bot_for_every_game() -> None:
         return RandomBot(seed)
 
     run_tournament(
-        {"random": factory, "threshold": ThresholdBot(30)},
+        {'random': factory, 'threshold': ThresholdBot(30)},
         games=5,
         seed=7,
         progress=False,
@@ -120,7 +120,7 @@ def test_factory_gets_fresh_seed_and_bot_for_every_game() -> None:
 
 def test_bot_class_is_accepted_as_a_seeded_factory() -> None:
     result = run_tournament(
-        {"random": RandomBot, "threshold": ThresholdBot(30)},
+        {'random': RandomBot, 'threshold': ThresholdBot(30)},
         games=2,
         seed=3,
         progress=False,
@@ -129,9 +129,9 @@ def test_bot_class_is_accepted_as_a_seeded_factory() -> None:
 
 
 def test_parallel_worker_errors_reach_the_caller() -> None:
-    with pytest.raises(RuntimeError, match="worker bot failed"):
+    with pytest.raises(RuntimeError, match='worker bot failed'):
         run_tournament(
-            {"broken": broken_factory, "other": ThresholdBot(0)},
+            {'broken': broken_factory, 'other': ThresholdBot(0)},
             games=3,
             seed=3,
             jobs=2,
@@ -148,20 +148,20 @@ def test_smaller_tables_seat_a_subset_and_unplayed_bots_are_unrated() -> None:
         initial_rating=1000,
     )
     assert len(result.games) == 2
-    benched = result.summary[result.summary["games"] == 0]
+    benched = result.summary[result.summary['games'] == 0]
     assert len(benched) == 1
-    assert benched["elo"].item() == 1000
+    assert benched['elo'].item() == 1000
     statistics = [
-        "win_rate",
-        "mean_place",
-        "mean_score",
-        "rating",
-        "rating_low",
-        "rating_high",
+        'win_rate',
+        'mean_place',
+        'mean_score',
+        'rating',
+        'rating_low',
+        'rating_high',
     ]
     assert benched[statistics].isna().all(axis=None)
     assert result.summary.index[-1] == benched.index[0]
-    assert result.summary["rating"].dropna().mean() == pytest.approx(1000)
+    assert result.summary['rating'].dropna().mean() == pytest.approx(1000)
 
 
 def test_default_table_seats_every_bot_up_to_the_player_limit() -> None:
@@ -170,34 +170,34 @@ def test_default_table_seats_every_bot_up_to_the_player_limit() -> None:
 
 
 @pytest.mark.parametrize(
-    ("bots", "options", "message"),
+    ('bots', 'options', 'message'),
     [
-        (threshold_bots(10, 20), {"games": 0}, "games"),
-        (threshold_bots(10), {"games": 1}, "players_per_game"),
+        (threshold_bots(10, 20), {'games': 0}, 'games'),
+        (threshold_bots(10), {'games': 1}, 'players_per_game'),
         (
             threshold_bots(10, 20),
-            {"games": 1, "players_per_game": 3},
-            "players_per_game",
+            {'games': 1, 'players_per_game': 3},
+            'players_per_game',
         ),
         (
             threshold_bots(10, 20),
-            {"games": 1, "players_per_game": 1},
-            "players_per_game",
+            {'games': 1, 'players_per_game': 1},
+            'players_per_game',
         ),
         (
             threshold_bots(*range(11)),
-            {"games": 1, "players_per_game": 11},
-            "players_per_game",
+            {'games': 1, 'players_per_game': 11},
+            'players_per_game',
         ),
-        (threshold_bots(10, 20), {"games": 2, "k_half_life": 0}, "k_half_life"),
+        (threshold_bots(10, 20), {'games': 2, 'k_half_life': 0}, 'k_half_life'),
     ],
     ids=[
-        "no-games",
-        "one-bot",
-        "table-too-big",
-        "table-too-small",
-        "table-over-player-limit",
-        "half-life",
+        'no-games',
+        'one-bot',
+        'table-too-big',
+        'table-too-small',
+        'table-over-player-limit',
+        'half-life',
     ],
 )
 def test_invalid_tournaments_are_rejected(
@@ -209,14 +209,14 @@ def test_invalid_tournaments_are_rejected(
 
 def test_progress_bar_can_be_disabled(capsys: pytest.CaptureFixture[str]) -> None:
     run_tournament(threshold_bots(10, 20), games=2, seed=0)
-    assert "Tournament" in capsys.readouterr().err
+    assert 'Tournament' in capsys.readouterr().err
     run_tournament(threshold_bots(10, 20), games=2, seed=0, progress=False)
-    assert capsys.readouterr().err == ""
+    assert capsys.readouterr().err == ''
 
 
 def test_elo_accepts_a_k_factor_per_player() -> None:
     assert elo_update([1500, 1500], [1, 2], k_factor=[32, 8]) == [1516, 1496]
-    with pytest.raises(ValueError, match="one K-factor per player"):
+    with pytest.raises(ValueError, match='one K-factor per player'):
         elo_update([1500, 1500], [1, 2], k_factor=[32])
 
 
@@ -229,7 +229,7 @@ def test_elo_k_factor_decays_with_games_played() -> None:
             k_half_life=k_half_life,
             progress=False,
         )
-        return result.games.groupby("game")["elo_change"].max().tolist()
+        return result.games.groupby('game')['elo_change'].max().tolist()
 
     constant, dynamic = changes(None), changes(4)
     # Both start at K=32, so the second game starts from the same ratings and
@@ -251,15 +251,15 @@ def test_bradley_terry_matches_the_closed_form_for_two_players() -> None:
 
 
 def test_ratings_cannot_be_shifted_by_game_order() -> None:
-    results = PairwiseResults(["a", "b", "c"])
+    results = PairwiseResults(['a', 'b', 'c'])
     games = [
-        (("a", "b", "c"), (1, 2, 3)),
-        (("b", "c", "a"), (1, 1, 3)),
-        (("c", "a", "b"), (2, 1, 3)),
+        (('a', 'b', 'c'), (1, 2, 3)),
+        (('b', 'c', 'a'), (1, 1, 3)),
+        (('c', 'a', 'b'), (2, 1, 3)),
     ]
     for unit, (players, places) in enumerate(games):
         results.add(unit, players, places)
-    reversed_results = PairwiseResults(["a", "b", "c"])
+    reversed_results = PairwiseResults(['a', 'b', 'c'])
     for unit, (players, places) in enumerate(reversed(games)):
         reversed_results.add(unit, players, places)
     np.testing.assert_allclose(results.fit()[0], reversed_results.fit()[0])
@@ -270,11 +270,11 @@ def two_player_results(
 ) -> PairwiseResults:
     """``a`` beats ``b`` in the first ``a_wins`` games; each game is recorded
     ``copies`` times, in the same unit if ``shared`` and otherwise separately."""
-    results = PairwiseResults(["a", "b"])
+    results = PairwiseResults(['a', 'b'])
     for game in range(games):
         for copy in range(copies):
             unit = game if shared else (game, copy)
-            results.add(unit, ["a", "b"], [1, 2] if game < a_wins else [2, 1])
+            results.add(unit, ['a', 'b'], [1, 2] if game < a_wins else [2, 1])
     return results
 
 
@@ -306,24 +306,24 @@ def test_rating_interval_counts_each_unit_once() -> None:
 def test_plots_show_ratings_intervals_and_elo_history() -> None:
     records = list(play_tournament(threshold_bots(10, 30), games=4, seed=1))
     result = TournamentResult.from_records(
-        records, ["t10", "t30", "idle"], initial_rating=1500
+        records, ['t10', 't30', 'idle'], initial_rating=1500
     )
-    summary = result.summary.dropna(subset=["rating"])
+    summary = result.summary.dropna(subset=['rating'])
 
     ratings = result.plot_ratings()
     assert [trace.x[0] for trace in traces(ratings)] == list(summary.index)
     for trace, (_, row) in zip(traces(ratings), summary.iterrows()):
-        assert trace.y[0] == row["rating"]
-        assert trace.y[0] + trace.error_y.array[0] == pytest.approx(row["rating_high"])
+        assert trace.y[0] == row['rating']
+        assert trace.y[0] + trace.error_y.array[0] == pytest.approx(row['rating_high'])
         assert trace.y[0] - trace.error_y.arrayminus[0] == pytest.approx(
-            row["rating_low"]
+            row['rating_low']
         )
 
     elo = result.plot_elo()
     assert {trace.legendgroup for trace in traces(elo)} == set(summary.index)
     for name, row in summary.iterrows():
         band, rating, history = (t for t in traces(elo) if t.legendgroup == name)
-        assert (min(band.y), max(band.y)) == (row["rating_low"], row["rating_high"])
-        assert set(rating.y) == {row["rating"]}
+        assert (min(band.y), max(band.y)) == (row['rating_low'], row['rating_high'])
+        assert set(rating.y) == {row['rating']}
         assert (history.x[0], history.y[0]) == (0, 1500)
-        assert (history.x[-1], history.y[-1]) == (4, row["elo"])
+        assert (history.x[-1], history.y[-1]) == (4, row['elo'])

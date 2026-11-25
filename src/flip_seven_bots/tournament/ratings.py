@@ -25,16 +25,16 @@ def elo_update(
     rating is unchanged.
     """
     if len(ratings) != len(places):
-        raise ValueError("ratings and places must have the same length")
+        raise ValueError('ratings and places must have the same length')
     if len(ratings) < 2:
-        raise ValueError("a rated game needs at least two players")
+        raise ValueError('a rated game needs at least two players')
     factors = (
         [k_factor] * len(ratings)
         if isinstance(k_factor, int | float)
         else list(k_factor)
     )
     if len(factors) != len(ratings):
-        raise ValueError("give one K-factor per player")
+        raise ValueError('give one K-factor per player')
     deltas = [0.0] * len(ratings)
     for i, j in combinations(range(len(ratings)), 2):
         expected = 1 / (1 + 10 ** ((ratings[j] - ratings[i]) / 400))

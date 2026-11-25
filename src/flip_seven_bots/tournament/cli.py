@@ -25,7 +25,7 @@ from .storage import save_results as save_results  # noqa: PLC0414
 if TYPE_CHECKING:
     from flip_seven_bots.bots.base import Bot
 
-DEFAULT_BOTS = ("random", "threshold:30", "expected")
+DEFAULT_BOTS = ('random', 'threshold:30', 'expected')
 DEFAULT_GAMES = 100
 
 
@@ -41,9 +41,9 @@ def _positive_int(value: str) -> int:
     try:
         number = int(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"{value!r} is not a whole number") from None
+        raise argparse.ArgumentTypeError(f'{value!r} is not a whole number') from None
     if number < 1:
-        raise argparse.ArgumentTypeError("must be at least one")
+        raise argparse.ArgumentTypeError('must be at least one')
     return number
 
 
@@ -51,9 +51,9 @@ def _positive_float(value: str) -> float:
     try:
         number = float(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"{value!r} is not a number") from None
+        raise argparse.ArgumentTypeError(f'{value!r} is not a number') from None
     if number <= 0:
-        raise argparse.ArgumentTypeError("must be positive")
+        raise argparse.ArgumentTypeError('must be positive')
     return number
 
 
@@ -88,10 +88,10 @@ def parse_launch(argv: Sequence[str] | None = None) -> TournamentLaunch:
     parser = _parser(launch=True)
     args = parser.parse_args(args_list)
     if (args.setup or args.no_setup) and not args.gui:
-        parser.error("--setup and --no-setup require --gui")
+        parser.error('--setup and --no-setup require --gui')
     options = _options(parser, args)
     gui = args.gui or not args_list
-    settings_given = any(arg != "--gui" for arg in args_list)
+    settings_given = any(arg != '--gui' for arg in args_list)
     return TournamentLaunch(
         options,
         gui=gui,
@@ -101,98 +101,98 @@ def parse_launch(argv: Sequence[str] | None = None) -> TournamentLaunch:
 
 def _parser(*, launch: bool) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="flip7 tournament",
+        prog='flip7 tournament',
         description=(
-            "Open the tournament setup window with no arguments. Pass tournament "
-            "options to run in the terminal, or add --gui to watch in the window."
+            'Open the tournament setup window with no arguments. Pass tournament '
+            'options to run in the terminal, or add --gui to watch in the window.'
         ),
     )
     if launch:
         parser.add_argument(
-            "--gui", action="store_true", help="use the window with tournament options"
+            '--gui', action='store_true', help='use the window with tournament options'
         )
         setup = parser.add_mutually_exclusive_group()
         setup.add_argument(
-            "--setup", action="store_true", help="show setup (with --gui)"
+            '--setup', action='store_true', help='show setup (with --gui)'
         )
         setup.add_argument(
-            "--no-setup", action="store_true", help="skip setup (with --gui)"
+            '--no-setup', action='store_true', help='skip setup (with --gui)'
         )
     parser.add_argument(
-        "--bot",
-        dest="bots",
-        action="append",
+        '--bot',
+        dest='bots',
+        action='append',
         type=named_bot,
-        metavar="[NAME=]KIND",
+        metavar='[NAME=]KIND',
         help=(
-            f"add a bot: {', '.join(kind.kind for kind in kinds())} (default lineup: "
-            f"{', '.join(DEFAULT_BOTS)})"
+            f'add a bot: {", ".join(kind.kind for kind in kinds())} (default lineup: '
+            f'{", ".join(DEFAULT_BOTS)})'
         ),
     )
     parser.add_argument(
-        "--games",
+        '--games',
         type=_positive_int,
         default=DEFAULT_GAMES,
-        metavar="N",
-        help="number of games to play (default: %(default)s)",
+        metavar='N',
+        help='number of games to play (default: %(default)s)',
     )
     parser.add_argument(
-        "--players-per-game",
+        '--players-per-game',
         type=_positive_int,
-        metavar="N",
+        metavar='N',
         help=(
-            "bots seated in each game, chosen at random "
-            f"(default: all, up to {MAX_PLAYERS})"
+            'bots seated in each game, chosen at random '
+            f'(default: all, up to {MAX_PLAYERS})'
         ),
     )
-    parser.add_argument("--seed", type=int, help="seed for seating, decks, and bots")
+    parser.add_argument('--seed', type=int, help='seed for seating, decks, and bots')
     parser.add_argument(
-        "--jobs",
+        '--jobs',
         type=_positive_int,
         default=1,
-        metavar="N",
-        help="number of parallel game workers (default: %(default)s)",
+        metavar='N',
+        help='number of parallel game workers (default: %(default)s)',
     )
     parser.add_argument(
-        "--vengeance", action="store_true", help="play With a Vengeance"
+        '--vengeance', action='store_true', help='play With a Vengeance'
     )
     parser.add_argument(
-        "--brutal", action="store_true", help="play With a Vengeance in Brutal Mode"
+        '--brutal', action='store_true', help='play With a Vengeance in Brutal Mode'
     )
     parser.add_argument(
-        "--k-factor",
+        '--k-factor',
         type=_positive_float,
         default=32.0,
-        metavar="K",
-        help="starting Elo K-factor (default: %(default)s)",
+        metavar='K',
+        help='starting Elo K-factor (default: %(default)s)',
     )
     k_schedule = parser.add_mutually_exclusive_group()
     k_schedule.add_argument(
-        "--k-half-life",
+        '--k-half-life',
         type=_positive_float,
         default=DEFAULT_K_HALF_LIFE,
-        metavar="N",
+        metavar='N',
         help="games after which a bot's Elo K-factor halves (default: %(default)s)",
     )
     k_schedule.add_argument(
-        "--constant-k", action="store_true", help="keep the Elo K-factor constant"
+        '--constant-k', action='store_true', help='keep the Elo K-factor constant'
     )
     parser.add_argument(
-        "--initial-rating",
+        '--initial-rating',
         type=float,
         default=1500.0,
-        metavar="R",
-        help="starting Elo rating (default: %(default)s)",
+        metavar='R',
+        help='starting Elo rating (default: %(default)s)',
     )
     parser.add_argument(
-        "--output",
+        '--output',
         type=Path,
-        metavar="DIR",
-        help="save games.csv and summary.csv in this folder",
+        metavar='DIR',
+        help='save games.csv and summary.csv in this folder',
     )
-    parser.add_argument("--quiet", action="store_true", help="hide the progress bar")
+    parser.add_argument('--quiet', action='store_true', help='hide the progress bar')
     parser.add_argument(
-        "--plots", action="store_true", help="save HTML plots (requires --output)"
+        '--plots', action='store_true', help='save HTML plots (requires --output)'
     )
     return parser
 
@@ -201,16 +201,16 @@ def _options(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> TournamentOptions:
     if args.plots and args.output is None:
-        parser.error("--plots requires --output")
+        parser.error('--plots requires --output')
 
     named = args.bots or [named_bot(spec) for spec in DEFAULT_BOTS]
     if len(named) < 2:
-        parser.error("a tournament needs at least two bots")
+        parser.error('a tournament needs at least two bots')
     names = number_duplicates([name for name, _ in named])
     bots = {name: bot for name, (_, bot) in zip(names, named)}
     largest = max_table_size(len(bots))
     if args.players_per_game is not None and not 2 <= args.players_per_game <= largest:
-        parser.error(f"--players-per-game must be between 2 and {largest}")
+        parser.error(f'--players-per-game must be between 2 and {largest}')
     return TournamentOptions(
         bots=bots,
         games=args.games,
@@ -230,24 +230,24 @@ def _options(
 
 def format_summary(summary: pd.DataFrame) -> str:
     """Render a tournament summary as an aligned text table, with intervals as ranges."""
-    table = summary.drop(columns=["rating_low", "rating_high"])
+    table = summary.drop(columns=['rating_low', 'rating_high'])
     table.insert(
-        list(table.columns).index("rating") + 1,
-        "95% interval",
+        list(table.columns).index('rating') + 1,
+        '95% interval',
         [
-            "-" if pd.isna(low) else f"{low:.0f}-{high:.0f}"
-            for low, high in zip(summary["rating_low"], summary["rating_high"])
+            '-' if pd.isna(low) else f'{low:.0f}-{high:.0f}'
+            for low, high in zip(summary['rating_low'], summary['rating_high'])
         ],
     )
     return table.to_string(
         formatters={
-            "win_rate": "{:.0%}".format,
-            "mean_place": "{:.2f}".format,
-            "mean_score": "{:.1f}".format,
-            "rating": "{:.0f}".format,
-            "elo": "{:.0f}".format,
+            'win_rate': '{:.0%}'.format,
+            'mean_place': '{:.2f}'.format,
+            'mean_score': '{:.1f}'.format,
+            'rating': '{:.0f}'.format,
+            'elo': '{:.0f}'.format,
         },
-        na_rep="-",
+        na_rep='-',
     )
 
 
@@ -258,4 +258,4 @@ def run(options: TournamentOptions) -> None:
     print(format_summary(result.summary))
     if options.output is not None:
         games, summary = save_results(result, options.output, options)
-        print(f"Saved {games} and {summary}")
+        print(f'Saved {games} and {summary}')

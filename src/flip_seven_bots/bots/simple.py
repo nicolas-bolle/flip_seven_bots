@@ -42,7 +42,7 @@ class ThresholdBot:
 
     def __init__(self, threshold: int):
         if threshold < 0:
-            raise ValueError("threshold must not be negative")
+            raise ValueError('threshold must not be negative')
         self.threshold = threshold
 
     def choose_action(self, observation: Observation) -> Action:

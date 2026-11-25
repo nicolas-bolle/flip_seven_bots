@@ -98,11 +98,11 @@ class Action:
             self.target is not None
         ):
             raise ValueError(
-                "an action has a target exactly when it chooses a target or card"
+                'an action has a target exactly when it chooses a target or card'
             )
         if (self.kind is ActionType.CHOOSE_CARD) != (self.card_index is not None):
             raise ValueError(
-                "an action has a card index exactly when it chooses a card"
+                'an action has a card index exactly when it chooses a card'
             )
 
 
@@ -409,5 +409,5 @@ class Observation:
         or ``next_draws`` are unavailable.
         """
         if self._sampler is None:
-            raise ValueError("observation is not linked to a game")
+            raise ValueError('observation is not linked to a game')
         return self._sampler(rng, next_draws)

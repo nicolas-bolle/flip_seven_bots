@@ -36,7 +36,7 @@ from flip_seven_bots.gui.play.game_scene import (
 )
 from flip_seven_bots.gui.play.table import Seat, Table
 
-NAMES = ("You", "Random bot", "Threshold bot")
+NAMES = ('You', 'Random bot', 'Threshold bot')
 FREEZE = Card(CardType.FREEZE)
 
 
@@ -59,13 +59,13 @@ def make_scene(
     player_count: int = 3,
     rules: Rules | None = None,
     seats: list[Seat] | None = None,
-    report_dir: Path = Path("unused-bug-reports"),
+    report_dir: Path = Path('unused-bug-reports'),
     animate_deal: bool = False,
 ) -> tuple[GameScene, Table]:
     """Seat 0 is dealt first and acts first; by default it is the only human and bots stay."""
     if seats is None:
-        seats = [Seat("You")] + [
-            Seat(f"Bot {i}", StayBot()) for i in range(1, player_count)
+        seats = [Seat('You')] + [
+            Seat(f'Bot {i}', StayBot()) for i in range(1, player_count)
         ]
     table = Table(
         seats,
@@ -141,7 +141,7 @@ def test_vengeance_cards_sort_into_number_and_modifier_rows_and_render() -> None
         scene._draw_card(surface, card, rect)
 
 
-@pytest.mark.parametrize("kind", [CardType.STEAL, CardType.DISCARD])
+@pytest.mark.parametrize('kind', [CardType.STEAL, CardType.DISCARD])
 def test_vengeance_card_selection_uses_highlighted_cards(kind: CardType) -> None:
     scene, table = make_scene(numbers(9, 2, 4) + [Card(kind)], rules=VengeanceRules())
     press(scene, pygame.K_h)
@@ -168,7 +168,7 @@ def test_vengeance_card_selection_uses_highlighted_cards(kind: CardType) -> None
 
 
 @pytest.mark.parametrize(
-    "card",
+    'card',
     [
         Card(CardType.SUBTRACT, 4),
         Card(CardType.DIVIDE, 2),
@@ -221,7 +221,7 @@ def test_swap_uses_two_card_clicks_and_blocks_selection_during_dialog() -> None:
     assert numbers(9)[0] in table.observation.players[1].cards
 
 
-@pytest.mark.parametrize("take_bonus", [True, False])
+@pytest.mark.parametrize('take_bonus', [True, False])
 def test_brutal_flip_seven_can_take_or_subtract_the_bonus(
     take_bonus: bool,
     monkeypatch: pytest.MonkeyPatch,
@@ -235,7 +235,7 @@ def test_brutal_flip_seven_can_take_or_subtract_the_bonus(
         press(scene, pygame.K_h)
         if table.human_to_act is None and table.round_summary is None:
             scene.update(scene._now)
-    assert any(b.label.startswith("Take bonus") for b in play_buttons(scene))
+    assert any(b.label.startswith('Take bonus') for b in play_buttons(scene))
     scene.render(pygame.Surface((1280, 900)))
     press(scene, pygame.K_b if take_bonus else pygame.K_2)
     assert table.round_summary is not None
@@ -243,17 +243,17 @@ def test_brutal_flip_seven_can_take_or_subtract_the_bonus(
     texts: list[str] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     scene.render(pygame.Surface((1280, 900)))
-    assert any("Bot 1:  -13" in text for text in texts) is not take_bonus
+    assert any('Bot 1:  -13' in text for text in texts) is not take_bonus
 
 
-@pytest.mark.parametrize("brutal", [False, True])
+@pytest.mark.parametrize('brutal', [False, True])
 def test_vengeance_game_completes_through_scene(brutal: bool) -> None:
     table = Table(
-        [Seat("Bot 1", ThresholdBot(25)), Seat("Bot 2", ThresholdBot(25))],
+        [Seat('Bot 1', ThresholdBot(25)), Seat('Bot 2', ThresholdBot(25))],
         seed=42,
         rules=VengeanceRules(brutal=brutal),
         bot_delay_ms=0,
@@ -274,23 +274,23 @@ def test_vengeance_game_completes_through_scene(brutal: bool) -> None:
 
 def test_buttons_offer_the_legal_actions_with_seat_names() -> None:
     scene, _ = make_scene(numbers(3, 1, 2) + [FREEZE])
-    assert [b.label for b in play_buttons(scene)] == ["Hit  [H]", "Stay  [S]"]
+    assert [b.label for b in play_buttons(scene)] == ['Hit  [H]', 'Stay  [S]']
 
     press(scene, pygame.K_h)
     assert [(b.label, b.shortcut) for b in play_buttons(scene)] == [
-        ("You  [1]", pygame.K_1),
-        ("Bot 1  [2]", pygame.K_2),
-        ("Bot 2  [3]", pygame.K_3),
+        ('You  [1]', pygame.K_1),
+        ('Bot 1  [2]', pygame.K_2),
+        ('Bot 2  [3]', pygame.K_3),
     ]
 
 
 def test_clicking_buttons_hits_and_chooses_a_target() -> None:
     scene, table = make_scene(numbers(3, 1, 2) + [FREEZE])
-    click(scene, button(scene, "Hit"))
+    click(scene, button(scene, 'Hit'))
     assert isinstance(table.observation.decision, ChooseTarget)
     assert table.observation.decision.card == FREEZE
 
-    click(scene, button(scene, "Bot 2"))
+    click(scene, button(scene, 'Bot 2'))
     assert table.observation.players[2].status is PlayerStatus.STAYED
     assert FREEZE in table.observation.players[2].cards
     assert play_buttons(scene) == []
@@ -316,7 +316,7 @@ def test_continue_dismisses_round_summary() -> None:
     press(scene, pygame.K_s)
     scene.update(scene._now)
     scene.update(scene._now)
-    assert [b.label for b in play_buttons(scene)] == ["Continue  [Enter]"]
+    assert [b.label for b in play_buttons(scene)] == ['Continue  [Enter]']
     scene.render(pygame.Surface((1280, 900)))
 
     press(scene, pygame.K_RETURN)
@@ -330,7 +330,7 @@ def test_play_again_restarts_finished_game() -> None:
     scene.update(scene._now)
     press(scene, pygame.K_RETURN)
     finished = table.game
-    assert [b.label for b in play_buttons(scene)] == ["Play again  [R]"]
+    assert [b.label for b in play_buttons(scene)] == ['Play again  [R]']
     scene.render(pygame.Surface((1280, 900)))
 
     press(scene, pygame.K_r)
@@ -340,12 +340,12 @@ def test_play_again_restarts_finished_game() -> None:
 def test_humans_take_turns_and_are_named_in_the_prompt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seats = [Seat("Ann"), Seat("Ben"), Seat("Bot", StayBot())]
+    seats = [Seat('Ann'), Seat('Ben'), Seat('Bot', StayBot())]
     scene, table = make_scene(numbers(3, 1, 2), seats=seats)
     texts: list[str] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
 
@@ -362,7 +362,7 @@ def test_humans_take_turns_and_are_named_in_the_prompt(
     assert play_buttons(scene) == []
 
 
-@pytest.mark.parametrize("player_count", range(1, 7))
+@pytest.mark.parametrize('player_count', range(1, 7))
 def test_target_buttons_fit_on_screen_for_any_player_count(player_count: int) -> None:
     scene, table = make_scene(
         numbers(*range(1, player_count + 1)) + [FREEZE], player_count
@@ -391,7 +391,7 @@ def test_large_hand_renders_in_smallest_panel() -> None:
     scene.render(pygame.Surface((1280, 900)))
 
 
-@pytest.mark.parametrize("player_count", [3, 6])
+@pytest.mark.parametrize('player_count', [3, 6])
 def test_non_number_cards_are_above_numbers(
     player_count: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -407,7 +407,7 @@ def test_non_number_cards_are_above_numbers(
     )
     cards: list[tuple[Card, pygame.Rect]] = []
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, rect: cards.append((card, rect))
+        scene, '_draw_card', lambda _screen, card, rect: cards.append((card, rect))
     )
     panel = pygame.Rect(30, 112, 895, (582 // player_count) - 12)
     scene._draw_player(pygame.Surface((1280, 900)), player, panel, table.observation)
@@ -436,7 +436,7 @@ def test_hand_cards_are_sorted_within_each_group(
     player = replace(table.observation.players[0], cards=hand)
     drawn: list[tuple[Card, pygame.Rect]] = []
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, rect: drawn.append((card, rect))
+        scene, '_draw_card', lambda _screen, card, rect: drawn.append((card, rect))
     )
     scene._draw_player(
         pygame.Surface((1280, 900)),
@@ -471,32 +471,32 @@ def test_live_score_uses_round_scoring_and_total_score(
     texts: list[str] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     scene.render(pygame.Surface((1280, 900)))
     assert table.observation.players[0].round_score == 14
-    assert "Total: 0    Live round: 14" in texts
+    assert 'Total: 0    Live round: 14' in texts
 
     press(scene, pygame.K_s)
     press(scene, pygame.K_RETURN)
     texts.clear()
     scene.render(pygame.Surface((1280, 900)))
-    assert "Total: 14    Live round: 9" in texts
+    assert 'Total: 14    Live round: 9' in texts
 
 
 def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None:
-    scene, table = make_scene(numbers(3, 2, 3), seats=[Seat("Ann"), Seat("Ben")])
+    scene, table = make_scene(numbers(3, 2, 3), seats=[Seat('Ann'), Seat('Ben')])
     press(scene, pygame.K_h)
     texts: list[str] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     scene.render(pygame.Surface((1280, 900)))
     assert table.observation.players[0].status is PlayerStatus.BUSTED
-    assert "Total: 0    Live round: 0" in texts
+    assert 'Total: 0    Live round: 0' in texts
 
 
 def test_unresolved_card_shows_in_its_drawers_panel_without_changing_live_score(
@@ -511,16 +511,16 @@ def test_unresolved_card_shows_in_its_drawers_panel_without_changing_live_score(
     drawn: list[Card] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card)
+        scene, '_draw_card', lambda _screen, card, _rect: drawn.append(card)
     )
     scene.render(pygame.Surface((1280, 900)))
     assert isinstance(table.observation.decision, ChooseTarget)
     assert modifier in drawn
-    assert "Total: 0    Live round: 5" in texts
+    assert 'Total: 0    Live round: 5' in texts
 
 
 def test_sorted_number_cards_wrap_in_ascending_order(
@@ -532,7 +532,7 @@ def test_sorted_number_cards_wrap_in_ascending_order(
     )
     drawn: list[tuple[Card, pygame.Rect]] = []
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, rect: drawn.append((card, rect))
+        scene, '_draw_card', lambda _screen, card, rect: drawn.append((card, rect))
     )
     scene._draw_player(
         pygame.Surface((1280, 900)),
@@ -561,7 +561,7 @@ def test_animation_lands_at_new_cards_sorted_position(
 
     drawn: list[tuple[Card, pygame.Rect]] = []
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, rect: drawn.append((card, rect))
+        scene, '_draw_card', lambda _screen, card, rect: drawn.append((card, rect))
     )
     scene._draw_player(
         pygame.Surface((1280, 900)),
@@ -587,12 +587,12 @@ def test_deal_flips_and_moves_cards_before_revealing_their_hands(
     texts: list[str] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     scene.render(pygame.Surface((1280, 900)))
-    assert "Total: 0    Live round: ..." in texts
-    assert not any("drew" in text for text in texts)
+    assert 'Total: 0    Live round: ...' in texts
+    assert not any('drew' in text for text in texts)
 
     def frame() -> pygame.Rect:
         screen = pygame.Surface((1280, 900), pygame.SRCALPHA)
@@ -607,7 +607,7 @@ def test_deal_flips_and_moves_cards_before_revealing_their_hands(
 
     drawn: list[Card] = []
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card)
+        scene, '_draw_card', lambda _screen, card, _rect: drawn.append(card)
     )
     scene.update(450)
     scene.render(pygame.Surface((1280, 900)))
@@ -618,14 +618,14 @@ def test_deal_flips_and_moves_cards_before_revealing_their_hands(
     scene.render(pygame.Surface((1280, 900)))
     assert drawn == [Card(CardType.NUMBER, 3)]
     finish_animations(scene)
-    assert [b.label for b in play_buttons(scene)] == ["Hit  [H]", "Stay  [S]"]
+    assert [b.label for b in play_buttons(scene)] == ['Hit  [H]', 'Stay  [S]']
 
 
 def test_flip_three_animates_each_draw_in_order() -> None:
     flip_three = Card(CardType.FLIP_THREE)
     scene, table = make_scene(
         numbers(1, 2) + [flip_three] + numbers(3, 4, 5),
-        seats=[Seat("Ann"), Seat("Ben")],
+        seats=[Seat('Ann'), Seat('Ben')],
     )
     press(scene, pygame.K_h)
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_2))
@@ -645,7 +645,7 @@ def test_flip_three_animates_each_draw_in_order() -> None:
 
 def test_bot_delay_starts_after_deal_animation() -> None:
     table = Table(
-        [Seat("Bot", StayBot())],
+        [Seat('Bot', StayBot())],
         new_game=lambda count, _seed: Game(count, deck=Deck.stacked(numbers(3, 4))),
     )
     scene = GameScene(table)
@@ -661,11 +661,11 @@ def test_bot_delay_starts_after_deal_animation() -> None:
 def test_animations_do_not_hide_an_existing_duplicate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    scene, table = make_scene(numbers(3, 2, 3), seats=[Seat("Ann"), Seat("Ben")])
+    scene, table = make_scene(numbers(3, 2, 3), seats=[Seat('Ann'), Seat('Ben')])
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h))
     drawn: list[Card] = []
     monkeypatch.setattr(
-        scene, "_draw_card", lambda _screen, card, _rect: drawn.append(card)
+        scene, '_draw_card', lambda _screen, card, _rect: drawn.append(card)
     )
     player = table.observation.players[0]
     scene._draw_player(
@@ -692,14 +692,14 @@ def test_round_summary_waits_for_last_draw_then_next_deal_waits_for_summary(
     texts: list[str] = []
     monkeypatch.setattr(
         scene,
-        "_text",
+        '_text',
         lambda _screen, _font, text, _position, _color=None: texts.append(text),
     )
     scene.render(pygame.Surface((1280, 900)))
-    assert any(text.startswith("Round 1  |") for text in texts)
+    assert any(text.startswith('Round 1  |') for text in texts)
     scene.update(scene._now)
     scene.update(scene._now + CARD_ANIMATION_MS)
-    assert [b.label for b in play_buttons(scene)] == ["Continue  [Enter]"]
+    assert [b.label for b in play_buttons(scene)] == ['Continue  [Enter]']
 
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
     assert table.round_summary is None
@@ -733,19 +733,19 @@ def test_bug_report_dialog_saves_message_and_resumes_play(tmp_path: Path) -> Non
 
     scene.update(10_000)
     assert table.game.current_player == 1  # bots wait while the dialog is open
-    type_text(scene, "Bot skippedd")
+    type_text(scene, 'Bot skippedd')
     press(scene, pygame.K_BACKSPACE)
     scene.handle_event(
         pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=pygame.KMOD_LSHIFT)
     )
-    type_text(scene, "its turn")
+    type_text(scene, 'its turn')
     scene.render(pygame.Surface((1280, 900)))
     press(scene, pygame.K_RETURN)
 
     [report] = tmp_path.iterdir()
-    assert "Bot skipped\nits turn" in report.read_text()
+    assert 'Bot skipped\nits turn' in report.read_text()
     assert not scene.dialog_open
-    assert scene.notice == f"Bug report saved to {report}"
+    assert scene.notice == f'Bug report saved to {report}'
     scene.update(10_000)
     assert table.game.current_player == 2
 
@@ -754,14 +754,14 @@ def test_typing_in_the_dialog_does_not_trigger_game_shortcuts(tmp_path: Path) ->
     scene, table = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
     press(scene, pygame.K_F1)
     press(scene, pygame.K_h)
-    type_text(scene, "h")
+    type_text(scene, 'h')
     assert table.moves == ()
 
 
 def test_empty_bug_report_is_not_saved(tmp_path: Path) -> None:
     scene, _ = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
     press(scene, pygame.K_F1)
-    type_text(scene, "   ")
+    type_text(scene, '   ')
     press(scene, pygame.K_RETURN)
     assert scene.dialog_open
     assert list(tmp_path.iterdir()) == []
@@ -769,8 +769,8 @@ def test_empty_bug_report_is_not_saved(tmp_path: Path) -> None:
 
 def test_cancelling_the_dialog_saves_nothing(tmp_path: Path) -> None:
     scene, table = make_scene(numbers(3, 1, 2), report_dir=tmp_path)
-    click(scene, button(scene, "Report bug"))
-    type_text(scene, "never mind")
+    click(scene, button(scene, 'Report bug'))
+    type_text(scene, 'never mind')
     press(scene, pygame.K_ESCAPE)
     assert not scene.dialog_open
     assert not table.paused
@@ -778,11 +778,11 @@ def test_cancelling_the_dialog_saves_nothing(tmp_path: Path) -> None:
 
 
 def test_save_failure_keeps_the_dialog_open(tmp_path: Path) -> None:
-    blocked = tmp_path / "file"
-    blocked.write_text("not a folder")
+    blocked = tmp_path / 'file'
+    blocked.write_text('not a folder')
     scene, _ = make_scene(numbers(3, 1, 2), report_dir=blocked)
     press(scene, pygame.K_F1)
-    type_text(scene, "help")
+    type_text(scene, 'help')
     press(scene, pygame.K_RETURN)
     assert scene.dialog_open
 
@@ -790,19 +790,19 @@ def test_save_failure_keeps_the_dialog_open(tmp_path: Path) -> None:
 def test_long_report_messages_wrap_in_the_dialog() -> None:
     scene, _ = make_scene(numbers(3, 1, 2))
     press(scene, pygame.K_F1)
-    type_text(scene, "word " * 400 + "x" * 300)
+    type_text(scene, 'word ' * 400 + 'x' * 300)
     scene.render(pygame.Surface((1280, 900)))
 
 
 @pytest.mark.parametrize(
-    ("card", "label"),
+    ('card', 'label'),
     [
-        (Card(CardType.NUMBER, 12), "12"),
-        (Card(CardType.ADD, 6), "+6"),
-        (Card(CardType.MULTIPLY, 2), "x2"),
-        (FREEZE, "FREEZE"),
-        (Card(CardType.FLIP_THREE), "FLIP 3"),
-        (Card(CardType.SECOND_CHANCE), "SECOND CHANCE"),
+        (Card(CardType.NUMBER, 12), '12'),
+        (Card(CardType.ADD, 6), '+6'),
+        (Card(CardType.MULTIPLY, 2), 'x2'),
+        (FREEZE, 'FREEZE'),
+        (Card(CardType.FLIP_THREE), 'FLIP 3'),
+        (Card(CardType.SECOND_CHANCE), 'SECOND CHANCE'),
     ],
 )
 def test_card_labels_show_values_signs_and_action_names(card: Card, label: str) -> None:
@@ -810,21 +810,21 @@ def test_card_labels_show_values_signs_and_action_names(card: Card, label: str) 
 
 
 @pytest.mark.parametrize(
-    ("event", "message"),
+    ('event', 'message'),
     [
-        (RoundStarted(2), "Round 2 started"),
-        (DiscardShuffled(2), "Discard pile reshuffled"),
-        (CardDrawn(2, 0, Card(CardType.NUMBER, 4)), "You drew 4"),
-        (ActionChosen(2, 1, Action(ActionType.STAY)), "Random bot chose stay"),
+        (RoundStarted(2), 'Round 2 started'),
+        (DiscardShuffled(2), 'Discard pile reshuffled'),
+        (CardDrawn(2, 0, Card(CardType.NUMBER, 4)), 'You drew 4'),
+        (ActionChosen(2, 1, Action(ActionType.STAY)), 'Random bot chose stay'),
         (
             ActionChosen(2, 0, Action(ActionType.CHOOSE_TARGET, 2)),
-            "You chose Threshold bot",
+            'You chose Threshold bot',
         ),
         (
             RoundEnded(2, RoundResult(2, (0, 40, 0), (0, 40, 0), 1)),
-            "Random bot got Flip 7!",
+            'Random bot got Flip 7!',
         ),
-        (RoundEnded(2, RoundResult(2, (0, 0, 0), (0, 0, 0), None)), "Round 2 ended"),
+        (RoundEnded(2, RoundResult(2, (0, 0, 0), (0, 0, 0), None)), 'Round 2 ended'),
     ],
 )
 def test_events_are_described_with_seat_names(event: GameEvent, message: str) -> None:

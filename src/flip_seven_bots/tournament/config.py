@@ -59,20 +59,20 @@ class TournamentOptions:
 
     def describe(self) -> str:
         """A one-line description of the settings."""
-        mode = "Flip 7"
+        mode = 'Flip 7'
         if self.vengeance:
-            mode = "With a Vengeance (Brutal)" if self.brutal else "With a Vengeance"
+            mode = 'With a Vengeance (Brutal)' if self.brutal else 'With a Vengeance'
         table = self.players_per_game or max_table_size(len(self.bots))
-        return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
+        return f'{len(self.bots)} bots, {self.games} games of {table} players, {mode}'
 
     def _settings(self) -> dict:
         return {
-            "games": self.games,
-            "players_per_game": self.players_per_game,
-            "rules": self.rules,
-            "seed": self.seed,
-            "k_factor": self.k_factor,
-            "k_half_life": self.k_half_life,
-            "initial_rating": self.initial_rating,
-            "jobs": self.jobs,
+            'games': self.games,
+            'players_per_game': self.players_per_game,
+            'rules': self.rules,
+            'seed': self.seed,
+            'k_factor': self.k_factor,
+            'k_half_life': self.k_half_life,
+            'initial_rating': self.initial_rating,
+            'jobs': self.jobs,
         }
