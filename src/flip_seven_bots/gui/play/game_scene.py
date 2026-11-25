@@ -35,9 +35,11 @@ from ..common.theme import (
     BACKGROUND,
     BUTTON,
     BUTTON_HOVER,
+    DANGER,
     MUTED,
     PANEL,
     PANEL_ALT,
+    PROMPT,
     TEXT,
 )
 from .bug_report import write_report
@@ -726,12 +728,12 @@ class GameScene:
         color = PANEL_ALT if player.player in self._table.humans else PANEL
         pygame.draw.rect(screen, color, rect, border_radius=12)
         if player.player == observation.current_player:
-            pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=12)
+            pygame.draw.rect(screen, PROMPT, rect, width=3, border_radius=12)
 
-        status = {
-            PlayerStatus.ACTIVE: 'ACTIVE',
-            PlayerStatus.STAYED: 'STAYED',
-            PlayerStatus.BUSTED: 'BUSTED',
+        status, status_color = {
+            PlayerStatus.ACTIVE: ('ACTIVE', ACTIVE),
+            PlayerStatus.STAYED: ('STAYED', ACCENT),
+            PlayerStatus.BUSTED: ('BUSTED', DANGER),
         }[player.status]
         waiting = any(
             draw.event.player == player.player
@@ -739,7 +741,7 @@ class GameScene:
             for draw in self._draws
         )
         if waiting:
-            status = '...'
+            status, status_color = '...', MUTED
         key = _seat_key(player.player)
         if key is not None:
             badge = pygame.Rect(rect.x + 12, rect.y + 10, 24, 24)
@@ -762,7 +764,7 @@ class GameScene:
             self._small_font,
             status,
             (rect.x + 58 + self._heading_font.size(name)[0], rect.y + 18),
-            ACCENT,
+            status_color,
         )
 
         cards = _shown_cards(player)
@@ -976,6 +978,8 @@ class GameScene:
                 case _:
                     message = f'{turn}: hit or stay'
         lines = _wrap(message, self._heading_font, TURN_BOX.width - 32)[:2]
+        if hint is not None:
+            pygame.draw.rect(screen, PROMPT, TURN_BOX, width=3, border_radius=12)
         for index, line in enumerate(lines):
             position = (TURN_BOX.x + 16, TURN_BOX.y + 16 + index * 26)
             self._text(screen, self._heading_font, line, position)
@@ -1120,11 +1124,11 @@ class GameScene:
         ):
             if hovered:
                 glow = pygame.Surface(button.rect.size, pygame.SRCALPHA)
-                pygame.draw.rect(glow, (*ACCENT, 40), glow.get_rect(), border_radius=12)
+                pygame.draw.rect(glow, (*PROMPT, 40), glow.get_rect(), border_radius=12)
                 screen.blit(glow, button.rect)
             pygame.draw.rect(
                 screen,
-                ACCENT,
+                PROMPT,
                 button.rect,
                 width=4 if hovered else 2,
                 border_radius=12,
@@ -1136,14 +1140,22 @@ class GameScene:
         ):
             pygame.draw.rect(
                 screen,
-                ACCENT if hovered else ACTIVE,
+                PROMPT,
                 button.rect,
-                width=2,
+                width=3 if hovered else 2,
                 border_radius=6,
             )
             return
         pygame.draw.rect(
             screen, BUTTON_HOVER if hovered else BUTTON, button.rect, border_radius=8
         )
+        if isinstance(button.action, Action):
+            pygame.draw.rect(
+                screen,
+                PROMPT,
+                button.rect,
+                width=3 if hovered else 2,
+                border_radius=8,
+            )
         text = self._font.render(button.label, True, TEXT)
         screen.blit(text, text.get_rect(center=button.rect.center))

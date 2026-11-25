@@ -27,6 +27,7 @@ from flip_seven_bots.game import (
     VengeanceRules,
 )
 from flip_seven_bots.gui.common.text import card_label, event_text
+from flip_seven_bots.gui.common.theme import ACTIVE, DANGER
 from flip_seven_bots.gui.play.game_scene import (
     CARD_ANIMATION_MS,
     PLAYER_AREA,
@@ -532,6 +533,24 @@ def test_busted_hand_live_score_is_zero(monkeypatch: pytest.MonkeyPatch) -> None
     scene.render(pygame.Surface((1280, 900)))
     assert table.observation.players[0].status is PlayerStatus.BUSTED
     assert 'Total: 0    Live round: 0' in texts
+
+
+def test_status_text_is_green_when_active_and_red_when_busted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scene, _ = make_scene(numbers(3, 2, 3), seats=[Seat('Ann'), Seat('Ben')])
+    press(scene, pygame.K_h)
+    statuses: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        scene,
+        '_text',
+        lambda _screen, _font, text, _position, color=None: statuses.append(
+            (text, color)
+        ),
+    )
+    scene.render(pygame.Surface((1280, 900)))
+    assert ('BUSTED', DANGER) in statuses
+    assert ('ACTIVE', ACTIVE) in statuses
 
 
 def test_unresolved_card_shows_in_its_drawers_panel_without_changing_live_score(
