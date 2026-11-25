@@ -25,8 +25,14 @@ from .storage import save_results as save_results  # noqa: PLC0414
 if TYPE_CHECKING:
     from flip_seven_bots.bots.base import Bot
 
-DEFAULT_BOTS = ('random', 'threshold:30', 'expected')
-DEFAULT_GAMES = 100
+DEFAULT_BOTS = (
+    'Random=random',
+    'threshold:20',
+    'threshold:30',
+    'threshold:40',
+    'Expected value=expected',
+)
+DEFAULT_GAMES = 500
 
 
 def named_bot(spec: str) -> tuple[str, Bot]:
@@ -89,8 +95,8 @@ def parse_launch(argv: Sequence[str] | None = None) -> TournamentLaunch:
     args = parser.parse_args(args_list)
     if (args.setup or args.no_setup) and not args.gui:
         parser.error('--setup and --no-setup require --gui')
-    options = _options(parser, args)
     gui = args.gui or not args_list
+    options = _options(parser, args)
     settings_given = any(arg != '--gui' for arg in args_list)
     return TournamentLaunch(
         options,
@@ -125,8 +131,8 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
         type=named_bot,
         metavar='[NAME=]KIND',
         help=(
-            f'add a bot: {", ".join(kind.kind for kind in kinds())} (default lineup: '
-            f'{", ".join(DEFAULT_BOTS)})'
+            f'add a bot: {", ".join(kind.kind for kind in kinds())} '
+            f'(default lineup: {", ".join(DEFAULT_BOTS)})'
         ),
     )
     parser.add_argument(

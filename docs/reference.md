@@ -299,8 +299,8 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 
 | Option | Effect |
 | --- | --- |
-| `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: `random`, `threshold:30`, `expected` |
-| `--games N` | Number of games (default 100) |
+| `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: Random, Threshold 20, Threshold 30, Threshold 40, and Expected value |
+| `--games N` | Number of games (default 500) |
 | `--players-per-game N` | Bots seated in each game (default: all, up to 10) |
 | `--seed N` | Seed for seating, decks, and bots |
 | `--jobs N` | Parallel game workers (default 1) |
@@ -317,14 +317,17 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 uv run flip7 tournament
 ```
 
-The setup screen lets you choose the game mode, number of games, players per
-game, seed, and up to ten bots. Tournament options run in the terminal unless
-you add `--gui`. To prefill setup instead of starting immediately, use
-`--gui --setup` with your options.
+The window defaults to 500 games with Random, Threshold 20, Threshold 30,
+Threshold 40, and Expected value. The setup screen lets you choose the game
+mode, number of games, players per game, seed, and up to ten bots. Tournament
+options run in the terminal unless you add `--gui`. To prefill setup instead
+of starting immediately, use `--gui --setup` with your options.
 
 While it runs, the window shows a progress bar, live standings by Elo, and an
 Elo chart. **Stop** schedules no more games and waits for those in progress.
-The final standings rank bots by `rating` with its 95% interval. Afterwards:
+Once the run finishes or is stopped, the chart adds dashed lines for the fitted
+ratings and error bars for their 95% confidence intervals, when available. The
+final standings rank bots by fitted rating. Afterwards:
 
 - With `--output DIR`, results are saved there automatically. Otherwise,
   **Save results** writes them to a timestamped folder in

@@ -321,6 +321,31 @@ class TournamentScene:
         )
         low = min(min(ratings) for ratings in self._history)
         high = max(max(ratings) for ratings in self._history)
+        fitted = []
+        if self.result is not None:
+            summary = self.result.summary
+            values = summary[['rating', 'rating_low', 'rating_high']].to_numpy(
+                dtype=float
+            )
+            for name, (rating, lower, upper) in zip(summary.index, values):
+                if math.isfinite(rating):
+                    fitted.append((self._standings[name].color, rating, lower, upper))
+                    bounds = [
+                        value
+                        for value in (rating, lower, upper)
+                        if math.isfinite(value)
+                    ]
+                    low, high = min(low, *bounds), max(high, *bounds)
+        gutter = 10 * min(len(fitted), len(LINE_COLORS))
+        if fitted:
+            plot.width -= gutter + 6
+            draw_text(
+                screen,
+                self._small_font,
+                'Dashed: fitted rating   |   Bars: 95% confidence interval',
+                (CHART.x + 18, CHART.y + 43),
+                MUTED,
+            )
         padding = max(10.0, (high - low) * 0.1)
         low, high = low - padding, high + padding
         games = max(len(self._history) - 1, 1)
@@ -357,3 +382,15 @@ class TournamentScene:
             points = [point(game, self._history[game][column]) for game in sampled]
             if len(points) > 1:
                 pygame.draw.lines(screen, standing.color, False, points, 2)
+
+        for index, (color, rating, lower, upper) in enumerate(fitted):
+            x = plot.right + 10 + round(gutter * index / len(fitted))
+            y = point(0, rating)[1]
+            for start in range(plot.x, x, 8):
+                pygame.draw.line(screen, color, (start, y), (min(start + 4, x), y))
+            if math.isfinite(lower) and math.isfinite(upper):
+                top, bottom = point(0, upper)[1], point(0, lower)[1]
+                pygame.draw.line(screen, color, (x, top), (x, bottom), 2)
+                for cap in (top, bottom):
+                    pygame.draw.line(screen, color, (x - 3, cap), (x + 3, cap), 2)
+            pygame.draw.circle(screen, color, (x, y), 3)

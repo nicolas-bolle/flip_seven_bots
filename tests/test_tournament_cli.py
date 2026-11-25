@@ -20,8 +20,14 @@ from flip_seven_bots.tournament.cli import (
 
 def test_default_lineup_and_settings() -> None:
     options = parse_options([])
-    assert list(options.bots) == ['Random bot', 'Threshold 30', 'Expected value bot']
-    assert (options.games, options.players_per_game, options.rules) == (100, None, None)
+    assert list(options.bots) == [
+        'Random',
+        'Threshold 20',
+        'Threshold 30',
+        'Threshold 40',
+        'Expected value',
+    ]
+    assert (options.games, options.players_per_game, options.rules) == (500, None, None)
 
 
 def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
@@ -63,7 +69,7 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         ['--bot', 'chess', '--bot', 'random'],
         ['--bot', '=random', '--bot', 'random'],
         ['--games', '0'],
-        ['--players-per-game', '4'],
+        ['--players-per-game', '6'],
         ['--players-per-game', '1'],
         ['--bot', 'random'] * 11 + ['--players-per-game', '11'],
         ['--k-factor', '0'],
@@ -152,7 +158,7 @@ def test_bot_specs_round_trip(bot: RandomBot | ThresholdBot | ExpectedValueBot) 
 def test_rating_options_reach_the_tournament() -> None:
     options = parse_options(['--games', '9', '--constant-k', '--seed', '2'])
     assert options.k_half_life is None
-    assert options.describe() == '3 bots, 9 games of 3 players, Flip 7'
+    assert options.describe() == '5 bots, 9 games of 5 players, Flip 7'
     assert parse_options(['--k-half-life', '20']).k_half_life == 20
 
     fast = replace(

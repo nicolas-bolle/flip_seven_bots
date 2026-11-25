@@ -11,6 +11,7 @@ from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.game import Action, Observation
 from flip_seven_bots.gui.tournament import app, run_scene
 from flip_seven_bots.gui.tournament.run_scene import (
+    CHART,
     NEW_BUTTON,
     SAVE_BUTTON,
     STANDINGS,
@@ -29,7 +30,11 @@ from flip_seven_bots.gui.tournament.setup_scene import (
     TournamentSetupScene,
     _row_rects,
 )
-from flip_seven_bots.tournament.cli import TournamentOptions, parse_options
+from flip_seven_bots.tournament.cli import (
+    TournamentOptions,
+    parse_launch,
+    parse_options,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -70,24 +75,54 @@ def wait_until(
         time.sleep(0.005)
 
 
-def test_setup_starts_with_the_given_options() -> None:
-    scene = TournamentSetupScene(parse_options([]))
+def test_setup_starts_with_the_gui_defaults() -> None:
+    scene = TournamentSetupScene(parse_launch([]).options)
     scene.render(pygame.Surface((1280, 900)))
     click(scene, START_BUTTON)
     assert scene.result is not None
     assert list(scene.result.bots) == [
-        'Random bot',
+        'Random',
+        'Threshold 20',
         'Threshold 30',
-        'Expected value bot',
+        'Threshold 40',
+        'Expected value',
     ]
-    assert isinstance(scene.result.bots['Threshold 30'], ThresholdBot)
-    assert scene.result.bots['Threshold 30'].threshold == 30
-    assert isinstance(scene.result.bots['Expected value bot'], ExpectedValueBot)
-    assert scene.result.games == 100 and scene.result.players_per_game is None
+    assert isinstance(scene.result.bots['Random'], RandomBot)
+    for threshold in (20, 30, 40):
+        bot = scene.result.bots[f'Threshold {threshold}']
+        assert isinstance(bot, ThresholdBot) and bot.threshold == threshold
+    assert isinstance(scene.result.bots['Expected value'], ExpectedValueBot)
+    assert scene.result.games == 500 and scene.result.players_per_game is None
+
+
+def test_terminal_and_gui_share_defaults_without_overriding_explicit_options() -> None:
+    terminal = parse_launch(['--seed', '7']).options
+    defaults = parse_launch([]).options
+    assert terminal.games == defaults.games == 500
+    assert list(terminal.bots) == list(defaults.bots)
+
+    gui = parse_launch(
+        ['--gui', '--games', '25', '--bot', 'random', '--bot', 'threshold:10']
+    ).options
+    assert gui.games == 25
+    assert list(gui.bots) == ['Random bot', 'Threshold 10']
 
 
 def test_setup_edits_bots_mode_and_numbers() -> None:
-    scene = TournamentSetupScene(parse_options(['--k-factor', '16']))
+    scene = TournamentSetupScene(
+        parse_options(
+            [
+                '--k-factor',
+                '16',
+                '--bot',
+                'random',
+                '--bot',
+                'threshold:30',
+                '--bot',
+                'expected',
+            ]
+        )
+    )
     click(scene, VENGEANCE_BUTTON)
     replace_field(scene, GAMES_FIELD, '12')
     replace_field(scene, TABLE_FIELD, '2')
@@ -168,7 +203,7 @@ def test_standings_fit_the_most_bots_in_distinct_colors(
     ('field', 'value', 'error'),
     [
         (GAMES_FIELD, '0', 'play at least one game'),
-        (TABLE_FIELD, '4', 'players per game must be between 2 and 3'),
+        (TABLE_FIELD, '6', 'players per game must be between 2 and 5'),
         (_row_rects(1)[0], ' ', 'every bot needs a name'),
     ],
     ids=['no-games', 'table-too-big', 'blank-name'],
@@ -217,13 +252,41 @@ def test_tournament_saves_automatically_to_the_output_folder(tmp_path: Path) -> 
     assert scene.saved is not None and (tmp_path / 'summary.csv').exists()
 
 
-def test_stop_ends_the_tournament_early() -> None:
-    scene = TournamentScene(quick_options(games=100_000))
-    wait_until(scene, lambda: len(scene.records) > 0)
-    click(scene, STOP_BUTTON)
+@pytest.mark.parametrize('stop_early', [False, True])
+def test_finished_chart_draws_fitted_ratings_and_confidence_bars(
+    monkeypatch: pytest.MonkeyPatch, stop_early: bool
+) -> None:
+    total = 100_000 if stop_early else 5
+    scene = TournamentScene(quick_options(seed=3, games=total))
+    if stop_early:
+        wait_until(scene, lambda: len(scene.records) >= 2)
+        click(scene, STOP_BUTTON)
     wait_until(scene, lambda: scene.finished)
+
+    draw_line = Mock(wraps=pygame.draw.line)
+    monkeypatch.setattr(pygame.draw, 'line', draw_line)
     scene.render(pygame.Surface((1280, 900)))
-    assert 0 < len(scene.records) < 100_000 and scene.error is None
+    assert scene.error is None
+    if stop_early:
+        assert 2 <= len(scene.records) < total
+    else:
+        assert len(scene.records) == total
+
+    for color in run_scene.LINE_COLORS[:2]:
+        segments = [
+            (start, end)
+            for call in draw_line.call_args_list
+            for _, line_color, start, end, *_ in [call.args]
+            if line_color == color
+        ]
+        [(top, bottom)] = [(a, b) for a, b in segments if a[0] == b[0] and a[1] < b[1]]
+        assert CHART.collidepoint(top) and CHART.collidepoint(bottom)
+        for x, y in (top, bottom):
+            assert ((x - 3, y), (x + 3, y)) in segments
+        assert any(
+            top[1] <= a[1] == b[1] <= bottom[1] and b[0] - a[0] == 4
+            for a, b in segments
+        )
 
 
 def test_bot_errors_are_shown_instead_of_crashing() -> None:
