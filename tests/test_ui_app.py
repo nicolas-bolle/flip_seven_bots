@@ -21,7 +21,7 @@ def test_app_forwards_events_until_quit_and_cleans_up(
     quit_event: pygame.event.Event,
     tmp_path: Path,
 ) -> None:
-    scene = Mock(dialog_open=False)
+    scene = Mock(dialog_open=False, return_to_setup=False)
     screen = pygame.Surface((1280, 900))
     clock = Mock()
     cleanup = Mock()
@@ -66,10 +66,13 @@ def test_app_cleans_up_when_scene_creation_fails(
 def run_app(
     monkeypatch: pytest.MonkeyPatch, scene: Mock, frames: list[list[pygame.event.Event]]
 ) -> None:
+    scene.return_to_setup = False
     events = iter(frames)
     monkeypatch.setattr(pygame, 'init', Mock())
     monkeypatch.setattr(pygame, 'quit', Mock())
-    monkeypatch.setattr(pygame.display, 'set_mode', Mock())
+    monkeypatch.setattr(
+        pygame.display, 'set_mode', Mock(return_value=pygame.Surface((1280, 900)))
+    )
     monkeypatch.setattr(pygame.display, 'set_caption', Mock())
     monkeypatch.setattr(pygame.display, 'flip', Mock())
     monkeypatch.setattr(pygame.time, 'Clock', Mock())
@@ -135,7 +138,9 @@ def test_mode_flags_create_vengeance_game_directly(
     assert table.game.rules.brutal is brutal
 
 
-def test_setup_transitions_to_selected_game(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_app_returns_to_setup_with_the_previous_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     pygame.font.init()
     try:
         scene = Mock(dialog_open=False)
@@ -148,19 +153,29 @@ def test_setup_transitions_to_selected_game(monkeypatch: pytest.MonkeyPatch) -> 
         def click(rect: pygame.Rect) -> pygame.event.Event:
             return pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center)
 
+        def request_setup(_event: pygame.event.Event) -> None:
+            scene.return_to_setup = True
+
+        scene.handle_event.side_effect = request_setup
         run_app(
             monkeypatch,
             scene,
             [
                 [click(VENGEANCE_BUTTON), click(BRUTAL_BUTTON), click(START_BUTTON)],
+                [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_r)],
+                [click(START_BUTTON)],
                 [pygame.event.Event(pygame.QUIT)],
             ],
         )
         constructor = Mock(return_value=scene)
         monkeypatch.setattr(app, 'GameScene', constructor)
         app.main([])
-        table = constructor.call_args.args[0]
-        assert isinstance(table.game.rules, VengeanceRules) and table.game.rules.brutal
-        assert table.names == ('Human', 'Threshold 30', 'Expected value')
+        first, second = [call.args[0] for call in constructor.call_args_list]
+        assert first is not second
+        for table in (first, second):
+            assert (
+                isinstance(table.game.rules, VengeanceRules) and table.game.rules.brutal
+            )
+            assert table.names == ('Human', 'Threshold 30', 'Expected value')
     finally:
         pygame.font.quit()

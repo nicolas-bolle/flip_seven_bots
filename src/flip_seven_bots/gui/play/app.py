@@ -13,7 +13,7 @@ from ..common.widgets import make_icon
 from .bug_report import write_report
 from .game_scene import GameScene
 from .options import parse_options
-from .setup_scene import SetupScene
+from .setup_scene import SetupResult, SetupScene
 from .table import Table
 
 
@@ -39,6 +39,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     exception is reraised. After initialization, Pygame is shut down on exit.
     """
     options = parse_options(argv)
+    settings = SetupResult(options.seats, options.vengeance, options.brutal)
     table: Table | None = None
     pygame.init()
     try:
@@ -66,15 +67,25 @@ def main(argv: Sequence[str] | None = None) -> None:
                     running = False
                 else:
                     scene.handle_event(event)
-                    if isinstance(scene, SetupScene) and scene.result is not None:
-                        result = scene.result
-                        rules = (
-                            VengeanceRules(brutal=result.brutal)
-                            if result.vengeance
-                            else None
+                    if isinstance(scene, SetupScene):
+                        if scene.result is not None:
+                            settings = scene.result
+                            rules = (
+                                VengeanceRules(brutal=settings.brutal)
+                                if settings.vengeance
+                                else None
+                            )
+                            table = Table(
+                                settings.seats, seed=options.seed, rules=rules
+                            )
+                            scene = GameScene(table, report_dir=options.bug_dir)
+                    elif scene.return_to_setup:
+                        table = None
+                        scene = SetupScene(
+                            settings.seats,
+                            vengeance=settings.vengeance,
+                            brutal=settings.brutal,
                         )
-                        table = Table(result.seats, seed=options.seed, rules=rules)
-                        scene = GameScene(table, report_dir=options.bug_dir)
 
             if running:
                 scene.update(pygame.time.get_ticks())

@@ -323,18 +323,26 @@ def test_continue_dismisses_round_summary() -> None:
     assert table.round_summary is None
 
 
-def test_play_again_restarts_finished_game() -> None:
+@pytest.mark.parametrize('use_shortcut', [False, True])
+def test_finished_game_requests_setup_without_restarting(use_shortcut: bool) -> None:
     scene, table = make_scene(numbers(3, 1, 2), rules=Rules(target_score=1))
     press(scene, pygame.K_s)
     scene.update(scene._now)
     scene.update(scene._now)
     press(scene, pygame.K_RETURN)
     finished = table.game
-    assert [b.label for b in play_buttons(scene)] == ['Play again  [R]']
+    [button] = play_buttons(scene)
+    assert button.label == 'Back to setup  [R]'
     scene.render(pygame.Surface((1280, 900)))
 
-    press(scene, pygame.K_r)
-    assert table.game is not finished
+    if use_shortcut:
+        press(scene, pygame.K_r)
+    else:
+        scene.handle_event(
+            pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=button.rect.center)
+        )
+    assert scene.return_to_setup
+    assert table.game is finished
 
 
 def test_humans_take_turns_and_are_named_in_the_prompt(

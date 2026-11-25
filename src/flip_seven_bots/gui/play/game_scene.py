@@ -70,7 +70,7 @@ class Command(Enum):
     """UI-only actions that do not directly represent game decisions."""
 
     CONTINUE = auto()
-    RESTART = auto()
+    BACK_TO_SETUP = auto()
     REPORT_BUG = auto()
     SUBMIT_REPORT = auto()
     CANCEL_REPORT = auto()
@@ -205,6 +205,7 @@ class GameScene:
         self, table: Table | None = None, *, report_dir: Path = Path('bug_reports')
     ) -> None:
         self._table = table if table is not None else Table(default_seats())
+        self.return_to_setup = False
         self._report_dir = report_dir
         self._report_text: str | None = None
         self._report_hint: str | None = None
@@ -267,7 +268,9 @@ class GameScene:
                 Button(corner, 'Continue  [Enter]', Command.CONTINUE, pygame.K_RETURN),
             )
         if table.game.is_finished:
-            return (Button(corner, 'Play again  [R]', Command.RESTART, pygame.K_r),)
+            return (
+                Button(corner, 'Back to setup  [R]', Command.BACK_TO_SETUP, pygame.K_r),
+            )
         if table.human_to_act is None:
             return ()
         actions = table.observation.legal_actions
@@ -317,12 +320,8 @@ class GameScene:
                 pass
             case Button(action=Command.CONTINUE):
                 self._table.dismiss_summary()
-            case Button(action=Command.RESTART):
-                self._table.restart()
-                self._draws.clear()
-                self._draw_started = None
-                self._previous_round = None
-                self._queue_draws(None)
+            case Button(action=Command.BACK_TO_SETUP):
+                self.return_to_setup = True
             case Button(action=Command.REPORT_BUG):
                 self._report_text = ''
                 self._report_hint = None
