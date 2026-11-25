@@ -181,6 +181,7 @@ class Game:
         self._tasks: deque[_Task] = deque()
         self._pending: Decision | None = None
         self._events: list[GameEvent] = []
+        self._past_events: list[GameEvent] = []
         self._recent_draws: list[CardDrawn] = []
         self._version = 0
         self._version_token = [0]
@@ -211,6 +212,15 @@ class Game:
     def recent_draws(self) -> tuple[CardDrawn, ...]:
         """Cards drawn during initialization or the most recent decision."""
         return tuple(self._recent_draws)
+
+    @property
+    def history(self) -> tuple[GameEvent, ...]:
+        """Public events of every round so far, in order, for display.
+
+        Copies made for observations and ``determinize`` only keep the current
+        round's events, so rollouts don't pay for copying the whole game.
+        """
+        return (*self._past_events, *self._events)
 
     def hidden_deck(self) -> tuple[Card, ...]:
         """The undrawn cards, next card first. For debugging only; bots must not use it."""
@@ -283,6 +293,7 @@ class Game:
         ]
         snapshot._tasks = copy.deepcopy(self._tasks)
         snapshot._events = list(self._events)
+        snapshot._past_events = []
         snapshot._recent_draws = list(self._recent_draws)
         snapshot._version_token = [self._version]
         return snapshot
@@ -290,7 +301,9 @@ class Game:
     def determinize(self, rng: Random) -> Game:
         """Return an independent copy with the hidden deck order resampled from ``rng``."""
         # Seeding the memo substitutes ``rng`` for the deck's generator instead of copying it.
-        clone = copy.deepcopy(self, {id(self._deck._random): rng})
+        clone = copy.deepcopy(
+            self, {id(self._deck._random): rng, id(self._past_events): []}
+        )
         clone._deck.resample(rng)
         return clone
 
@@ -330,6 +343,7 @@ class Game:
             player.reset()
         self._tasks.clear()
         self._pending = None
+        self._past_events.extend(self._events)
         self._events.clear()
         self._events.append(RoundStarted(self._round_number))
         first = (self._dealer + 1) % len(self._players)

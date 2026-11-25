@@ -9,10 +9,9 @@ from pathlib import Path
 from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
 from flip_seven_bots.bots.registry import kinds
 from flip_seven_bots.bots.specs import number_duplicates, parse_named_bot
+from flip_seven_bots.game import MAX_PLAYERS
 
 from .table import Seat
-
-MAX_PLAYERS = 6
 
 
 @dataclass(frozen=True)

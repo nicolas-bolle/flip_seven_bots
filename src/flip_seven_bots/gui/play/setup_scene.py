@@ -51,12 +51,12 @@ def _initial_player(seat: Seat) -> _PlayerSetting:
 
 
 def _row_rects(index: int) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
-    y = 310 + index * 64
+    y = 308 + index * 42
     return (
-        pygame.Rect(90, y, 320, 48),
-        pygame.Rect(425, y, 250, 48),
-        pygame.Rect(690, y, 180, 48),
-        pygame.Rect(885, y, 150, 48),
+        pygame.Rect(90, y, 320, 38),
+        pygame.Rect(425, y, 250, 38),
+        pygame.Rect(690, y, 180, 38),
+        pygame.Rect(885, y, 150, 38),
     )
 
 
@@ -220,7 +220,7 @@ class SetupScene:
                 )
             else:
                 self._text(
-                    screen, self._font, '-', (parameter.x + 12, parameter.y + 13), MUTED
+                    screen, self._font, '-', (parameter.x + 12, parameter.y + 10), MUTED
                 )
             self._button(screen, remove, 'Remove', disabled=len(self.players) == 1)
         self._button(

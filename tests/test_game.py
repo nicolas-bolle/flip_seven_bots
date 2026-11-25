@@ -1,4 +1,5 @@
 from collections import Counter
+from random import Random
 
 import pytest
 
@@ -80,6 +81,27 @@ def test_dealer_rotates_and_player_left_of_dealer_starts() -> None:
     assert observation.dealer == 1
     assert observation.players[2].cards == (number(4),)
     assert game.current_player == 2
+
+
+def test_history_keeps_earlier_rounds_but_copies_only_the_current_round() -> None:
+    game = stacked_game([number(n) for n in range(1, 5)])
+    game.apply(STAY)
+    game.apply(STAY)
+    history = game.history
+    assert [type(event).__name__ for event in history] == [
+        'RoundStarted',
+        'CardDrawn',
+        'CardDrawn',
+        'ActionChosen',
+        'ActionChosen',
+        'RoundEnded',
+        'RoundStarted',
+        'CardDrawn',
+        'CardDrawn',
+    ]
+    current = game.observe(0).events
+    assert history[-len(current) :] == current
+    assert game.determinize(Random(0)).history == current
 
 
 def test_flip_three_defers_freeze_but_second_chance_saves_a_duplicate_at_once() -> None:

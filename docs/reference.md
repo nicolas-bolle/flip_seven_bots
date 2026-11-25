@@ -101,25 +101,30 @@ uv run flip7 play
 
 The setup screen starts with a player named Human, a bot that stays at 30 points, and
 an expected value bot. Choose the game mode, edit player names and types, add
-or remove seats (up to six), then press Start. Click a name or value to edit
+or remove seats (up to ten), then press Start. Click a name or value to edit
 it; Ctrl+A clears the field.
 
 During play:
 
-- Use the buttons or their keyboard shortcuts to hit, stay, or choose a player
-  when an action card needs a target.
+- Use the buttons or their keyboard shortcuts to hit or stay.
+- When an action card needs a target, click a highlighted player, or press
+  their seat number (shown on each board; the tenth seat is 0).
 - For Swap, Steal, and Discard, click a highlighted card. Swap needs two cards
   from different players.
+- Press L to see the whole game's history, and L or Escape to close it.
 - Press Escape or close the window to quit.
 
 Every card is public, so several humans can share the screen and take turns,
 and a table of only bots can be watched. Bot decisions take at least one second
 each, and play waits for the dealing animations to finish.
 
-Each hand shows number cards below modifiers and action cards, sorted by
-value. A player's total score appears beside their live round score, which
-excludes any Flip 7 bonus. The activity panel shows the current round's draws
-and decisions, and a summary appears after each round.
+Each hand is a row of cards: modifiers and action cards first, then number
+cards, each sorted by value. Large hands overlap like a fanned hand, with each
+card's corner label still visible. Up to three players are stacked in one
+column; larger tables use two columns, filled top to bottom. A player's total
+score appears beside their live round score, which excludes any Flip 7 bonus.
+The activity panel shows the latest draws and decisions, and a summary appears
+after each round.
 
 ### From the command line
 
@@ -142,7 +147,7 @@ uv run flip7 play --brutal --seed 7
 | `--bug-dir PATH` | Folder for bug and crash reports (default `bug_reports`) |
 | `--setup`, `--no-setup` | Show or skip the setup screen explicitly |
 
-Seats are filled in the order given, up to six players. With only a mode flag,
+Seats are filled in the order given, up to ten players. With only a mode flag,
 the default players are used.
 
 ### From Python
