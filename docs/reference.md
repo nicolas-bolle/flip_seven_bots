@@ -16,7 +16,7 @@ For setup and step-by-step guides, start with the [README](../README.md).
 | Task | Window (Pygame) | Terminal | Python |
 | --- | --- | --- | --- |
 | Play a game | `flip7 play` | `flip7 trace` (prints a game between bots) | `simulation.play_game`, `game.Game` |
-| Run a tournament | `flip7 tournament --gui` | `flip7 tournament`, `flip7 compare` | `tournament.run_tournament`, `play_tournament` |
+| Run a tournament | `flip7 tournament` | `flip7 tournament --games N`, `flip7 compare` | `tournament.run_tournament`, `play_tournament` |
 | Rebuild a reported game | | `flip7 replay` | `game.replay.replay` |
 
 Options given to `flip7 play` configure the window; human players always play
@@ -304,7 +304,7 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 | `--players-per-game N` | Bots seated in each game (default: all, up to 10) |
 | `--seed N` | Seed for seating, decks, and bots |
 | `--jobs N` | Parallel game workers (default 1) |
-| `--gui` | Open the tournament window |
+| `--gui` | Use the tournament window even when options are given |
 | `--setup`, `--no-setup` | Show or skip setup explicitly (with `--gui`) |
 | `--vengeance`, `--brutal` | Choose the game mode |
 | `--output DIR` | Save results and settings in this folder |
@@ -314,12 +314,13 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 ### In a window
 
 ```shell
-uv run flip7 tournament --gui
+uv run flip7 tournament
 ```
 
 The setup screen lets you choose the game mode, number of games, players per
-game, seed, and up to ten bots. Giving any of the tournament options above
-skips setup and starts immediately unless `--setup` is supplied.
+game, seed, and up to ten bots. Tournament options run in the terminal unless
+you add `--gui`. To prefill setup instead of starting immediately, use
+`--gui --setup` with your options.
 
 While it runs, the window shows a progress bar, live standings by Elo, and an
 Elo chart. **Stop** schedules no more games and waits for those in progress.

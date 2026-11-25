@@ -275,28 +275,31 @@ def test_unified_tournament_dispatches_gui_and_terminal(
     main(["tournament", "--games", "2"])
     main(["tournament", "--gui", "--setup", "--games", "3"])
     main(["compare", "random", "threshold:20", "--gui", "--games", "4"])
-    assert [call[0] for call in calls] == ["terminal", "gui", "gui"]
-    assert [call[1].games for call in calls] == [2, 3, 4]
+    main(["tournament"])
+    assert [call[0] for call in calls] == ["terminal", "gui", "gui", "gui"]
+    assert [call[1].games for call in calls[:3]] == [2, 3, 4]
     assert calls[1][2] and not calls[2][2]
     assert list(calls[2][1].bots) == ["Random bot", "Threshold 20"]
+    assert calls[3][2]
 
 
 @pytest.mark.parametrize(
-    ("argv", "show_setup"),
+    ("argv", "gui", "show_setup"),
     [
-        (["--gui"], True),
-        (["--gui", "--games", "5"], False),
-        (["--gui", "--setup", "--games", "5"], True),
-        (["--gui", "--no-setup"], False),
-        ([], False),
+        ([], True, True),
+        (["--games", "5"], False, False),
+        (["--gui"], True, True),
+        (["--gui", "--games", "5"], True, False),
+        (["--gui", "--setup", "--games", "5"], True, True),
+        (["--gui", "--no-setup"], True, False),
     ],
 )
 def test_launch_shows_setup_only_when_requested_or_unconfigured(
-    argv: list[str], show_setup: bool
+    argv: list[str], gui: bool, show_setup: bool
 ) -> None:
     launch = parse_launch(argv)
     assert launch.show_setup == show_setup
-    assert launch.gui == ("--gui" in argv)
+    assert launch.gui == gui
 
 
 @pytest.mark.parametrize(

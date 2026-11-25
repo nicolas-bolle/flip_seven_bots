@@ -8,7 +8,7 @@ A tournament plays many complete games between named bots and rates them.
 uv run flip7 tournament --bot random --bot careful=threshold:25 \
     --games 500 --seed 7 --jobs 4 --output results
 uv run flip7 compare expected threshold:30 --games 500 --seed 7
-uv run flip7 tournament --gui
+uv run flip7 tournament  # open the setup window
 ```
 
 From Python, use `run_tournament`, or `play_tournament` to receive games as

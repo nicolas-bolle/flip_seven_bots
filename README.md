@@ -18,8 +18,8 @@ the dependencies:
 uv sync
 uv run flip7 bots                    # list the available bots
 uv run flip7 play                    # play against bots in a window
-uv run flip7 tournament --gui        # watch a tournament in a window
-uv run flip7 tournament --games 200 --seed 1 --jobs 2   # rate bots in the terminal
+uv run flip7 tournament              # open the tournament setup window
+uv run flip7 tournament --games 200 --seed 1 --jobs 2   # pass args to run a tournment in terminal
 ```
 
 Every command accepts `--help`, for example `uv run flip7 tournament --help`.

@@ -80,8 +80,9 @@ def parse_options(argv: Sequence[str] | None = None) -> TournamentOptions:
 def parse_launch(argv: Sequence[str] | None = None) -> TournamentLaunch:
     """Parse the full ``flip7 tournament`` command, including window flags.
 
-    With ``--gui`` and no other options, the setup screen is shown; any other
-    options start the tournament immediately unless ``--setup`` is given.
+    No arguments opens the setup screen. Tournament options run in the
+    terminal unless ``--gui`` is given. Use ``--gui --setup`` to prefill the
+    setup screen instead of starting the configured tournament immediately.
     """
     args_list = list(sys.argv[1:] if argv is None else argv)
     parser = _parser(launch=True)
@@ -89,12 +90,12 @@ def parse_launch(argv: Sequence[str] | None = None) -> TournamentLaunch:
     if (args.setup or args.no_setup) and not args.gui:
         parser.error("--setup and --no-setup require --gui")
     options = _options(parser, args)
+    gui = args.gui or not args_list
     settings_given = any(arg != "--gui" for arg in args_list)
     return TournamentLaunch(
         options,
-        gui=args.gui,
-        show_setup=args.gui
-        and (args.setup or (not args.no_setup and not settings_given)),
+        gui=gui,
+        show_setup=gui and (args.setup or (not args.no_setup and not settings_given)),
     )
 
 
@@ -102,14 +103,13 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flip7 tournament",
         description=(
-            "Play a tournament between bots and print their Elo ratings, or watch "
-            "it with --gui. With --gui and no other options, configure it on the "
-            "setup screen."
+            "Open the tournament setup window with no arguments. Pass tournament "
+            "options to run in the terminal, or add --gui to watch in the window."
         ),
     )
     if launch:
         parser.add_argument(
-            "--gui", action="store_true", help="show the tournament window"
+            "--gui", action="store_true", help="use the window with tournament options"
         )
         setup = parser.add_mutually_exclusive_group()
         setup.add_argument(

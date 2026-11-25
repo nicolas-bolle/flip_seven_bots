@@ -6,7 +6,7 @@ to any command for its full options.
 | Command | Purpose |
 | --- | --- |
 | `flip7 play` | Play a game in a window |
-| `flip7 tournament` | Rate bots in the terminal, or in a window with `--gui` |
+| `flip7 tournament` | Open tournament setup, or pass options to run a tournament in terminal |
 | `flip7 compare A B` | Rate two bots against each other |
 | `flip7 bots` | List the available bots and their parameters |
 | `flip7 trace` | Print one bot's decisions during a game |
@@ -26,7 +26,7 @@ uv run flip7 play --vengeance --human Ann --bot random
 ## Tournament and compare
 
 ```shell
-uv run flip7 tournament --gui                      # setup window
+uv run flip7 tournament                            # setup window
 uv run flip7 tournament --bot random --bot careful=threshold:25 \
     --games 200 --seed 7 --jobs 2 --output results --plots
 uv run flip7 compare random threshold:25 --games 200 --seed 7
@@ -44,10 +44,11 @@ uv run flip7 compare random threshold:25 --games 200 --seed 7
 
 ## Windows and setup screens
 
-`flip7 play` and `flip7 tournament --gui` open a setup screen when given no
-other options. Any other options start immediately with those settings.
-`--setup` shows the setup screen anyway, prefilled with the options, and
-`--no-setup` skips it.
+`flip7 play` and `flip7 tournament` open a setup screen when given no options.
+Passing options to `play` starts a game in the window. Passing options to
+`tournament` runs in the terminal unless you add `--gui`.
+For `play` or `tournament --gui`, `--setup` opens setup prefilled with the
+options, and `--no-setup` skips it.
 
 `--vengeance` and `--brutal` choose the game mode for `play`, `tournament`,
 `compare`, and `trace`. In the game
