@@ -3,8 +3,8 @@
 from collections import Counter
 from collections.abc import Sequence
 
-from .base import Bot
-from .registry import config_for, parse_config
+from .base import Bot, BotFactory
+from .registry import BotConfig, config_for, parse_config
 
 
 def parse_bot(spec: str) -> tuple[str, Bot]:
@@ -27,11 +27,16 @@ def parse_named_bot(spec: str) -> tuple[str, Bot]:
     return (name.strip() if separator else default_name), bot
 
 
-def bot_spec(bot: Bot) -> str:
+def bot_spec(bot: Bot | BotFactory) -> str:
     """Return the specification ``parse_bot`` accepts for a new bot like ``bot``.
 
-    Raises ``ValueError`` for bots that have no specification.
+    ``bot`` may be a bot instance or a ``BotConfig`` factory. Raises
+    ``TypeError`` for other factories and ``ValueError`` for unregistered bots.
     """
+    if isinstance(bot, BotConfig):
+        return bot.spec
+    if isinstance(bot, type) or not isinstance(bot, Bot):
+        raise TypeError(f'cannot get a specification for bot factory {bot!r}')
     return config_for(bot).spec
 
 

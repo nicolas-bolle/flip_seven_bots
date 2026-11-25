@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
-from flip_seven_bots.bots.registry import BotKind, Parameter, register
+from flip_seven_bots.bots.registry import BotKind, Parameter, parse_config, register
 from flip_seven_bots.bots.specs import bot_spec, parse_bot
 from flip_seven_bots.game import VengeanceRules
 from flip_seven_bots.tournament import TournamentResult, play_tournament, run_tournament
@@ -28,6 +28,9 @@ def test_default_lineup_and_settings() -> None:
         'Expected value',
     ]
     assert (options.games, options.players_per_game, options.rules) == (500, None, None)
+    assert options.jobs == -1
+    assert parse_options(['--jobs', '-1']).jobs == -1
+    assert parse_options(['--jobs', '2']).jobs == 2
 
 
 def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
@@ -69,6 +72,8 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         ['--bot', 'chess', '--bot', 'random'],
         ['--bot', '=random', '--bot', 'random'],
         ['--games', '0'],
+        ['--jobs', '0'],
+        ['--jobs', '-2'],
         ['--players-per-game', '6'],
         ['--players-per-game', '1'],
         ['--bot', 'random'] * 11 + ['--players-per-game', '11'],
@@ -80,6 +85,8 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         'unknown',
         'blank-name',
         'no-games',
+        'no-workers',
+        'invalid-negative-workers',
         'table-too-big',
         'table-too-small',
         'table-over-player-limit',
@@ -153,6 +160,14 @@ def test_bot_specs_round_trip(bot: RandomBot | ThresholdBot | ExpectedValueBot) 
     rebuilt = parse_bot(bot_spec(bot))[1]
     assert type(rebuilt) is type(bot)
     assert bot_spec(rebuilt) == bot_spec(bot)
+
+
+def test_bot_spec_accepts_configs_and_rejects_other_factories() -> None:
+    assert bot_spec(parse_config('threshold:25')) == 'threshold:25'
+    with pytest.raises(TypeError, match='bot factory'):
+        bot_spec(RandomBot)
+    with pytest.raises(TypeError, match='bot factory'):
+        bot_spec(lambda seed: RandomBot(seed))
 
 
 def test_rating_options_reach_the_tournament() -> None:

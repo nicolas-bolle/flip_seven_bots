@@ -49,7 +49,10 @@ revision, so a saved run records how to reproduce it.
 
 ## Parallel runs
 
-`--jobs N` (or `jobs=N` in Python) plays games in `N` worker processes, with
-only a few games in flight at a time. Errors in a worker stop the tournament
-and are reported rather than retried. Stopping the window waits for games in
-progress, and the results include only the games finished before stopping.
+`--jobs N` (or `jobs=N` in Python) plays games in `N` worker processes. The
+default, `-1`, uses all available CPUs, up to the number of games; `1` runs
+games sequentially in the current process. Parallel runs require picklable bot
+factories and rules. At most one game per worker is in flight. Errors in a
+worker stop the tournament and are reported rather than retried. Stopping the
+window waits for games in progress, and the results include only the games
+finished before stopping.

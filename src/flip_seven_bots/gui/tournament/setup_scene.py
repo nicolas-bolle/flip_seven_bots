@@ -120,7 +120,8 @@ class TournamentSetupScene:
             digits = ''.join(char for char in value if char.isdigit())[
                 :MAX_NUMBER_LENGTH
             ]
-            self.numbers[field] = digits
+            sign = '-' if field == 'jobs' and value.startswith('-') else ''
+            self.numbers[field] = sign + digits
         else:
             self.bots[index].parameter = value[:100]
         self.error = None
@@ -188,9 +189,10 @@ class TournamentSetupScene:
         table = int(self.numbers['table']) if self.numbers['table'] else None
         if table is not None and not 2 <= table <= len(bots):
             raise ValueError(f'players per game must be between 2 and {len(bots)}')
-        jobs = int(self.numbers['jobs'] or 0)
-        if jobs < 1:
-            raise ValueError('use at least one worker')
+        jobs_text = self.numbers['jobs']
+        jobs = int(jobs_text) if jobs_text not in ('', '-') else 0
+        if jobs != -1 and jobs < 1:
+            raise ValueError('use -1 or at least one worker')
         return replace(
             self._defaults,
             bots=bots,
@@ -227,7 +229,7 @@ class TournamentSetupScene:
             ('games', GAMES_FIELD, 'GAMES'),
             ('table', TABLE_FIELD, 'PER GAME (BLANK = ALL)'),
             ('seed', SEED_FIELD, 'SEED (BLANK = RANDOM)'),
-            ('jobs', JOBS_FIELD, 'WORKERS'),
+            ('jobs', JOBS_FIELD, 'WORKERS (-1 = ALL)'),
         )
         for field, rect, label in labels:
             draw_text(screen, small, label, (rect.x, rect.y - 23), MUTED)

@@ -120,7 +120,8 @@ if __name__ == '__main__':
     print(result.summary)
 ```
 
-With `jobs > 1`, games run in separate processes, so factories and rules must
+With multiple workers (including the default `jobs=-1`), games run in separate
+processes, so factories and rules must
 be importable from a module, and scripts need the `if __name__ == "__main__"`
 guard shown above.
 

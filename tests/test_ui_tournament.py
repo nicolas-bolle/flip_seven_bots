@@ -62,7 +62,7 @@ def quick_options(**changes: object) -> TournamentOptions:
     options = parse_options(
         ['--bot', 'threshold:10', '--bot', 'threshold:30', '--games', '5']
     )
-    return replace(options, **changes)
+    return replace(options, **({'jobs': 1} | changes))
 
 
 def wait_until(
@@ -93,6 +93,7 @@ def test_setup_starts_with_the_gui_defaults() -> None:
         assert isinstance(bot, ThresholdBot) and bot.threshold == threshold
     assert isinstance(scene.result.bots['Expected value'], ExpectedValueBot)
     assert scene.result.games == 500 and scene.result.players_per_game is None
+    assert scene.result.jobs == -1
 
 
 def test_terminal_and_gui_share_defaults_without_overriding_explicit_options() -> None:
@@ -151,6 +152,19 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
     assert result.jobs == 2
     assert result.vengeance and not result.brutal and result.k_factor == 16
+
+
+def test_setup_accepts_automatic_workers_and_rejects_invalid_counts() -> None:
+    scene = TournamentSetupScene(parse_options([]))
+    for value in ('0', '-2', '-'):
+        replace_field(scene, JOBS_FIELD, value)
+        click(scene, START_BUTTON)
+        assert scene.result is None
+        assert scene.error == 'use -1 or at least one worker'
+    replace_field(scene, JOBS_FIELD, '-')
+    scene.handle_event(pygame.event.Event(pygame.TEXTINPUT, text='1'))
+    click(scene, START_BUTTON)
+    assert scene.result is not None and scene.result.jobs == -1
 
 
 def test_setup_limits_bot_count() -> None:

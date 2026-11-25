@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from flip_seven_bots.game import Rules, VengeanceRules
 
 from .core import (
+    DEFAULT_JOBS,
     GameRecord,
     TournamentResult,
     max_table_size,
@@ -35,7 +36,7 @@ class TournamentOptions:
     initial_rating: float
     output: Path | None
     k_half_life: float | None = DEFAULT_K_HALF_LIFE
-    jobs: int = 1
+    jobs: int = DEFAULT_JOBS
     quiet: bool = False
     plots: bool = False
 

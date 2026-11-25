@@ -19,7 +19,7 @@ from flip_seven_bots.bots.specs import number_duplicates, parse_named_bot
 
 from .config import DEFAULT_K_HALF_LIFE
 from .config import TournamentOptions as TournamentOptions  # noqa: PLC0414
-from .core import MAX_PLAYERS, max_table_size
+from .core import DEFAULT_JOBS, MAX_PLAYERS, max_table_size
 from .storage import save_results as save_results  # noqa: PLC0414
 
 if TYPE_CHECKING:
@@ -60,6 +60,16 @@ def _positive_float(value: str) -> float:
         raise argparse.ArgumentTypeError(f'{value!r} is not a number') from None
     if number <= 0:
         raise argparse.ArgumentTypeError('must be positive')
+    return number
+
+
+def _jobs(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'{value!r} is not a whole number') from None
+    if number != -1 and number < 1:
+        raise argparse.ArgumentTypeError('must be -1 or at least one')
     return number
 
 
@@ -154,10 +164,10 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
     parser.add_argument('--seed', type=int, help='seed for seating, decks, and bots')
     parser.add_argument(
         '--jobs',
-        type=_positive_int,
-        default=1,
+        type=_jobs,
+        default=DEFAULT_JOBS,
         metavar='N',
-        help='number of parallel game workers (default: %(default)s)',
+        help='parallel game workers; -1 uses all available CPUs (default: %(default)s)',
     )
     parser.add_argument(
         '--vengeance', action='store_true', help='play With a Vengeance'

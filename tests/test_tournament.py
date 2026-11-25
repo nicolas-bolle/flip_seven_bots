@@ -10,6 +10,7 @@ from flip_seven_bots.game import Action, Observation
 from flip_seven_bots.tournament import (
     PairwiseResults,
     TournamentResult,
+    core,
     elo_update,
     fit_bradley_terry,
     play_tournament,
@@ -102,6 +103,40 @@ def test_random_bots_are_reproducible_across_worker_counts() -> None:
     pd.testing.assert_frame_equal(sequential.summary, parallel.summary)
 
 
+@pytest.mark.parametrize(('cpus', 'expected_workers'), [(2, 2), (100, 3)])
+def test_default_workers_use_available_cpus_and_preserve_results(
+    monkeypatch: pytest.MonkeyPatch, cpus: int, expected_workers: int
+) -> None:
+    monkeypatch.setattr(core.os, 'process_cpu_count', lambda: cpus)
+    original_executor = core.ProcessPoolExecutor
+    counts: list[int] = []
+
+    def executor(*, max_workers: int) -> core.ProcessPoolExecutor:
+        counts.append(max_workers)
+        return original_executor(max_workers=max_workers)
+
+    monkeypatch.setattr(core, 'ProcessPoolExecutor', executor)
+    bots = {'random': RandomBot(), 'threshold': ThresholdBot(25)}
+    sequential = list(play_tournament(bots, games=3, seed=42, jobs=1))
+    automatic = list(play_tournament(bots, games=3, seed=42))
+    assert automatic == sequential
+    assert counts == [expected_workers]
+
+
+def test_automatic_workers_handle_unknown_cpu_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(core.os, 'process_cpu_count', lambda: None)
+    bots = threshold_bots(10, 20)
+    assert len(list(play_tournament(bots, games=1, jobs=-1))) == 1
+
+
+@pytest.mark.parametrize('jobs', [0, -2])
+def test_tournament_rejects_invalid_worker_counts(jobs: int) -> None:
+    with pytest.raises(ValueError, match='jobs'):
+        play_tournament(threshold_bots(10, 20), games=1, jobs=jobs)
+
+
 def test_factory_gets_fresh_seed_and_bot_for_every_game() -> None:
     seeds: list[int | None] = []
 
@@ -114,6 +149,7 @@ def test_factory_gets_fresh_seed_and_bot_for_every_game() -> None:
         games=5,
         seed=7,
         progress=False,
+        jobs=1,
     )
     assert len(seeds) == 5 and len(set(seeds)) == 5
 

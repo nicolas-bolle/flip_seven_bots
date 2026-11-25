@@ -36,7 +36,8 @@ uv run flip7 compare random threshold:25 --games 200 --seed 7
 - `compare A B` is shorthand for `tournament --bot A --bot B` and accepts the
   same options, including `--gui`.
 - `--jobs N` sets the number of parallel game workers, in the terminal and the
-  window. The tournament setup window also has a Workers field.
+  window. The default, `-1`, uses all available CPUs; use `1` for sequential
+  execution. The tournament setup window also has a Workers field.
 - `--output DIR` saves `games.csv`, `summary.csv`, and `settings.json` (bot
   specs, seed, settings, and source revision). Existing files are overwritten.
 - `--plots` also saves HTML plots, and requires `--output`. `--quiet` hides the

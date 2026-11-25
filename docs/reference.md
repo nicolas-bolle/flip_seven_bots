@@ -303,7 +303,7 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 | `--games N` | Number of games (default 500) |
 | `--players-per-game N` | Bots seated in each game (default: all, up to 10) |
 | `--seed N` | Seed for seating, decks, and bots |
-| `--jobs N` | Parallel game workers (default 1) |
+| `--jobs N` | Number of game workers for parallelization (default -1: all available CPUs; use 1 for no parallelization) |
 | `--gui` | Use the tournament window even when options are given |
 | `--setup`, `--no-setup` | Show or skip setup explicitly (with `--gui`) |
 | `--vengeance`, `--brutal` | Choose the game mode |
@@ -319,7 +319,7 @@ uv run flip7 tournament
 
 The window defaults to 500 games with Random, Threshold 20, Threshold 30,
 Threshold 40, and Expected value. The setup screen lets you choose the game
-mode, number of games, players per game, seed, and up to ten bots. Tournament
+mode, number of games, players per game, seed, workers, and up to ten bots. Tournament
 options run in the terminal unless you add `--gui`. To prefill setup instead
 of starting immediately, use `--gui --setup` with your options.
 
@@ -369,7 +369,8 @@ and other bots as factories taking a seed (see
 
 `play_tournament` takes the same settings but returns an iterator yielding a
 `GameRecord` in game order, for showing progress or stopping early. Multiple
-games may be in flight when `jobs > 1`; close the iterator if stopping early.
+games may be in flight when multiple workers are used (including the default
+`jobs=-1`); close the iterator if stopping early.
 `TournamentResult.from_records` builds the result tables from the records.
 
 ### How ratings work

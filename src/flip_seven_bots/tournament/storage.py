@@ -3,8 +3,6 @@
 import json
 from pathlib import Path
 
-from flip_seven_bots.bots.base import Bot
-from flip_seven_bots.bots.registry import BotConfig
 from flip_seven_bots.bots.specs import bot_spec
 from flip_seven_bots.provenance import git_commit
 
@@ -18,14 +16,7 @@ def save_results(
     """Write result CSVs and, when provided, settings and optional plots."""
     metadata = None
     if options is not None:
-        specs = {}
-        for name, bot in options.bots.items():
-            if isinstance(bot, BotConfig):
-                specs[name] = bot.spec
-            elif isinstance(bot, Bot) and not isinstance(bot, type):
-                specs[name] = bot_spec(bot)
-            else:
-                raise TypeError(f'cannot save a specification for bot factory {name!r}')
+        specs = {name: bot_spec(bot) for name, bot in options.bots.items()}
         metadata = {
             'bots': specs,
             'games_requested': options.games,
