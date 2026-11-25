@@ -8,7 +8,7 @@ to any command for its full options.
 | `flip7 play` | Play a game in a window |
 | `flip7 tournament` | Open tournament setup, or pass options to run a tournament in terminal |
 | `flip7 compare A B` | Rate two bots against each other |
-| `flip7 bots` | List the available bots and their parameters |
+| `flip7 bots` | List available bots, their parameter names, and default values |
 | `flip7 trace` | Print one bot's decisions during a game |
 | `flip7 replay REPORT` | Rebuild a game from a bug report |
 

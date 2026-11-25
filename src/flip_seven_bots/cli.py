@@ -62,8 +62,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         from .bots.registry import kinds
 
         for kind in kinds():
-            params = ", ".join(f"{p.name}={p.default}" for p in kind.parameters)
-            print(f"{kind.kind:12} {kind.label}" + (f" ({params})" if params else ""))
+            line = f"{kind.kind:12} {kind.label}"
+            if kind.parameters:
+                parameters = ", ".join(
+                    f"{p.name} (default: {p.default!r})" for p in kind.parameters
+                )
+                line += f" (parameters: {parameters})"
+            print(line)
     elif args.command == "trace":
         if rest:
             parser.error(f"unrecognized arguments: {' '.join(rest)}")

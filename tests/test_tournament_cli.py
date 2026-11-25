@@ -165,10 +165,11 @@ def test_rating_options_reach_the_tournament() -> None:
     assert fast.result(list(fast.start())).games.equals(result.games)
 
 
-def test_registered_multi_parameter_bot_parses_named_spec(
-    monkeypatch: pytest.MonkeyPatch,
+def test_registered_bot_parameters_are_listed_and_parseable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     from flip_seven_bots.bots import registry
+    from flip_seven_bots.cli import main
 
     class Configurable(ThresholdBot):
         def __init__(self, *, seed: int | None, threshold: int, bonus: int) -> None:
@@ -185,6 +186,15 @@ def test_registered_multi_parameter_bot_parses_named_spec(
             (Parameter("threshold", 30), Parameter("bonus", 1)),
         )
     )
+    main(["bots"])
+    listing = capsys.readouterr().out
+    assert "Random bot\n" in listing
+    assert "Threshold bot (parameters: threshold (default: 30))\n" in listing
+    assert (
+        "Configurable (parameters: threshold (default: 30), bonus (default: 1))\n"
+        in listing
+    )
+
     options = parse_options(
         ["--bot", "example=configurable:threshold=12,bonus=3", "--bot", "random"]
     )
