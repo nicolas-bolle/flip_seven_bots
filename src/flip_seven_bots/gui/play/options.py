@@ -30,7 +30,7 @@ class Options:
 def default_seats() -> list[Seat]:
     """Create the default human, threshold-bot, and expected-value-bot seats."""
     return [
-        Seat("Me"),
+        Seat("Human"),
         Seat("Threshold 30", ThresholdBot(30)),
         Seat("Expected value", ExpectedValueBot()),
     ]

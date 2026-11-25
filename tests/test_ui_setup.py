@@ -43,7 +43,7 @@ def test_setup_starts_a_base_game_with_the_default_seats() -> None:
     assert scene.result is not None
     assert not scene.result.vengeance and not scene.result.brutal
     assert [seat.name for seat in scene.result.seats] == [
-        "Me",
+        "Human",
         "Threshold 30",
         "Expected value",
     ]

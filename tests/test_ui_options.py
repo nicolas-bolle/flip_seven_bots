@@ -11,7 +11,7 @@ def test_no_options_gives_the_default_table() -> None:
     assert options.seed is None
     assert options.bug_dir == Path("bug_reports")
     seats = options.seats
-    assert [seat.name for seat in seats] == ["Me", "Threshold 30", "Expected value"]
+    assert [seat.name for seat in seats] == ["Human", "Threshold 30", "Expected value"]
     assert [seat.bot is None for seat in seats] == [True, False, False]
     assert options.show_setup and not options.vengeance and not options.brutal
 
@@ -102,7 +102,7 @@ def test_mode_flags_skip_setup_with_default_players(flag: str, brutal: bool) -> 
     assert options.vengeance and options.brutal is brutal
     assert not options.show_setup
     assert [seat.name for seat in options.seats] == [
-        "Me",
+        "Human",
         "Threshold 30",
         "Expected value",
     ]

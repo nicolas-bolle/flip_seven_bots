@@ -99,7 +99,7 @@ All of them support every decision in every game mode.
 uv run flip7 play
 ```
 
-The setup screen starts with a human (Me), a bot that stays at 30 points, and
+The setup screen starts with a player named Human, a bot that stays at 30 points, and
 an expected value bot. Choose the game mode, edit player names and types, add
 or remove seats (up to six), then press Start. Click a name or value to edit
 it; Ctrl+A clears the field.
