@@ -155,12 +155,12 @@ class TournamentSetupScene:
                 if name.collidepoint(pos):
                     self._focus = ('name', index)
                 elif kind.collidepoint(pos):
-                    names = tuple(kind.kind for kind in kinds())
+                    names = tuple(kind.key for kind in kinds())
                     bot.kind = names[(names.index(bot.kind) + 1) % len(names)]
                     bot.parameter = ''
                 elif (
                     parameter.collidepoint(pos)
-                    and next(k for k in kinds() if k.kind == bot.kind).parameters
+                    and next(k for k in kinds() if k.key == bot.kind).parameters
                 ):
                     self._focus = ('parameter', index)
                 elif remove.collidepoint(pos) and len(self.bots) > 2:
@@ -242,8 +242,8 @@ class TournamentSetupScene:
         for index, bot in enumerate(self.bots):
             name, kind, parameter, remove = _row_rects(index)
             draw_field(screen, font, name, bot.name, self._focus == ('name', index))
-            definition = next(k for k in kinds() if k.kind == bot.kind)
-            draw_button(screen, font, kind, definition.label)
+            definition = next(k for k in kinds() if k.key == bot.kind)
+            draw_button(screen, font, kind, definition.key)
             if definition.parameters:
                 focused = self._focus == ('parameter', index)
                 draw_field(screen, font, parameter, bot.parameter, focused)

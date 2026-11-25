@@ -52,7 +52,7 @@ def test_bots_take_optional_names_and_duplicates_are_numbered() -> None:
         'Threshold 20 1',
         'Threshold 20 2',
         'careful',
-        'Random bot',
+        'Random',
     ]
     careful = options.bots['careful']
     assert isinstance(careful, ThresholdBot) and careful.threshold == 40
@@ -186,17 +186,17 @@ def test_registered_bot_parameters_are_listed_and_parseable(
     register(
         BotKind(
             'configurable',
-            'Configurable',
-            Configurable,
             Configurable,
             (Parameter('threshold', int), Parameter('bonus', int)),
+            Configurable,
+            'Configured bot',
         )
     )
     main(['bots'])
-    listing = capsys.readouterr().out
-    assert 'Random bot\n' in listing
-    assert 'Threshold bot (parameters: threshold)\n' in listing
-    assert 'Configurable (parameters: threshold, bonus)\n' in listing
+    listing = capsys.readouterr().out.splitlines()
+    assert 'random' in listing
+    assert 'threshold (parameters: threshold)' in listing
+    assert 'configurable (parameters: threshold, bonus)' in listing
 
     with pytest.raises(
         ValueError, match='missing required parameters.*threshold, bonus'
@@ -204,6 +204,9 @@ def test_registered_bot_parameters_are_listed_and_parseable(
         parse_bot('configurable')
     with pytest.raises(ValueError, match='missing required parameters.*bonus'):
         parse_bot('configurable:threshold=12')
+
+    name, _ = parse_bot('configurable:threshold=12,bonus=3')
+    assert name == 'Configured bot'
 
     options = parse_options(
         ['--bot', 'example=configurable:threshold=12,bonus=3', '--bot', 'random']
@@ -299,7 +302,7 @@ def test_unified_tournament_dispatches_gui_and_terminal(
     assert [call[0] for call in calls] == ['terminal', 'gui', 'gui', 'gui']
     assert [call[1].games for call in calls[:3]] == [2, 3, 4]
     assert calls[1][2] and not calls[2][2]
-    assert list(calls[2][1].bots) == ['Random bot', 'Threshold 20']
+    assert list(calls[2][1].bots) == ['Random', 'Threshold 20']
     assert calls[3][2]
 
 
@@ -354,7 +357,7 @@ def test_bot_spec_round_trips_reserved_text_characters(
             self.label = label
 
     monkeypatch.setattr(registry, '_KINDS', dict(registry._KINDS))
-    register(BotKind('text', 'Text', TextBot, TextBot, (Parameter('label', str),)))
+    register(BotKind('text', TextBot, (Parameter('label', str),), TextBot, 'Text'))
     bot = parse_bot('text:hello%2Cworld%3Dyes')[1]
     assert isinstance(bot, TextBot) and bot.label == 'hello,world=yes'
     assert bot_spec(bot) == 'text:hello%2Cworld%3Dyes'

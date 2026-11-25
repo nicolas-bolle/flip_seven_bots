@@ -30,11 +30,11 @@ class CarefulBot:
 
 register(
     BotKind(
-        kind='careful',
-        label='Careful bot',
-        constructor=CarefulBot,
+        key='careful',
         bot_type=CarefulBot,
         parameters=(Parameter('threshold', int),),
+        constructor=CarefulBot,
+        display_name='Careful bot',
     )
 )
 ```
@@ -66,6 +66,9 @@ Registration makes the bot available as `careful:20` or
   value. With several parameters, use `kind:name=value,other=value`;
   percent-encode reserved characters in text values, for example `%2C` for a
   comma.
+- Supply `parameters=()` for a bot without parameters. `key` identifies the bot
+  kind in specs, menus, and listings; `display_name` names a configured bot. Use a
+  string for a fixed name or a function that takes the parameter values in order.
 - The constructor, parsers, and any `display_name` function must be defined at
   module level, so that parallel tournament workers can import them.
 

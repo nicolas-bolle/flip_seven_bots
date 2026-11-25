@@ -105,7 +105,7 @@ def test_terminal_and_gui_share_defaults_without_overriding_explicit_options() -
         ['--gui', '--games', '25', '--bot', 'random', '--bot', 'threshold:10']
     ).options
     assert gui.games == 25
-    assert list(gui.bots) == ['Random bot', 'Threshold 10']
+    assert list(gui.bots) == ['Random', 'Threshold 10']
 
 
 def test_setup_edits_bots_mode_and_numbers() -> None:
@@ -140,13 +140,13 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     result = scene.result
     assert result is not None
     assert list(result.bots) == [
-        'Random bot',
+        'Random',
         'Threshold 30 1',
         'Threshold 30 2',
         'Threshold 30 3',
     ]
-    assert isinstance(result.bots['Random bot'], ThresholdBot)
-    assert result.bots['Random bot'].threshold == 15
+    assert isinstance(result.bots['Random'], ThresholdBot)
+    assert result.bots['Random'].threshold == 15
     assert isinstance(result.bots['Threshold 30 2'], ExpectedValueBot)
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
     assert result.jobs == 2

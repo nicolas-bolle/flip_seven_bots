@@ -62,7 +62,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         from .bots.registry import kinds
 
         for kind in kinds():
-            line = f'{kind.kind:12} {kind.label}'
+            line = kind.key
             if kind.parameters:
                 parameters = ', '.join(p.name for p in kind.parameters)
                 line += f' (parameters: {parameters})'

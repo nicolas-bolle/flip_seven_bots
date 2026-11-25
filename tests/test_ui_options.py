@@ -32,11 +32,11 @@ def test_seats_follow_option_order() -> None:
         ]
     ).seats
     assert [seat.name for seat in seats] == [
-        'Random bot',
+        'Random',
         'Ann',
         'Threshold 20',
         'Ben',
-        'Expected value bot',
+        'Expected value',
     ]
     assert isinstance(seats[0].bot, RandomBot)
     assert seats[1].bot is None
@@ -51,7 +51,7 @@ def test_a_table_can_be_all_bots() -> None:
 
 def test_duplicate_names_are_numbered() -> None:
     seats = parse_options(['--human', 'Ann', '--human', 'Ann', '--bot', 'random']).seats
-    assert [seat.name for seat in seats] == ['Ann 1', 'Ann 2', 'Random bot']
+    assert [seat.name for seat in seats] == ['Ann 1', 'Ann 2', 'Random']
 
 
 @pytest.mark.parametrize(

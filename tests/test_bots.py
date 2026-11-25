@@ -1,4 +1,5 @@
 from dataclasses import replace
+from pickle import dumps, loads
 from random import Random
 
 import pytest
@@ -34,7 +35,15 @@ FREEZE = Card(CardType.FREEZE)
 BOT_TEST_SPECS = {'threshold': 'threshold:30'}
 
 
-@pytest.mark.parametrize('kind', [kind.kind for kind in kinds()])
+@pytest.mark.parametrize(
+    ('spec', 'name'), [('random', 'Random'), ('threshold:25', 'Threshold 25')]
+)
+def test_bot_config_preserves_display_name_when_pickled(spec: str, name: str) -> None:
+    config = loads(dumps(parse_config(spec)))
+    assert config.name == name
+
+
+@pytest.mark.parametrize('kind', [kind.key for kind in kinds()])
 @pytest.mark.parametrize('mode', ['base', 'vengeance', 'brutal'])
 def test_registered_bots_play_legal_reproducible_games(kind: str, mode: str) -> None:
     config = parse_config(BOT_TEST_SPECS.get(kind, kind))

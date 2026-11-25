@@ -148,13 +148,13 @@ class SetupScene:
                 if name.collidepoint(pos):
                     self._focus = (index, 'name')
                 elif kind.collidepoint(pos):
-                    names = ('human', *(kind.kind for kind in kinds()))
+                    names = ('human', *(kind.key for kind in kinds()))
                     player.kind = names[(names.index(player.kind) + 1) % len(names)]
                     player.parameter = ''
                 elif (
                     parameter.collidepoint(pos)
                     and player.kind != 'human'
-                    and next(k for k in kinds() if k.kind == player.kind).parameters
+                    and next(k for k in kinds() if k.key == player.kind).parameters
                 ):
                     self._focus = (index, 'parameter')
                 elif remove.collidepoint(pos) and len(self.players) > 1:
@@ -209,8 +209,8 @@ class SetupScene:
         for index, player in enumerate(self.players):
             name, kind, parameter, remove = _row_rects(index)
             self._field(screen, name, player.name, self._focus == (index, 'name'))
-            definition = next((k for k in kinds() if k.kind == player.kind), None)
-            self._button(screen, kind, definition.label if definition else 'Human')
+            definition = next((k for k in kinds() if k.key == player.kind), None)
+            self._button(screen, kind, definition.key if definition else 'Human')
             if definition and definition.parameters:
                 self._field(
                     screen,

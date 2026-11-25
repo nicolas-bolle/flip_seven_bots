@@ -26,11 +26,11 @@ if TYPE_CHECKING:
     from flip_seven_bots.bots.base import Bot
 
 DEFAULT_BOTS = (
-    'Random=random',
+    'random',
     'threshold:20',
     'threshold:30',
     'threshold:40',
-    'Expected value=expected',
+    'expected',
 )
 DEFAULT_GAMES = 500
 
@@ -131,7 +131,7 @@ def _parser(*, launch: bool) -> argparse.ArgumentParser:
         type=named_bot,
         metavar='[NAME=]KIND',
         help=(
-            f'add a bot: {", ".join(kind.kind for kind in kinds())} '
+            f'add a bot: {", ".join(kind.key for kind in kinds())} '
             f'(default lineup: {", ".join(DEFAULT_BOTS)})'
         ),
     )

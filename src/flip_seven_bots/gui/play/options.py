@@ -84,7 +84,7 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
         action='append',
         type=_bot_seat,
         metavar='[NAME=]KIND',
-        help=f'add a bot: {", ".join(kind.kind for kind in kinds())}',
+        help=f'add a bot: {", ".join(kind.key for kind in kinds())}',
     )
     parser.add_argument(
         '--seed',
