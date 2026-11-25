@@ -98,6 +98,8 @@ class TournamentScene:
         self._stop = threading.Event()
         self._started = time.monotonic()
         self._elapsed = 0.0
+        self._last_game_elapsed = 0.0
+        self._slot_widths: dict[str, int] = {}
         self._title_font = pygame.font.Font(None, 52)
         self._heading_font = pygame.font.Font(None, 32)
         self._font = pygame.font.Font(None, 26)
@@ -164,6 +166,7 @@ class TournamentScene:
 
     def _record(self, record: GameRecord) -> None:
         self.records.append(record)
+        self._last_game_elapsed = time.monotonic() - self._started
         for name, place, elo in zip(record.players, record.places, record.elo):
             standing = self._standings[name]
             standing.elo = elo
@@ -219,32 +222,90 @@ class TournamentScene:
                 filled,
                 border_radius=8,
             )
-        label = self._font.render(
-            f'{played} / {total} games  ({played / total:.0%})', True, TEXT
+        font = self._font
+        label = (
+            ('played', str(played)),
+            (None, f' / {total} games  ('),
+            ('percent', f'{played / total:.0%}'),
+            (None, ')'),
         )
-        screen.blit(label, label.get_rect(center=PROGRESS_BAR.center))
-
-        rate = played / self._elapsed if self._elapsed > 0 else 0.0
-        if self.error is not None:
-            status = f'Stopped by an error: {self.error}'
-        elif not self.finished:
-            remaining = f', about {(total - played) / rate:.0f} s left' if rate else ''
-            status = f'Running: {rate:.1f} games/s{remaining}'
-            if played == total:
-                status = 'Computing ratings...'
-            elif self._stop.is_set():
-                status = 'Stopping after the current game, then computing ratings...'
-        elif played < total:
-            status = f'Stopped after {played} games in {self._elapsed:.1f} s'
-        else:
-            status = f'Finished in {self._elapsed:.1f} s ({rate:.1f} games/s)'
-        draw_text(
+        width = sum(self._slot_width(font, key, text) for key, text in label)
+        self._draw_slots(
             screen,
-            self._font,
+            font,
+            label,
+            (
+                PROGRESS_BAR.centerx - width // 2,
+                PROGRESS_BAR.centery - font.get_height() // 2,
+            ),
+            TEXT,
+        )
+
+        # Measure the rate when games arrive, not every frame, so it doesn't
+        # sag between games and jump back when the next one finishes.
+        rate = played / self._last_game_elapsed if self._last_game_elapsed else 0.0
+        status: tuple[tuple[str | None, str], ...]
+        if self.error is not None:
+            status = ((None, f'Stopped by an error: {self.error}'),)
+        elif not self.finished:
+            status = ((None, 'Running: '), ('rate', f'{rate:.1f}'), (None, ' games/s'))
+            if rate:
+                remaining = max(0.0, total / rate - self._elapsed)
+                status += (
+                    (None, ', about '),
+                    ('remaining', f'{remaining:.0f}'),
+                    (None, ' s left'),
+                )
+            if played == total:
+                status = ((None, 'Computing ratings...'),)
+            elif self._stop.is_set():
+                status = (
+                    (
+                        None,
+                        'Stopping after the current game, then computing ratings...',
+                    ),
+                )
+        elif played < total:
+            status = ((None, f'Stopped after {played} games in {self._elapsed:.1f} s'),)
+        else:
+            status = (
+                (None, f'Finished in {self._elapsed:.1f} s ({rate:.1f} games/s)'),
+            )
+        self._draw_slots(
+            screen,
+            font,
             status,
             (PROGRESS_BAR.x, PROGRESS_BAR.bottom + 14),
             ACCENT if self.error else MUTED,
         )
+
+    def _slot_width(self, font: pygame.font.Font, key: str | None, text: str) -> int:
+        """Width of ``text``, or of the widest text shown so far in slot ``key``."""
+        width = font.size(text)[0]
+        if key is not None:
+            width = self._slot_widths[key] = max(self._slot_widths.get(key, 0), width)
+        return width
+
+    def _draw_slots(
+        self,
+        screen: pygame.Surface,
+        font: pygame.font.Font,
+        parts: tuple[tuple[str | None, str], ...],
+        pos: tuple[int, int],
+        color: tuple[int, int, int],
+    ) -> None:
+        """Draw text pieces in a row, right-aligning each keyed piece in its slot.
+
+        Slots only grow, so later pieces don't shift as numbers change width.
+        """
+        x, y = pos
+        for key, text in parts:
+            width = self._slot_width(font, key, text)
+            if key is None:
+                draw_text(screen, font, text, (x, y), color)
+            else:
+                draw_text(screen, font, text, (x + width, y), color, anchor='topright')
+            x += width
 
     def _draw_standings(self, screen: pygame.Surface) -> None:
         pygame.draw.rect(screen, PANEL, STANDINGS, border_radius=10)
@@ -253,15 +314,23 @@ class TournamentScene:
         title = 'Final standings' if summary is not None else 'Standings (live Elo)'
         draw_text(screen, self._heading_font, title, (x, y))
         rating_label = 'RATING (95%)' if summary is not None else 'ELO'
+        # Numbers are right-aligned to these edges so digits stay in place.
         columns = (
-            ('BOT', 18),
-            (rating_label, 190),
-            ('GAMES', 300),
-            ('WINS', 360),
-            ('AVG PLACE', 455),
+            ('BOT', 18, 'topleft'),
+            (rating_label, 265, 'topright'),
+            ('GAMES', 330, 'topright'),
+            ('WINS', 440, 'topright'),
+            ('AVG PLACE', 528, 'topright'),
         )
-        for label, offset in columns:
-            draw_text(screen, self._small_font, label, (x + offset, y + 44), MUTED)
+        for label, offset, anchor in columns:
+            draw_text(
+                screen,
+                self._small_font,
+                label,
+                (x + offset, y + 44),
+                MUTED,
+                anchor=anchor,
+            )
         if summary is not None:
             ranked = [self._standings[name] for name in summary.index]
         else:
@@ -272,8 +341,11 @@ class TournamentScene:
                 stripe = (STANDINGS.x + 8, row_y - 8, STANDINGS.width - 16, 40)
                 pygame.draw.rect(screen, PANEL_ALT, stripe, border_radius=6)
             pygame.draw.rect(screen, standing.color, (x, row_y + 3, 10, 14))
+            draw_text(
+                screen, self._font, self._fit(standing.name, 165), (x + 18, row_y)
+            )
             win_rate = (
-                f' ({standing.wins / standing.games:.0%})' if standing.games else ''
+                f'({standing.wins / standing.games:.0%})' if standing.games else ''
             )
             average = (
                 f'{standing.place_total / standing.games:.2f}'
@@ -281,14 +353,21 @@ class TournamentScene:
                 else '-'
             )
             cells = (
-                (self._fit(standing.name, 165), 18),
-                (self._rating_text(standing, summary), 190),
-                (str(standing.games), 300),
-                (f'{standing.wins}{win_rate}', 360),
-                (average, 455),
+                (self._rating_text(standing, summary), 265),
+                (str(standing.games), 330),
+                (str(standing.wins), 380),
+                (win_rate, 440),
+                (average, 528),
             )
             for text, offset in cells:
-                draw_text(screen, self._font, text, (x + offset, row_y), TEXT)
+                draw_text(
+                    screen,
+                    self._font,
+                    text,
+                    (x + offset, row_y),
+                    TEXT,
+                    anchor='topright',
+                )
 
     @staticmethod
     def _rating_text(standing: _Standing, summary: pd.DataFrame | None) -> str:
@@ -361,15 +440,21 @@ class TournamentScene:
             y = point(0, rating)[1]
             pygame.draw.line(screen, PANEL_ALT, (plot.x, y), (plot.right, y))
             draw_text(
-                screen, self._small_font, f'{rating:.0f}', (CHART.x + 12, y - 7), MUTED
+                screen,
+                self._small_font,
+                f'{rating:.0f}',
+                (plot.x - 8, y - 7),
+                MUTED,
+                anchor='topright',
             )
         draw_text(screen, self._small_font, '0', (plot.x - 4, plot.bottom + 10), MUTED)
         draw_text(
             screen,
             self._small_font,
             str(games),
-            (plot.right - 20, plot.bottom + 10),
+            (plot.right, plot.bottom + 10),
             MUTED,
+            anchor='topright',
         )
         pygame.draw.line(screen, BUTTON, plot.bottomleft, plot.bottomright)
 

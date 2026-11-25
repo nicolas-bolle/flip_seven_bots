@@ -1,7 +1,9 @@
+import queue
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pygame
@@ -30,6 +32,7 @@ from flip_seven_bots.gui.tournament.setup_scene import (
     TournamentSetupScene,
     _row_rects,
 )
+from flip_seven_bots.tournament import GameRecord
 from flip_seven_bots.tournament.cli import (
     TournamentOptions,
     parse_launch,
@@ -195,7 +198,7 @@ def test_standings_fit_the_most_bots_in_distinct_colors(
     monkeypatch.setattr(
         run_scene,
         'draw_text',
-        lambda _screen, _font, text, position, _color=None: drawn.setdefault(
+        lambda _screen, _font, text, position, _color=None, **_kwargs: drawn.setdefault(
             text, position
         ),
     )
@@ -315,6 +318,52 @@ def test_bot_errors_are_shown_instead_of_crashing() -> None:
     scene.render(pygame.Surface((1280, 900)))
     assert scene.error == 'RuntimeError: boom' and scene.records == []
     assert scene.result is None
+
+
+def test_status_rate_holds_between_games_and_later_text_stays_put(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(run_scene, 'time', SimpleNamespace(monotonic=lambda: now[0]))
+    base = quick_options(seed=3, games=50)
+    first = next(base.start())
+    feed: queue.Queue[GameRecord | None] = queue.Queue()
+
+    class Scripted(TournamentOptions):
+        def start(self) -> Iterator[GameRecord]:
+            yield from iter(feed.get, None)
+
+    scene = TournamentScene(
+        Scripted(**{field.name: getattr(base, field.name) for field in fields(base)})
+    )
+    drawn: dict[str, tuple[int, int]] = {}
+    monkeypatch.setattr(
+        run_scene,
+        'draw_text',
+        lambda _screen, _font, text, position, _color=None, **_kwargs: (
+            drawn.__setitem__(text, position)
+        ),
+    )
+
+    def frame(at: float) -> dict[str, tuple[int, int]]:
+        now[0] = at
+        scene.update(0)
+        drawn.clear()
+        scene.render(pygame.Surface((1280, 900)))
+        return dict(drawn)
+
+    try:
+        now[0] = 2.0
+        feed.put(first)
+        wait_until(scene, lambda: len(scene.records) == 1)
+        # One game in 2 s is 0.5 games/s, or 100 s for all 50 games.
+        ten_left, nine_left = frame(90.0), frame(91.0)
+    finally:
+        scene.close()
+        feed.put(None)
+    assert ten_left['0.5'] == nine_left['0.5']
+    assert '10' in ten_left and '9' in nine_left
+    assert ten_left[' s left'] == nine_left[' s left']
 
 
 def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(
