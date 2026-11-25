@@ -58,9 +58,9 @@ class Table:
         rules: Rules | None = None,
     ):
         if not seats:
-            raise ValueError("a table needs at least one seat")
+            raise ValueError('a table needs at least one seat')
         if rules is not None and new_game is not seeded_game:
-            raise ValueError("pass rules to the custom game factory instead")
+            raise ValueError('pass rules to the custom game factory instead')
         self.seats = tuple(seats)
         self.humans = tuple(
             index for index, seat in enumerate(seats) if seat.bot is None

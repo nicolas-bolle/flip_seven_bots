@@ -65,7 +65,7 @@ def _sample_observation(
     next_draws: Sequence[Card],
 ) -> Game:
     if version[0] != expected:
-        raise RuntimeError("observation is out of date; the game has advanced")
+        raise RuntimeError('observation is out of date; the game has advanced')
     clone = snapshot.determinize(rng)
     clone._deck.stack(next_draws)
     return clone
@@ -163,11 +163,11 @@ class Game:
         dealer: int = 0,
     ):
         if not 1 <= player_count <= MAX_PLAYERS:
-            raise ValueError(f"player_count must be between 1 and {MAX_PLAYERS}")
+            raise ValueError(f'player_count must be between 1 and {MAX_PLAYERS}')
         if not 0 <= dealer < player_count:
-            raise ValueError("dealer must be a valid player index")
+            raise ValueError('dealer must be a valid player index')
         if deck is not None and seed is not None:
-            raise ValueError("pass either a deck or a seed, not both")
+            raise ValueError('pass either a deck or a seed, not both')
 
         self._rules = rules if rules is not None else Rules()
         self._deck = (
@@ -181,6 +181,7 @@ class Game:
         self._tasks: deque[_Task] = deque()
         self._pending: Decision | None = None
         self._events: list[GameEvent] = []
+        self._past_events: list[GameEvent] = []
         self._recent_draws: list[CardDrawn] = []
         self._version = 0
         self._version_token = [0]
@@ -212,6 +213,15 @@ class Game:
         """Cards drawn during initialization or the most recent decision."""
         return tuple(self._recent_draws)
 
+    @property
+    def history(self) -> tuple[GameEvent, ...]:
+        """Public events of every round so far, in order, for display.
+
+        Copies made for observations and ``determinize`` only keep the current
+        round's events, so rollouts don't pay for copying the whole game.
+        """
+        return (*self._past_events, *self._events)
+
     def hidden_deck(self) -> tuple[Card, ...]:
         """The undrawn cards, next card first. For debugging only; bots must not use it."""
         return self._deck.remaining
@@ -234,7 +244,7 @@ class Game:
         seat. The returned snapshot can be sampled only until the game advances.
         """
         if not 0 <= player < len(self._players):
-            raise ValueError("player must be a valid player index")
+            raise ValueError('player must be a valid player index')
         views = tuple(
             PlayerView(
                 player=index,
@@ -283,6 +293,7 @@ class Game:
         ]
         snapshot._tasks = copy.deepcopy(self._tasks)
         snapshot._events = list(self._events)
+        snapshot._past_events = []
         snapshot._recent_draws = list(self._recent_draws)
         snapshot._version_token = [self._version]
         return snapshot
@@ -290,7 +301,9 @@ class Game:
     def determinize(self, rng: Random) -> Game:
         """Return an independent copy with the hidden deck order resampled from ``rng``."""
         # Seeding the memo substitutes ``rng`` for the deck's generator instead of copying it.
-        clone = copy.deepcopy(self, {id(self._deck._random): rng})
+        clone = copy.deepcopy(
+            self, {id(self._deck._random): rng, id(self._past_events): []}
+        )
         clone._deck.resample(rng)
         return clone
 
@@ -301,7 +314,7 @@ class Game:
         """
         decision = self._pending
         if decision is None or action not in decision.actions:
-            raise ValueError(f"illegal action: {action!r}")
+            raise ValueError(f'illegal action: {action!r}')
         self._pending = None
         self._version += 1
         self._version_token[0] = self._version
@@ -330,6 +343,7 @@ class Game:
             player.reset()
         self._tasks.clear()
         self._pending = None
+        self._past_events.extend(self._events)
         self._events.clear()
         self._events.append(RoundStarted(self._round_number))
         first = (self._dealer + 1) % len(self._players)

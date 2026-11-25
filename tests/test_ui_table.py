@@ -26,7 +26,7 @@ def make_table(rules: Rules | None = None, bot_delay_ms: int = 0) -> Table:
     """The human (seat 0) is dealt first and holds a 3; both bots always stay."""
     draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2, 7, 8, 9)]
     return Table(
-        [Seat("You"), Seat("A", StayBot()), Seat("B", StayBot())],
+        [Seat('You'), Seat('A', StayBot()), Seat('B', StayBot())],
         new_game=lambda count, _seed: Game(
             count, dealer=2, deck=Deck.stacked(draws), rules=rules
         ),
@@ -54,7 +54,7 @@ def test_bot_moves_once_its_delay_has_passed() -> None:
 def test_default_bot_delay_is_at_least_one_second_for_each_decision() -> None:
     draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2)]
     table = Table(
-        [Seat("You"), Seat("A", StayBot()), Seat("B", StayBot())],
+        [Seat('You'), Seat('A', StayBot()), Seat('B', StayBot())],
         new_game=lambda count, _seed: Game(count, dealer=2, deck=Deck.stacked(draws)),
     )
     table.choose(STAY)
@@ -107,7 +107,7 @@ def test_restart_replaces_a_finished_game() -> None:
 def test_each_human_acts_on_their_own_turn() -> None:
     draws = [Card(CardType.NUMBER, n) for n in (3, 1, 2)]
     table = Table(
-        [Seat("Ann"), Seat("Bot", StayBot()), Seat("Ben")],
+        [Seat('Ann'), Seat('Bot', StayBot()), Seat('Ben')],
         new_game=lambda count, _seed: Game(count, dealer=2, deck=Deck.stacked(draws)),
         bot_delay_ms=0,
     )
@@ -121,7 +121,7 @@ def test_each_human_acts_on_their_own_turn() -> None:
 
 def test_bots_play_a_table_without_humans() -> None:
     table = Table(
-        [Seat("A", StayBot()), Seat("B", StayBot())],
+        [Seat('A', StayBot()), Seat('B', StayBot())],
         new_game=lambda count, _seed: Game(count, seed=1),
         bot_delay_ms=0,
     )
@@ -132,13 +132,13 @@ def test_bots_play_a_table_without_humans() -> None:
 
 
 def test_table_needs_a_seat() -> None:
-    with pytest.raises(ValueError, match="at least one seat"):
+    with pytest.raises(ValueError, match='at least one seat'):
         Table([])
 
 
 def test_seed_makes_games_repeatable() -> None:
     def deals(seed: int | None) -> list[tuple[Card, ...]]:
-        table = Table([Seat("You"), Seat("A", StayBot())], seed=seed)
+        table = Table([Seat('You'), Seat('A', StayBot())], seed=seed)
         first = table.game.hidden_deck()
         table.restart()
         return [first, table.game.hidden_deck()]

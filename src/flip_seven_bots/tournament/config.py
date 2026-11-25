@@ -1,6 +1,6 @@
 """Tournament settings shared by the terminal and window."""
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from flip_seven_bots.game import Rules, VengeanceRules
 
 from .core import (
+    DEFAULT_JOBS,
     GameRecord,
     TournamentResult,
     max_table_size,
@@ -25,7 +26,7 @@ DEFAULT_K_HALF_LIFE = 50.0
 class TournamentOptions:
     """Settings for a tournament."""
 
-    bots: dict[str, Bot | BotFactory]
+    bots: Mapping[str, Bot | BotFactory]
     games: int
     players_per_game: int | None
     seed: int | None
@@ -35,7 +36,7 @@ class TournamentOptions:
     initial_rating: float
     output: Path | None
     k_half_life: float | None = DEFAULT_K_HALF_LIFE
-    jobs: int = 1
+    jobs: int = DEFAULT_JOBS
     quiet: bool = False
     plots: bool = False
 
@@ -59,20 +60,20 @@ class TournamentOptions:
 
     def describe(self) -> str:
         """A one-line description of the settings."""
-        mode = "Flip 7"
+        mode = 'Flip 7'
         if self.vengeance:
-            mode = "With a Vengeance (Brutal)" if self.brutal else "With a Vengeance"
+            mode = 'With a Vengeance (Brutal)' if self.brutal else 'With a Vengeance'
         table = self.players_per_game or max_table_size(len(self.bots))
-        return f"{len(self.bots)} bots, {self.games} games of {table} players, {mode}"
+        return f'{len(self.bots)} bots, {self.games} games of {table} players, {mode}'
 
     def _settings(self) -> dict:
         return {
-            "games": self.games,
-            "players_per_game": self.players_per_game,
-            "rules": self.rules,
-            "seed": self.seed,
-            "k_factor": self.k_factor,
-            "k_half_life": self.k_half_life,
-            "initial_rating": self.initial_rating,
-            "jobs": self.jobs,
+            'games': self.games,
+            'players_per_game': self.players_per_game,
+            'rules': self.rules,
+            'seed': self.seed,
+            'k_factor': self.k_factor,
+            'k_half_life': self.k_half_life,
+            'initial_rating': self.initial_rating,
+            'jobs': self.jobs,
         }

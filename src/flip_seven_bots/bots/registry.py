@@ -1,7 +1,8 @@
 """Registry of bot configurations shared by the interfaces."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import partial
 from urllib.parse import quote, unquote
 
 from .base import Bot
@@ -10,11 +11,10 @@ from .simple import ExpectedValueBot, RandomBot, ThresholdBot
 
 @dataclass(frozen=True)
 class Parameter:
-    """A bot parameter, its default, and its text parser."""
+    """A required bot parameter and its text parser."""
 
     name: str
-    default: object
-    parse: Callable[[str], object] = int
+    parse: Callable[[str], object]
 
 
 @dataclass(frozen=True)
@@ -23,30 +23,37 @@ class BotKind:
 
     The constructor must accept ``seed`` as a keyword argument. Deterministic
     bots may ignore it. Parameter values must also be readable as attributes.
+    Pass an empty parameter tuple for bots without parameters. The display name
+    is either a fixed string or a callable taking the parameter values in order.
     """
 
-    kind: str
-    label: str
-    constructor: Callable[..., Bot]
+    key: str
     bot_type: type
-    parameters: tuple[Parameter, ...] = ()
-    display_name: Callable[..., str] | None = None
+    parameters: tuple[Parameter, ...]
+    constructor: Callable[..., Bot]
+    display_name: str | Callable[..., str]
 
 
 _KINDS: dict[str, BotKind] = {}
 
 
+def _fixed_name(name: str, *_values: object) -> str:
+    return name
+
+
 def register(kind: BotKind) -> None:
-    """Register a bot kind, rejecting duplicate or invalid names."""
-    if not kind.kind or any(c in kind.kind for c in ":,="):
-        raise ValueError("invalid bot kind")
-    if kind.kind in _KINDS:
-        raise ValueError(f"bot kind {kind.kind!r} is already registered")
+    """Register a bot kind, normalizing a fixed display name to a callable."""
+    if not kind.key or any(c in kind.key for c in ':,='):
+        raise ValueError('invalid bot kind')
+    if kind.key in _KINDS:
+        raise ValueError(f'bot kind {kind.key!r} is already registered')
     if len({parameter.name for parameter in kind.parameters}) != len(kind.parameters):
-        raise ValueError("duplicate bot parameter")
-    if any(not p.name.isidentifier() or p.name == "seed" for p in kind.parameters):
-        raise ValueError("invalid or reserved bot parameter name")
-    _KINDS[kind.kind] = kind
+        raise ValueError('duplicate bot parameter')
+    if any(not p.name.isidentifier() or p.name == 'seed' for p in kind.parameters):
+        raise ValueError('invalid or reserved bot parameter name')
+    if isinstance(kind.display_name, str):
+        kind = replace(kind, display_name=partial(_fixed_name, kind.display_name))
+    _KINDS[kind.key] = kind
 
 
 def kinds() -> tuple[BotKind, ...]:
@@ -72,62 +79,58 @@ class BotConfig:
 
     @property
     def name(self) -> str:
-        if self.definition.display_name:
-            return self.definition.display_name(*self.values)
-        return self.definition.label
+        display_name = self.definition.display_name
+        if not callable(display_name):
+            raise TypeError('bot configuration requires a registered display name')
+        return display_name(*self.values)
 
     @property
     def spec(self) -> str:
         if not self.values:
-            return self.definition.kind
-        if len(self.values) == 1:
-            return f"{self.definition.kind}:{quote(str(self.values[0]), safe='')}"
-        values = ",".join(
-            f"{parameter.name}={quote(str(value), safe='')}"
+            return self.definition.key
+        # A named empty value stays distinct from a blank setup field.
+        if len(self.values) == 1 and str(self.values[0]):
+            return f'{self.definition.key}:{quote(str(self.values[0]), safe="")}'
+        values = ','.join(
+            f'{parameter.name}={quote(str(value), safe="")}'
             for parameter, value in zip(self.definition.parameters, self.values)
         )
-        return f"{self.definition.kind}:{values}"
-
-
-def default_parameters(kind: BotKind) -> str:
-    """Return editable default parameters for a setup screen."""
-    if len(kind.parameters) == 1:
-        return quote(str(kind.parameters[0].default), safe="")
-    return ",".join(
-        f"{p.name}={quote(str(p.default), safe='')}" for p in kind.parameters
-    )
+        return f'{self.definition.key}:{values}'
 
 
 def parse_config(spec: str) -> BotConfig:
-    """Parse ``kind``, ``kind:value`` or ``kind:name=value,...``."""
-    name, separator, text = spec.partition(":")
+    """Parse a bot spec with explicit values for all its parameters."""
+    name, separator, text = spec.partition(':')
     if name not in _KINDS:
-        raise ValueError(f"unknown bot {spec!r}; choose from {', '.join(_KINDS)}")
+        raise ValueError(f'unknown bot {spec!r}; choose from {", ".join(_KINDS)}')
     definition = _KINDS[name]
     parameters = definition.parameters
-    values = {parameter.name: parameter.default for parameter in parameters}
+    values: dict[str, object] = {}
     if separator:
         if not parameters:
-            raise ValueError(f"invalid parameters for {name!r}")
-        if "=" not in text and len(parameters) == 1:
+            raise ValueError(f'invalid parameters for {name!r}')
+        if '=' not in text and len(parameters) == 1:
             entries = [(parameters[0].name, text)]
         else:
             entries = []
-            for entry in text.split(","):
-                key, equals, value = entry.partition("=")
+            for entry in text.split(','):
+                key, equals, value = entry.partition('=')
                 if not equals or not key:
-                    raise ValueError(f"invalid parameter {entry!r}")
+                    raise ValueError(f'invalid parameter {entry!r}')
                 entries.append((key, value))
-        seen: set[str] = set()
         for key, value in entries:
             parameter = next((p for p in parameters if p.name == key), None)
-            if parameter is None or key in seen:
-                raise ValueError(f"unknown or duplicate parameter {key!r}")
-            seen.add(key)
+            if parameter is None or key in values:
+                raise ValueError(f'unknown or duplicate parameter {key!r}')
             try:
-                values[key] = parameter.parse(unquote(value, errors="strict"))
+                values[key] = parameter.parse(unquote(value, errors='strict'))
             except ValueError as error:
-                raise ValueError(f"invalid {key}: {error}") from error
+                raise ValueError(f'invalid {key}: {error}') from error
+    missing = [p.name for p in parameters if p.name not in values]
+    if missing:
+        raise ValueError(
+            f'missing required parameters for {name!r}: {", ".join(missing)}'
+        )
     config = BotConfig(definition, tuple(values[p.name] for p in parameters))
     # Validate constructor constraints at input time.
     config(None)
@@ -142,34 +145,49 @@ def config_for(bot: Bot) -> BotConfig:
                 definition,
                 tuple(getattr(bot, p.name) for p in definition.parameters),
             )
-    raise ValueError(f"no registered configuration for {bot!r}; pass a bot factory")
+    raise ValueError(f'no registered configuration for {bot!r}; pass a bot factory')
 
 
-def _random(*, seed: int | None) -> Bot:
+def _construct_random(*, seed: int | None) -> Bot:
     return RandomBot(seed)
 
 
-def _threshold(*, seed: int | None, threshold: int) -> Bot:
+def _construct_threshold(*, seed: int | None, threshold: int) -> Bot:
     return ThresholdBot(threshold)
 
 
-def _expected(*, seed: int | None) -> Bot:
+def _construct_expected(*, seed: int | None) -> Bot:
     return ExpectedValueBot()
 
 
 def _threshold_name(threshold: int) -> str:
-    return f"Threshold {threshold}"
+    return f'Threshold {threshold}'
 
 
-register(BotKind("random", "Random bot", _random, RandomBot))
 register(
     BotKind(
-        "threshold",
-        "Threshold bot",
-        _threshold,
-        ThresholdBot,
-        (Parameter("threshold", 30),),
-        _threshold_name,
+        key='random',
+        bot_type=RandomBot,
+        parameters=(),
+        constructor=_construct_random,
+        display_name='Random',
     )
 )
-register(BotKind("expected", "Expected value bot", _expected, ExpectedValueBot))
+register(
+    BotKind(
+        key='threshold',
+        bot_type=ThresholdBot,
+        parameters=(Parameter('threshold', int),),
+        constructor=_construct_threshold,
+        display_name=_threshold_name,
+    )
+)
+register(
+    BotKind(
+        key='expected',
+        bot_type=ExpectedValueBot,
+        parameters=(),
+        constructor=_construct_expected,
+        display_name='Expected value',
+    )
+)

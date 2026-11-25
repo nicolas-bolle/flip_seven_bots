@@ -8,7 +8,7 @@ A tournament plays many complete games between named bots and rates them.
 uv run flip7 tournament --bot random --bot careful=threshold:25 \
     --games 500 --seed 7 --jobs 4 --output results
 uv run flip7 compare expected threshold:30 --games 500 --seed 7
-uv run flip7 tournament --gui
+uv run flip7 tournament  # open the setup window
 ```
 
 From Python, use `run_tournament`, or `play_tournament` to receive games as
@@ -49,7 +49,10 @@ revision, so a saved run records how to reproduce it.
 
 ## Parallel runs
 
-`--jobs N` (or `jobs=N` in Python) plays games in `N` worker processes, with
-only a few games in flight at a time. Errors in a worker stop the tournament
-and are reported rather than retried. Stopping the window waits for games in
-progress, and the results include only the games finished before stopping.
+`--jobs N` (or `jobs=N` in Python) plays games in `N` worker processes. The
+default, `-1`, uses all available CPUs, up to the number of games; `1` runs
+games sequentially in the current process. Parallel runs require picklable bot
+factories and rules. At most one game per worker is in flight. Errors in a
+worker stop the tournament and are reported rather than retried. Stopping the
+window waits for games in progress, and the results include only the games
+finished before stopping.

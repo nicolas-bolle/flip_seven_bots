@@ -1,5 +1,7 @@
 """Rate bots against each other over a series of games."""
 
+import os
+import sys
 from collections import Counter
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ProcessPoolExecutor
@@ -23,6 +25,8 @@ from .ratings import PairwiseResults, elo_update
 
 if TYPE_CHECKING:
     from flip_seven_bots.bots.base import BotFactory
+
+DEFAULT_JOBS = -1
 
 
 @dataclass(frozen=True)
@@ -113,15 +117,15 @@ class TournamentResult:
         """
         rows = [
             {
-                "game": record.game,
-                "seat": seat,
-                "player": name,
-                "score": record.scores[seat],
-                "place": record.places[seat],
-                "won": record.places[seat] == 1,
-                "elo_before": record.elo_before[seat],
-                "elo": record.elo[seat],
-                "elo_change": record.elo[seat] - record.elo_before[seat],
+                'game': record.game,
+                'seat': seat,
+                'player': name,
+                'score': record.scores[seat],
+                'place': record.places[seat],
+                'won': record.places[seat] == 1,
+                'elo_before': record.elo_before[seat],
+                'elo': record.elo[seat],
+                'elo_change': record.elo[seat] - record.elo_before[seat],
             }
             for record in records
             for seat, name in enumerate(record.players)
@@ -129,22 +133,22 @@ class TournamentResult:
         played = pd.DataFrame(
             rows,
             columns=[
-                "game",
-                "seat",
-                "player",
-                "score",
-                "place",
-                "won",
-                "elo_before",
-                "elo",
-                "elo_change",
+                'game',
+                'seat',
+                'player',
+                'score',
+                'place',
+                'won',
+                'elo_before',
+                'elo',
+                'elo_change',
             ],
         )
         elo = dict.fromkeys(players, float(initial_rating))
         for record in records:
             elo.update(zip(record.players, record.elo))
 
-        active = [name for name in players if name in set(played["player"])]
+        active = [name for name in players if name in set(played['player'])]
         results = PairwiseResults(active)
         for record in records:
             results.add(record.game, record.players, record.places)
@@ -153,7 +157,7 @@ class TournamentResult:
             if active
             else np.empty((0, 3)),
             index=active,
-            columns=["rating", "rating_low", "rating_high"],
+            columns=['rating', 'rating_low', 'rating_high'],
         )
         return cls(played, _summarize(played, list(players), fitted, elo))
 
@@ -173,27 +177,32 @@ def play_tournament(
     k_factor: float = 32.0,
     k_half_life: float | None = 50.0,
     initial_rating: float = 1500.0,
-    jobs: int = 1,
+    jobs: int = DEFAULT_JOBS,
 ) -> Generator[GameRecord]:
     """Validate the settings, then return an iterator of games in scheduled order.
 
-    With multiple workers, up to ``jobs`` games may be in flight. Close the
-    iterator when stopping early to wait for workers and release resources.
+    ``jobs=-1`` uses all available CPUs, up to the number of games. With
+    multiple workers, up to that many games may be in flight. Close the iterator
+    when stopping early to wait for workers and release resources.
     """
     names = list(bots)
     largest = max_table_size(len(names))
     table_size = largest if players_per_game is None else players_per_game
     if games < 1:
-        raise ValueError("games must be at least one")
+        raise ValueError('games must be at least one')
     if not 2 <= table_size <= largest:
         raise ValueError(
-            "players_per_game must be between two and the number of bots, "
-            f"up to {MAX_PLAYERS}"
+            'players_per_game must be between two and the number of bots, '
+            f'up to {MAX_PLAYERS}'
         )
     if k_half_life is not None and k_half_life <= 0:
-        raise ValueError("k_half_life must be positive")
-    if jobs < 1:
-        raise ValueError("jobs must be at least one")
+        raise ValueError('k_half_life must be positive')
+    if jobs != -1 and jobs < 1:
+        raise ValueError('jobs must be -1 or at least one')
+    if jobs == -1:
+        jobs = min(os.process_cpu_count() or 1, games)
+        if sys.platform == 'win32':
+            jobs = min(jobs, 61)
     factories = {
         name: config_for(bot)
         if isinstance(bot, Bot) and not isinstance(bot, type)
@@ -270,7 +279,7 @@ def run_tournament(
     initial_rating: float = 1500.0,
     confidence: float = 0.95,
     progress: bool = True,
-    jobs: int = 1,
+    jobs: int = DEFAULT_JOBS,
 ) -> TournamentResult:
     """Play ``games`` games between named bots and rate them.
 
@@ -279,7 +288,8 @@ def run_tournament(
     decks, and bot seeds.
     Each game constructs fresh bots from factories accepting a seed. Registered
     bot instances are also accepted as configurations. Factories and rules
-    must be picklable when ``jobs`` is greater than one.
+    must be picklable when multiple workers are used. ``jobs=-1`` (the default)
+    uses all available CPUs, up to the number of games; ``jobs=1`` runs locally.
 
     The summary's ``rating`` is fitted to all games at once (see
     ``TournamentResult``), with a ``confidence`` interval. An online Elo rating
@@ -302,7 +312,7 @@ def run_tournament(
     elo = dict.fromkeys(bots, float(initial_rating))
     played = []
     bar = tqdm(
-        records, total=games, desc="Tournament", unit="game", disable=not progress
+        records, total=games, desc='Tournament', unit='game', disable=not progress
     )
     for record in bar:
         played.append(record)
@@ -323,30 +333,30 @@ def _summarize(
     fitted: pd.DataFrame,
     elo: Mapping[str, float],
 ) -> pd.DataFrame:
-    grouped = played.groupby("player")
+    grouped = played.groupby('player')
     summary = pd.DataFrame(
         {
-            "games": grouped.size(),
-            "wins": grouped["won"].sum(),
-            "mean_place": grouped["place"].mean(),
-            "mean_score": grouped["score"].mean(),
+            'games': grouped.size(),
+            'wins': grouped['won'].sum(),
+            'mean_place': grouped['place'].mean(),
+            'mean_score': grouped['score'].mean(),
         }
     ).reindex(players)
-    summary["games"] = summary["games"].fillna(0).astype(int)
-    summary["wins"] = summary["wins"].fillna(0).astype(int)
-    summary["win_rate"] = summary["wins"] / summary["games"].where(summary["games"] > 0)
+    summary['games'] = summary['games'].fillna(0).astype(int)
+    summary['wins'] = summary['wins'].fillna(0).astype(int)
+    summary['win_rate'] = summary['wins'] / summary['games'].where(summary['games'] > 0)
     summary = summary.join(fitted)
-    summary["elo"] = pd.Series(elo)
-    summary.index.name = "player"
+    summary['elo'] = pd.Series(elo)
+    summary.index.name = 'player'
     columns = [
-        "games",
-        "wins",
-        "win_rate",
-        "mean_place",
-        "mean_score",
-        "rating",
-        "rating_low",
-        "rating_high",
-        "elo",
+        'games',
+        'wins',
+        'win_rate',
+        'mean_place',
+        'mean_score',
+        'rating',
+        'rating_low',
+        'rating_high',
+        'elo',
     ]
-    return summary[columns].sort_values("rating", ascending=False, na_position="last")
+    return summary[columns].sort_values('rating', ascending=False, na_position='last')

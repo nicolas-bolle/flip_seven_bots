@@ -4,11 +4,11 @@ from .core import GameRecord, TournamentResult, play_tournament, run_tournament
 from .ratings import PairwiseResults, elo_update, fit_bradley_terry
 
 __all__ = [
-    "GameRecord",
-    "PairwiseResults",
-    "TournamentResult",
-    "elo_update",
-    "fit_bradley_terry",
-    "play_tournament",
-    "run_tournament",
+    'GameRecord',
+    'PairwiseResults',
+    'TournamentResult',
+    'elo_update',
+    'fit_bradley_terry',
+    'play_tournament',
+    'run_tournament',
 ]

@@ -9,10 +9,9 @@ from pathlib import Path
 from flip_seven_bots.bots import ExpectedValueBot, ThresholdBot
 from flip_seven_bots.bots.registry import kinds
 from flip_seven_bots.bots.specs import number_duplicates, parse_named_bot
+from flip_seven_bots.game import MAX_PLAYERS
 
 from .table import Seat
-
-MAX_PLAYERS = 6
 
 
 @dataclass(frozen=True)
@@ -30,9 +29,9 @@ class Options:
 def default_seats() -> list[Seat]:
     """Create the default human, threshold-bot, and expected-value-bot seats."""
     return [
-        Seat("Me"),
-        Seat("Threshold 30", ThresholdBot(30)),
-        Seat("Expected value", ExpectedValueBot()),
+        Seat('Human'),
+        Seat('Threshold 30', ThresholdBot(30)),
+        Seat('Expected value', ExpectedValueBot()),
     ]
 
 
@@ -46,7 +45,7 @@ def _bot_seat(spec: str) -> Seat:
 
 def _human_seat(name: str) -> Seat:
     if not name.strip():
-        raise argparse.ArgumentTypeError("a human player needs a name")
+        raise argparse.ArgumentTypeError('a human player needs a name')
     return Seat(name.strip())
 
 
@@ -63,56 +62,56 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     implies With a Vengeance.
     """
     parser = argparse.ArgumentParser(
-        prog="flip7 play",
+        prog='flip7 play',
         description=(
-            "Play Flip 7 at one screen. Seats are filled in the order the options "
-            "are given; players take turns at the same keyboard and mouse. With no "
-            "options, configure the game on the setup screen."
+            'Play Flip 7 at one screen. Seats are filled in the order the options '
+            'are given; players take turns at the same keyboard and mouse. With no '
+            'options, configure the game on the setup screen.'
         ),
     )
     parser.add_argument(
-        "--human",
-        dest="seats",
-        action="append",
+        '--human',
+        dest='seats',
+        action='append',
         type=_human_seat,
-        metavar="NAME",
-        help="add a human player",
+        metavar='NAME',
+        help='add a human player',
     )
     parser.add_argument(
-        "--bot",
-        dest="seats",
-        action="append",
+        '--bot',
+        dest='seats',
+        action='append',
         type=_bot_seat,
-        metavar="[NAME=]KIND",
-        help=f"add a bot: {', '.join(kind.kind for kind in kinds())}",
+        metavar='[NAME=]KIND',
+        help=f'add a bot: {", ".join(kind.key for kind in kinds())}',
     )
     parser.add_argument(
-        "--seed",
+        '--seed',
         type=int,
-        help="seed for the decks, so games can be repeated (bots stay random)",
+        help='seed for the decks, so games can be repeated (bots stay random)',
     )
     parser.add_argument(
-        "--bug-dir",
+        '--bug-dir',
         type=Path,
-        default=Path("bug_reports"),
-        metavar="PATH",
-        help="folder for bug and crash reports (default: %(default)s)",
+        default=Path('bug_reports'),
+        metavar='PATH',
+        help='folder for bug and crash reports (default: %(default)s)',
     )
     parser.add_argument(
-        "--vengeance", action="store_true", help="play With a Vengeance"
+        '--vengeance', action='store_true', help='play With a Vengeance'
     )
     parser.add_argument(
-        "--brutal", action="store_true", help="play With a Vengeance in Brutal Mode"
+        '--brutal', action='store_true', help='play With a Vengeance in Brutal Mode'
     )
     setup = parser.add_mutually_exclusive_group()
-    setup.add_argument("--setup", action="store_true", help="show the setup screen")
-    setup.add_argument("--no-setup", action="store_true", help="start immediately")
+    setup.add_argument('--setup', action='store_true', help='show the setup screen')
+    setup.add_argument('--no-setup', action='store_true', help='start immediately')
     args = parser.parse_args(argv)
     seats: list[Seat] | None = args.seats
     if not seats:
         seats = default_seats()
     elif len(seats) > MAX_PLAYERS:
-        parser.error(f"at most {MAX_PLAYERS} players fit on the screen")
+        parser.error(f'at most {MAX_PLAYERS} players fit on the screen')
     show_setup = args.setup or (
         not args.no_setup and not (sys.argv[1:] if argv is None else argv)
     )

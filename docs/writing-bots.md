@@ -17,7 +17,7 @@ from flip_seven_bots.game import HitOrStay
 
 
 class CarefulBot:
-    def __init__(self, *, seed, threshold=25):
+    def __init__(self, *, seed, threshold):
         # A bot that uses randomness should create its own Random(seed).
         self.threshold = threshold
 
@@ -30,11 +30,11 @@ class CarefulBot:
 
 register(
     BotKind(
-        kind="careful",
-        label="Careful bot",
-        constructor=CarefulBot,
+        key='careful',
         bot_type=CarefulBot,
-        parameters=(Parameter("threshold", 25),),
+        parameters=(Parameter('threshold', int),),
+        constructor=CarefulBot,
+        display_name='Careful bot',
     )
 )
 ```
@@ -54,17 +54,21 @@ runs when the package loads:
 from . import careful as careful
 ```
 
-Registration makes the bot available as the spec `careful` or
+Registration makes the bot available as `careful:20` or
 `careful:threshold=20` in every command and setup screen. The rules:
 
 - The constructor takes `seed` as a keyword argument, even if it ignores it.
   `seed` is reserved and cannot be a parameter.
 - Each parameter is also an instance attribute of the same name, so bots can
   be described and saved.
-- Parameters are integers unless `Parameter` gets another parser, for example
-  `Parameter("style", "safe", str)`. With several parameters, use
-  `kind:name=value,other=value`; percent-encode reserved characters in text
-  values, for example `%2C` for a comma.
+- Each `Parameter` declares a parser, such as `Parameter("threshold", int)`
+  or `Parameter("style", str)`. Every declared parameter needs an explicit
+  value. With several parameters, use `kind:name=value,other=value`;
+  percent-encode reserved characters in text values, for example `%2C` for a
+  comma.
+- Supply `parameters=()` for a bot without parameters. `key` identifies the bot
+  kind in specs, menus, and listings; `display_name` names a configured bot. Use a
+  string for a fixed name or a function that takes the parameter values in order.
 - The constructor, parsers, and any `display_name` function must be defined at
   module level, so that parallel tournament workers can import them.
 
@@ -73,7 +77,7 @@ Registration makes the bot available as the spec `careful` or
 ```shell
 uv run flip7 bots
 uv run flip7 compare careful:25 threshold:30 --games 100 --seed 42 --jobs 2
-uv run flip7 trace --bot careful --bot random --seed 1 --step
+uv run flip7 trace --bot careful:25 --bot random --seed 1 --step
 ```
 
 ## 4. Test it
@@ -106,9 +110,9 @@ def make_careful(seed):
     return CarefulBot(seed=seed, threshold=25)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     result = run_tournament(
-        {"careful": make_careful, "baseline": ThresholdBot(30)},
+        {'careful': make_careful, 'baseline': ThresholdBot(30)},
         games=100,
         seed=42,
         jobs=2,
@@ -116,7 +120,8 @@ if __name__ == "__main__":
     print(result.summary)
 ```
 
-With `jobs > 1`, games run in separate processes, so factories and rules must
+With multiple workers (including the default `jobs=-1`), games run in separate
+processes, so factories and rules must
 be importable from a module, and scripts need the `if __name__ == "__main__"`
 guard shown above.
 

@@ -9,7 +9,7 @@ def git_commit() -> str:
 
     def git(*args: str) -> str:
         return subprocess.run(
-            ["git", *args],
+            ['git', *args],
             cwd=Path(__file__).resolve().parent,
             capture_output=True,
             text=True,
@@ -18,8 +18,8 @@ def git_commit() -> str:
         ).stdout.strip()
 
     try:
-        commit = git("rev-parse", "--short", "HEAD")
-        dirty = git("status", "--porcelain")
+        commit = git('rev-parse', '--short', 'HEAD')
+        dirty = git('status', '--porcelain')
     except OSError, subprocess.SubprocessError:
-        return "unknown"
-    return f"{commit} (with uncommitted changes)" if dirty else commit
+        return 'unknown'
+    return f'{commit} (with uncommitted changes)' if dirty else commit

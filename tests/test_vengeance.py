@@ -365,7 +365,7 @@ def test_discard_selects_a_face_up_card_and_changes_score() -> None:
     assert DISCARD in observation.discard
 
 
-@pytest.mark.parametrize("card", [SWAP, STEAL, DISCARD])
+@pytest.mark.parametrize('card', [SWAP, STEAL, DISCARD])
 def test_untargetable_action_is_discarded(card: Card) -> None:
     game = game_with([card, number(2)], players=1)
     observation = game.observe(0)
@@ -435,7 +435,7 @@ def test_brutal_mode_can_keep_flip_seven_bonus() -> None:
     assert game.last_round.scores == (9, 36)
 
 
-@pytest.mark.parametrize("brutal", [False, True])
+@pytest.mark.parametrize('brutal', [False, True])
 def test_seeded_vengeance_game_finishes_with_a_winner(brutal: bool) -> None:
     result = play_game(
         [ThresholdBot(25), ThresholdBot(25), ThresholdBot(25)],
@@ -447,7 +447,7 @@ def test_seeded_vengeance_game_finishes_with_a_winner(brutal: bool) -> None:
     assert max(player.total_score for player in result.players) >= 200
 
 
-@pytest.mark.parametrize("brutal", [False, True])
+@pytest.mark.parametrize('brutal', [False, True])
 def test_vengeance_card_conservation_through_a_game(brutal: bool) -> None:
     game = Game(3, seed=7, rules=VengeanceRules(brutal=brutal))
     bots = [RandomBot(seed) for seed in range(3)]
@@ -465,4 +465,4 @@ def test_vengeance_card_conservation_through_a_game(brutal: bool) -> None:
         assert player is not None
         game.apply(bots[player].choose_action(game.observe(player)))
     else:
-        pytest.fail("game did not finish")
+        pytest.fail('game did not finish')

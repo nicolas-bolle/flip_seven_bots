@@ -70,8 +70,17 @@ def draw_text(
     text: str,
     pos: tuple[int, int],
     color: tuple[int, int, int] = TEXT,
-) -> None:
-    screen.blit(font.render(text, True, color), pos)
+    *,
+    anchor: str = 'topleft',
+) -> pygame.Rect:
+    """Draw ``text`` with the ``anchor`` point of its rectangle at ``pos``.
+
+    Use ``anchor='topright'`` for numbers, so they stay put as digits change.
+    """
+    surface = font.render(text, True, color)
+    rect = surface.get_rect(**{anchor: pos})
+    screen.blit(surface, rect)
+    return rect
 
 
 def draw_button(
@@ -101,5 +110,5 @@ def draw_field(
     if focused:
         pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=8)
     draw_text(
-        screen, font, value + ("|" if focused else ""), (rect.x + 12, rect.y + 13)
+        screen, font, value + ('|' if focused else ''), (rect.x + 12, rect.y + 13)
     )

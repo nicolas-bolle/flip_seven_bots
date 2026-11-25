@@ -23,7 +23,7 @@ def estimate(
     is the observing player's round score minus the best opponent's.
     """
     if not seeds:
-        raise ValueError("at least one seed is required")
+        raise ValueError('at least one seed is required')
     me = observation.player
     bots = [rollout] * len(observation.players)
     total = 0
@@ -50,7 +50,7 @@ def best_action(
     numbers). A lone legal action is returned without simulating.
     """
     if samples < 1:
-        raise ValueError("samples must be at least one")
+        raise ValueError('samples must be at least one')
     actions = acting_decision(observation).actions
     if len(actions) == 1:
         return actions[0]

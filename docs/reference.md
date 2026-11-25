@@ -16,7 +16,7 @@ For setup and step-by-step guides, start with the [README](../README.md).
 | Task | Window (Pygame) | Terminal | Python |
 | --- | --- | --- | --- |
 | Play a game | `flip7 play` | `flip7 trace` (prints a game between bots) | `simulation.play_game`, `game.Game` |
-| Run a tournament | `flip7 tournament --gui` | `flip7 tournament`, `flip7 compare` | `tournament.run_tournament`, `play_tournament` |
+| Run a tournament | `flip7 tournament` | `flip7 tournament --games N`, `flip7 compare` | `tournament.run_tournament`, `play_tournament` |
 | Rebuild a reported game | | `flip7 replay` | `game.replay.replay` |
 
 Options given to `flip7 play` configure the window; human players always play
@@ -86,7 +86,7 @@ Rules notes:
 | Bot | Spec (command line and setup screens) | Strategy |
 | --- | --- | --- |
 | `RandomBot` | `random` | Picks a random legal action |
-| `ThresholdBot` | `threshold[:SCORE]` (default 30) | Hits until its round score reaches the threshold |
+| `ThresholdBot` | `threshold:SCORE` | Hits until its round score reaches the threshold |
 | `ExpectedValueBot` | `expected` | Hits only if one more card is expected to raise its round score |
 
 All of them support every decision in every game mode.
@@ -99,27 +99,32 @@ All of them support every decision in every game mode.
 uv run flip7 play
 ```
 
-The setup screen starts with a human (Me), a bot that stays at 30 points, and
+The setup screen starts with a player named Human, a bot that stays at 30 points, and
 an expected value bot. Choose the game mode, edit player names and types, add
-or remove seats (up to six), then press Start. Click a name or value to edit
+or remove seats (up to ten), then press Start. Click a name or value to edit
 it; Ctrl+A clears the field.
 
 During play:
 
-- Use the buttons or their keyboard shortcuts to hit, stay, or choose a player
-  when an action card needs a target.
+- Use the buttons or their keyboard shortcuts to hit or stay.
+- When an action card needs a target, click a highlighted player, or press
+  their seat number (shown on each board; the tenth seat is 0).
 - For Swap, Steal, and Discard, click a highlighted card. Swap needs two cards
   from different players.
+- Press L to see the whole game's history, and L or Escape to close it.
 - Press Escape or close the window to quit.
 
 Every card is public, so several humans can share the screen and take turns,
 and a table of only bots can be watched. Bot decisions take at least one second
 each, and play waits for the dealing animations to finish.
 
-Each hand shows number cards below modifiers and action cards, sorted by
-value. A player's total score appears beside their live round score, which
-excludes any Flip 7 bonus. The activity panel shows the current round's draws
-and decisions, and a summary appears after each round.
+Each hand is a row of cards: modifiers and action cards first, then number
+cards, each sorted by value. Large hands overlap like a fanned hand, with each
+card's corner label still visible. Up to three players are stacked in one
+column; larger tables use two columns, filled top to bottom. A player's total
+score appears beside their live round score, which excludes any Flip 7 bonus.
+The activity panel shows the latest draws and decisions, and a summary appears
+after each round.
 
 ### From the command line
 
@@ -142,7 +147,7 @@ uv run flip7 play --brutal --seed 7
 | `--bug-dir PATH` | Folder for bug and crash reports (default `bug_reports`) |
 | `--setup`, `--no-setup` | Show or skip the setup screen explicitly |
 
-Seats are filled in the order given, up to six players. With only a mode flag,
+Seats are filled in the order given, up to ten players. With only a mode flag,
 the default players are used.
 
 ### From Python
@@ -191,7 +196,7 @@ Each report ends with replay data, so the game can be rebuilt in a test:
 ```python
 from flip_seven_bots.game.replay import replay
 
-game = replay("bug_reports/2026-11-21_16-30-05.md")
+game = replay('bug_reports/2026-11-21_16-30-05.md')
 ```
 
 ## Writing bots
@@ -299,12 +304,12 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 
 | Option | Effect |
 | --- | --- |
-| `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: `random`, `threshold:30`, `expected` |
-| `--games N` | Number of games (default 100) |
+| `--bot [NAME=]KIND` | Add a bot (see [Included bots](#included-bots)); duplicate names are numbered. Default lineup: Random, Threshold 20, Threshold 30, Threshold 40, and Expected value |
+| `--games N` | Number of games (default 500) |
 | `--players-per-game N` | Bots seated in each game (default: all, up to 10) |
 | `--seed N` | Seed for seating, decks, and bots |
-| `--jobs N` | Parallel game workers (default 1) |
-| `--gui` | Open the tournament window |
+| `--jobs N` | Number of game workers for parallelization (default -1: all available CPUs; use 1 for no parallelization) |
+| `--gui` | Use the tournament window even when options are given |
 | `--setup`, `--no-setup` | Show or skip setup explicitly (with `--gui`) |
 | `--vengeance`, `--brutal` | Choose the game mode |
 | `--output DIR` | Save results and settings in this folder |
@@ -314,16 +319,20 @@ and, with `--output`, saves `games.csv`, `summary.csv`, and `settings.json`.
 ### In a window
 
 ```shell
-uv run flip7 tournament --gui
+uv run flip7 tournament
 ```
 
-The setup screen lets you choose the game mode, number of games, players per
-game, seed, and up to ten bots. Giving any of the tournament options above
-skips setup and starts immediately unless `--setup` is supplied.
+The window defaults to 500 games with Random, Threshold 20, Threshold 30,
+Threshold 40, and Expected value. The setup screen lets you choose the game
+mode, number of games, players per game, seed, workers, and up to ten bots. Tournament
+options run in the terminal unless you add `--gui`. To prefill setup instead
+of starting immediately, use `--gui --setup` with your options.
 
 While it runs, the window shows a progress bar, live standings by Elo, and an
 Elo chart. **Stop** schedules no more games and waits for those in progress.
-The final standings rank bots by `rating` with its 95% interval. Afterwards:
+Once the run finishes or is stopped, the chart adds dashed lines for the fitted
+ratings and error bars for their 95% confidence intervals, when available. The
+final standings rank bots by fitted rating. Afterwards:
 
 - With `--output DIR`, results are saved there automatically. Otherwise,
   **Save results** writes them to a timestamped folder in
@@ -337,7 +346,7 @@ from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.tournament import run_tournament
 
 result = run_tournament(
-    {"random": RandomBot(1), "t25": ThresholdBot(25), "ev": ExpectedValueBot()},
+    {'random': RandomBot(1), 't25': ThresholdBot(25), 'ev': ExpectedValueBot()},
     games=100,
     seed=0,
 )
@@ -365,7 +374,8 @@ and other bots as factories taking a seed (see
 
 `play_tournament` takes the same settings but returns an iterator yielding a
 `GameRecord` in game order, for showing progress or stopping early. Multiple
-games may be in flight when `jobs > 1`; close the iterator if stopping early.
+games may be in flight when multiple workers are used (including the default
+`jobs=-1`); close the iterator if stopping early.
 `TournamentResult.from_records` builds the result tables from the records.
 
 ### How ratings work

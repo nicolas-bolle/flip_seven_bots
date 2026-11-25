@@ -1,4 +1,5 @@
 from collections import Counter
+from random import Random
 
 import pytest
 
@@ -52,13 +53,13 @@ def test_multiplier_doubles_numbers_before_adding_modifiers() -> None:
 
 
 @pytest.mark.parametrize(
-    ("kind", "target_player"),
+    ('kind', 'target_player'),
     [(ActionType.HIT, 1), (ActionType.STAY, 0), (ActionType.CHOOSE_TARGET, None)],
 )
 def test_action_has_target_only_when_choosing_one(
     kind: ActionType, target_player: int | None
 ) -> None:
-    with pytest.raises(ValueError, match="target"):
+    with pytest.raises(ValueError, match='target'):
         Action(kind, target_player)
 
 
@@ -80,6 +81,27 @@ def test_dealer_rotates_and_player_left_of_dealer_starts() -> None:
     assert observation.dealer == 1
     assert observation.players[2].cards == (number(4),)
     assert game.current_player == 2
+
+
+def test_history_keeps_earlier_rounds_but_copies_only_the_current_round() -> None:
+    game = stacked_game([number(n) for n in range(1, 5)])
+    game.apply(STAY)
+    game.apply(STAY)
+    history = game.history
+    assert [type(event).__name__ for event in history] == [
+        'RoundStarted',
+        'CardDrawn',
+        'CardDrawn',
+        'ActionChosen',
+        'ActionChosen',
+        'RoundEnded',
+        'RoundStarted',
+        'CardDrawn',
+        'CardDrawn',
+    ]
+    current = game.observe(0).events
+    assert history[-len(current) :] == current
+    assert game.determinize(Random(0)).history == current
 
 
 def test_flip_three_defers_freeze_but_second_chance_saves_a_duplicate_at_once() -> None:
@@ -188,7 +210,7 @@ def test_freeze_is_not_reshuffled_during_the_round() -> None:
     assert all(event.card != FREEZE for event in game.recent_draws)
 
 
-@pytest.mark.parametrize("target_score", [1, 1000])
+@pytest.mark.parametrize('target_score', [1, 1000])
 def test_action_cards_are_discarded_once_round_ends(target_score: int) -> None:
     draws = [number(2), number(4), FLIP_THREE, number(5), number(6), FREEZE]
     draws += [number(8), number(9)]
@@ -331,7 +353,7 @@ def test_only_active_player_must_target_themselves() -> None:
 
 def test_illegal_decision_is_rejected() -> None:
     game = stacked_game([number(2), number(4)])
-    with pytest.raises(ValueError, match="illegal action"):
+    with pytest.raises(ValueError, match='illegal action'):
         game.apply(target(0))
 
 
@@ -378,9 +400,9 @@ def test_discard_is_reshuffled_for_next_round() -> None:
 
 
 @pytest.mark.parametrize(
-    ("draws", "winners"),
+    ('draws', 'winners'),
     [([number(5), number(5)], (0, 1)), ([number(5), number(3)], (1,))],
-    ids=["tie", "single-winner"],
+    ids=['tie', 'single-winner'],
 )
 def test_match_ends_after_round_reaching_target(
     draws: list[Card], winners: tuple[int, ...]
@@ -395,18 +417,18 @@ def test_match_ends_after_round_reaching_target(
     assert game.winners == observation.winners == winners
     assert observation.current_player is None
     assert observation.legal_actions == ()
-    with pytest.raises(ValueError, match="illegal action"):
+    with pytest.raises(ValueError, match='illegal action'):
         game.apply(HIT)
 
 
 @pytest.mark.parametrize(
-    ("player_count", "dealer", "seed", "message"),
+    ('player_count', 'dealer', 'seed', 'message'),
     [
-        (0, 0, None, "player_count"),
-        (11, 0, None, "player_count"),
-        (2, -1, None, "dealer"),
-        (2, 2, None, "dealer"),
-        (2, 0, 1, "deck or a seed"),
+        (0, 0, None, 'player_count'),
+        (11, 0, None, 'player_count'),
+        (2, -1, None, 'dealer'),
+        (2, 2, None, 'dealer'),
+        (2, 0, 1, 'deck or a seed'),
     ],
 )
 def test_game_rejects_bad_player_count_dealer_or_seeded_stacked_deck(
@@ -416,16 +438,16 @@ def test_game_rejects_bad_player_count_dealer_or_seeded_stacked_deck(
         Game(player_count, dealer=dealer, seed=seed, deck=Deck.stacked([number(1)] * 2))
 
 
-@pytest.mark.parametrize("player", [-1, 2])
+@pytest.mark.parametrize('player', [-1, 2])
 def test_observe_rejects_a_seat_outside_the_game(player: int) -> None:
     game = Game(2, seed=42)
-    with pytest.raises(ValueError, match="player"):
+    with pytest.raises(ValueError, match='player'):
         game.observe(player)
 
 
 def test_draw_fails_if_deck_and_discard_are_exhausted() -> None:
     game = stacked_game([number(2)], player_count=1)
-    with pytest.raises(RuntimeError, match="no cards are available"):
+    with pytest.raises(RuntimeError, match='no cards are available'):
         game.apply(HIT)
 
 

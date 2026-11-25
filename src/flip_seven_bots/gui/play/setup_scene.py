@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from flip_seven_bots.bots.registry import config_for, default_parameters, kinds
+from flip_seven_bots.bots.registry import config_for, kinds
 
 from ..common.theme import ACCENT, BACKGROUND, MUTED, TEXT
 from ..common.widgets import draw_button, draw_field, draw_text
@@ -31,7 +31,7 @@ MAX_PARAMETER_LENGTH = 100
 class _PlayerSetting:
     name: str
     kind: str
-    parameter: str = ""
+    parameter: str = ''
 
 
 @dataclass(frozen=True)
@@ -45,18 +45,18 @@ class SetupResult:
 
 def _initial_player(seat: Seat) -> _PlayerSetting:
     if seat.bot is None:
-        return _PlayerSetting(seat.name, "human")
-    kind, _, parameter = config_for(seat.bot).spec.partition(":")
+        return _PlayerSetting(seat.name, 'human')
+    kind, _, parameter = config_for(seat.bot).spec.partition(':')
     return _PlayerSetting(seat.name, kind, parameter)
 
 
 def _row_rects(index: int) -> tuple[pygame.Rect, pygame.Rect, pygame.Rect, pygame.Rect]:
-    y = 310 + index * 64
+    y = 308 + index * 42
     return (
-        pygame.Rect(90, y, 320, 48),
-        pygame.Rect(425, y, 250, 48),
-        pygame.Rect(690, y, 180, 48),
-        pygame.Rect(885, y, 150, 48),
+        pygame.Rect(90, y, 320, 38),
+        pygame.Rect(425, y, 250, 38),
+        pygame.Rect(690, y, 180, 38),
+        pygame.Rect(885, y, 150, 38),
     )
 
 
@@ -95,7 +95,7 @@ class SetupScene:
         if event.type == pygame.TEXTINPUT and self._focus is not None:
             index, field = self._focus
             player = self.players[index]
-            if field == "name":
+            if field == 'name':
                 player.name = (player.name + event.text)[:MAX_NAME_LENGTH]
             else:
                 player.parameter = (player.parameter + event.text)[
@@ -106,19 +106,19 @@ class SetupScene:
         if event.type == pygame.KEYDOWN:
             if (
                 event.key == pygame.K_a
-                and getattr(event, "mod", 0) & pygame.KMOD_CTRL
+                and getattr(event, 'mod', 0) & pygame.KMOD_CTRL
                 and self._focus is not None
             ):
                 index, field = self._focus
-                if field == "name":
-                    self.players[index].name = ""
+                if field == 'name':
+                    self.players[index].name = ''
                 else:
-                    self.players[index].parameter = ""
+                    self.players[index].parameter = ''
                 self.error = None
             elif event.key == pygame.K_BACKSPACE and self._focus is not None:
                 index, field = self._focus
                 player = self.players[index]
-                if field == "name":
+                if field == 'name':
                     player.name = player.name[:-1]
                 else:
                     player.parameter = player.parameter[:-1]
@@ -138,7 +138,7 @@ class SetupScene:
             self.brutal = not self.brutal
         elif ADD_BUTTON.collidepoint(pos) and len(self.players) < MAX_PLAYERS:
             self.players.append(
-                _PlayerSetting(f"Player {len(self.players) + 1}", "human")
+                _PlayerSetting(f'Player {len(self.players) + 1}', 'human')
             )
         elif START_BUTTON.collidepoint(pos):
             self._start()
@@ -146,22 +146,17 @@ class SetupScene:
             for index, player in enumerate(self.players):
                 name, kind, parameter, remove = _row_rects(index)
                 if name.collidepoint(pos):
-                    self._focus = (index, "name")
+                    self._focus = (index, 'name')
                 elif kind.collidepoint(pos):
-                    names = ("human", *(kind.kind for kind in kinds()))
+                    names = ('human', *(kind.key for kind in kinds()))
                     player.kind = names[(names.index(player.kind) + 1) % len(names)]
-                    definition = next(
-                        (k for k in kinds() if k.kind == player.kind), None
-                    )
-                    player.parameter = (
-                        default_parameters(definition) if definition else ""
-                    )
+                    player.parameter = ''
                 elif (
                     parameter.collidepoint(pos)
-                    and player.kind != "human"
-                    and next(k for k in kinds() if k.kind == player.kind).parameters
+                    and player.kind != 'human'
+                    and next(k for k in kinds() if k.key == player.kind).parameters
                 ):
-                    self._focus = (index, "parameter")
+                    self._focus = (index, 'parameter')
                 elif remove.collidepoint(pos) and len(self.players) > 1:
                     self.players.pop(index)
                 else:
@@ -175,9 +170,9 @@ class SetupScene:
             for player in self.players:
                 name = _human_seat(player.name).name
                 spec = player.kind
-                if player.parameter and player.kind != "human":
-                    spec += f":{player.parameter}"
-                bot = None if player.kind == "human" else _bot_seat(spec).bot
+                if player.parameter and player.kind != 'human':
+                    spec += f':{player.parameter}'
+                bot = None if player.kind == 'human' else _bot_seat(spec).bot
                 seats.append(Seat(name, bot))
         except argparse.ArgumentTypeError as error:
             self.error = str(error)
@@ -194,48 +189,48 @@ class SetupScene:
     ) -> None:
         """Draw the current settings and any validation error."""
         screen.fill(BACKGROUND)
-        self._text(screen, self._title_font, "GAME SETUP", (90, 45), ACCENT)
-        self._text(screen, self._heading_font, "Game mode", (90, 110))
-        self._button(screen, BASE_BUTTON, "Flip 7", self.vengeance is False)
-        self._button(screen, VENGEANCE_BUTTON, "With a Vengeance", self.vengeance)
+        self._text(screen, self._title_font, 'GAME SETUP', (90, 45), ACCENT)
+        self._text(screen, self._heading_font, 'Game mode', (90, 110))
+        self._button(screen, BASE_BUTTON, 'Flip 7', self.vengeance is False)
+        self._button(screen, VENGEANCE_BUTTON, 'With a Vengeance', self.vengeance)
         self._button(
             screen,
             BRUTAL_BUTTON,
-            f"Brutal: {'on' if self.brutal else 'off'}",
+            f'Brutal: {"on" if self.brutal else "off"}',
             self.brutal,
             disabled=not self.vengeance,
         )
-        self._text(screen, self._heading_font, "Players", (90, 235))
-        self._text(screen, self._small_font, "NAME", (90, 282), MUTED)
+        self._text(screen, self._heading_font, 'Players', (90, 235))
+        self._text(screen, self._small_font, 'NAME', (90, 282), MUTED)
         self._text(
-            screen, self._small_font, "TYPE (CLICK TO CHANGE)", (425, 282), MUTED
+            screen, self._small_font, 'TYPE (CLICK TO CHANGE)', (425, 282), MUTED
         )
-        self._text(screen, self._small_font, "PARAMETERS", (690, 282), MUTED)
+        self._text(screen, self._small_font, 'PARAMETERS', (690, 282), MUTED)
         for index, player in enumerate(self.players):
             name, kind, parameter, remove = _row_rects(index)
-            self._field(screen, name, player.name, self._focus == (index, "name"))
-            definition = next((k for k in kinds() if k.kind == player.kind), None)
-            self._button(screen, kind, definition.label if definition else "Human")
+            self._field(screen, name, player.name, self._focus == (index, 'name'))
+            definition = next((k for k in kinds() if k.key == player.kind), None)
+            self._button(screen, kind, definition.key if definition else 'Human')
             if definition and definition.parameters:
                 self._field(
                     screen,
                     parameter,
                     player.parameter,
-                    self._focus == (index, "parameter"),
+                    self._focus == (index, 'parameter'),
                 )
             else:
                 self._text(
-                    screen, self._font, "-", (parameter.x + 12, parameter.y + 13), MUTED
+                    screen, self._font, '-', (parameter.x + 12, parameter.y + 10), MUTED
                 )
-            self._button(screen, remove, "Remove", disabled=len(self.players) == 1)
+            self._button(screen, remove, 'Remove', disabled=len(self.players) == 1)
         self._button(
-            screen, ADD_BUTTON, "Add player", disabled=len(self.players) >= MAX_PLAYERS
+            screen, ADD_BUTTON, 'Add player', disabled=len(self.players) >= MAX_PLAYERS
         )
-        self._button(screen, START_BUTTON, "Start  [Enter]", selected=True)
+        self._button(screen, START_BUTTON, 'Start  [Enter]', selected=True)
         self._text(
             screen,
             self._small_font,
-            "Click a name or value to edit. Esc quits.",
+            'Click a name or value to edit. Esc quits.',
             (90, 805),
             MUTED,
         )

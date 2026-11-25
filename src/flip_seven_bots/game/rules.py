@@ -115,5 +115,5 @@ class VengeanceRules(Rules):
     def __post_init__(self) -> None:
         if self.brutal and self.score_cards is score_vengeance_cards:
             object.__setattr__(
-                self, "score_cards", partial(score_vengeance_cards, brutal=True)
+                self, 'score_cards', partial(score_vengeance_cards, brutal=True)
             )

@@ -24,6 +24,9 @@ flip7 = "flip_seven_bots.cli:main"
 requires = ["uv_build>=0.13.8,<0.14.0"]
 build-backend = "uv_build"
 
+[tool.ruff.format]
+quote-style = "single"
+
 [tool.ruff.lint]
 unfixable = ['F401']
 
@@ -32,6 +35,7 @@ dev = [
     "ipykernel>=7.4.0",
     "ipywidgets>=8.1.9",
     "nbformat>=5.11.1",
+    "pandas-stubs>=3.1.0.261029",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.6",

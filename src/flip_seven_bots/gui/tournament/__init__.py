@@ -1,1 +1,1 @@
-"""Tournament window, opened with ``flip7 tournament --gui``."""
+"""Tournament window, opened with ``flip7 tournament``."""

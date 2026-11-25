@@ -13,7 +13,7 @@ from ..common.widgets import make_icon
 from .bug_report import write_report
 from .game_scene import GameScene
 from .options import parse_options
-from .setup_scene import SetupScene
+from .setup_scene import SetupResult, SetupScene
 from .table import Table
 
 
@@ -21,15 +21,15 @@ def _report_crash(table: Table, directory: Path) -> None:
     try:
         path = write_report(
             table,
-            "Automatic report: the game crashed.",
+            'Automatic report: the game crashed.',
             directory,
             error=traceback.format_exc(),
         )
     # The original crash matters more than a failure to report it.
     except Exception as error:  # noqa: BLE001
-        print(f"Could not save a crash report: {error!r}", file=sys.stderr)
+        print(f'Could not save a crash report: {error!r}', file=sys.stderr)
     else:
-        print(f"Crash report saved to {path}", file=sys.stderr)
+        print(f'Crash report saved to {path}', file=sys.stderr)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -39,12 +39,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     exception is reraised. After initialization, Pygame is shut down on exit.
     """
     options = parse_options(argv)
+    settings = SetupResult(options.seats, options.vengeance, options.brutal)
     table: Table | None = None
     pygame.init()
     try:
         pygame.display.set_icon(make_icon())
         screen = pygame.display.set_mode((1280, 900))
-        pygame.display.set_caption("Flip 7")
+        pygame.display.set_caption('Flip 7')
         clock = pygame.time.Clock()
         if options.show_setup:
             scene: SetupScene | GameScene = SetupScene(
@@ -66,15 +67,25 @@ def main(argv: Sequence[str] | None = None) -> None:
                     running = False
                 else:
                     scene.handle_event(event)
-                    if isinstance(scene, SetupScene) and scene.result is not None:
-                        result = scene.result
-                        rules = (
-                            VengeanceRules(brutal=result.brutal)
-                            if result.vengeance
-                            else None
+                    if isinstance(scene, SetupScene):
+                        if scene.result is not None:
+                            settings = scene.result
+                            rules = (
+                                VengeanceRules(brutal=settings.brutal)
+                                if settings.vengeance
+                                else None
+                            )
+                            table = Table(
+                                settings.seats, seed=options.seed, rules=rules
+                            )
+                            scene = GameScene(table, report_dir=options.bug_dir)
+                    elif scene.return_to_setup:
+                        table = None
+                        scene = SetupScene(
+                            settings.seats,
+                            vengeance=settings.vengeance,
+                            brutal=settings.brutal,
                         )
-                        table = Table(result.seats, seed=options.seed, rules=rules)
-                        scene = GameScene(table, report_dir=options.bug_dir)
 
             if running:
                 scene.update(pygame.time.get_ticks())

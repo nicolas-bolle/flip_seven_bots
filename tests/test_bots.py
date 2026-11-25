@@ -1,4 +1,5 @@
 from dataclasses import replace
+from pickle import dumps, loads
 from random import Random
 
 import pytest
@@ -31,14 +32,25 @@ FLIP_THREE = Card(CardType.FLIP_THREE)
 FREEZE = Card(CardType.FREEZE)
 
 
-@pytest.mark.parametrize("kind", [kind.kind for kind in kinds()])
-@pytest.mark.parametrize("mode", ["base", "vengeance", "brutal"])
+BOT_TEST_SPECS = {'threshold': 'threshold:30'}
+
+
+@pytest.mark.parametrize(
+    ('spec', 'name'), [('random', 'Random'), ('threshold:25', 'Threshold 25')]
+)
+def test_bot_config_preserves_display_name_when_pickled(spec: str, name: str) -> None:
+    config = loads(dumps(parse_config(spec)))
+    assert config.name == name
+
+
+@pytest.mark.parametrize('kind', [kind.key for kind in kinds()])
+@pytest.mark.parametrize('mode', ['base', 'vengeance', 'brutal'])
 def test_registered_bots_play_legal_reproducible_games(kind: str, mode: str) -> None:
-    config = parse_config(kind)
+    config = parse_config(BOT_TEST_SPECS.get(kind, kind))
     rules = (
         Rules(target_score=25)
-        if mode == "base"
-        else VengeanceRules(target_score=25, brutal=mode == "brutal")
+        if mode == 'base'
+        else VengeanceRules(target_score=25, brutal=mode == 'brutal')
     )
 
     def play() -> list[Action]:
@@ -114,18 +126,18 @@ def test_threshold_bot_prefers_an_opponent_but_can_target_itself() -> None:
 
 
 @pytest.mark.parametrize(
-    "bot", [RandomBot(), ThresholdBot(30)], ids=["random", "threshold"]
+    'bot', [RandomBot(), ThresholdBot(30)], ids=['random', 'threshold']
 )
 def test_bots_reject_observations_without_legal_actions(
     bot: RandomBot | ThresholdBot,
 ) -> None:
     observation = replace(opening_observation(), decision=None)
-    with pytest.raises(ValueError, match="no legal actions"):
+    with pytest.raises(ValueError, match='no legal actions'):
         bot.choose_action(observation)
 
 
 def test_threshold_must_not_be_negative() -> None:
-    with pytest.raises(ValueError, match="threshold"):
+    with pytest.raises(ValueError, match='threshold'):
         ThresholdBot(-1)
 
 
@@ -175,16 +187,16 @@ def test_rollouts_evaluate_hit_or_stay_decisions() -> None:
 
 
 def test_rollouts_need_at_least_one_sample() -> None:
-    with pytest.raises(ValueError, match="samples"):
+    with pytest.raises(ValueError, match='samples'):
         rollouts.best_action(
             opening_observation(), ThresholdBot(0), samples=0, rng=Random(0)
         )
 
 
 @pytest.mark.parametrize(
-    ("unseen", "expected", "action"),
+    ('unseen', 'expected', 'action'),
     [((5, 3), 4, STAY), ((5, 3, 3), 16 / 3, HIT)],
-    ids=["bust-risk-too-high", "worth-the-risk"],
+    ids=['bust-risk-too-high', 'worth-the-risk'],
 )
 def test_expected_value_bot_compares_hit_average_with_current_score(
     unseen: tuple[int, ...], expected: float, action: Action

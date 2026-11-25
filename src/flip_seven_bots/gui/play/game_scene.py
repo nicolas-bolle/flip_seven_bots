@@ -4,6 +4,7 @@ from collections import Counter, deque
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
+from itertools import pairwise
 from pathlib import Path
 
 import pygame
@@ -17,11 +18,14 @@ from flip_seven_bots.game import (
     ChooseCard,
     ChooseTarget,
     FlipSevenBonus,
+    GameEvent,
     HitOrStay,
     Observation,
     PlayerStatus,
     PlayerView,
+    RoundEnded,
     RoundResult,
+    RoundStarted,
 )
 
 from ..common.text import card_label, event_text
@@ -31,25 +35,53 @@ from ..common.theme import (
     BACKGROUND,
     BUTTON,
     BUTTON_HOVER,
+    DANGER,
     MUTED,
     PANEL,
     PANEL_ALT,
+    PROMPT,
     TEXT,
 )
 from .bug_report import write_report
 from .options import default_seats
 from .table import Table
 
-PLAYER_AREA = pygame.Rect(30, 112, 895, 570)
-PANEL_GAP = 12
-CONTROLS = pygame.Rect(30, 700, 1220, 170)
-OVERLAY = pygame.Rect(360, 240, 560, 400)
+TOP_STRIP_Y = 18
+TURN_BOX = pygame.Rect(320, TOP_STRIP_Y, 432, 178)
+DECK_RECT = pygame.Rect(781, 46, 56, 78)
+ACTIVITY = pygame.Rect(866, TOP_STRIP_Y, 384, 178)
+REPORT_BUTTON = pygame.Rect(30, 150, 190, 42)
+HISTORY_BUTTON = pygame.Rect(ACTIVITY.right - 128, ACTIVITY.y + 10, 116, 32)
+PLAYER_AREA = pygame.Rect(30, 210, 1220, 674)
+PANEL_GAP = 10
+OVERLAY = pygame.Rect(340, 150, 600, 600)
 DIALOG = pygame.Rect(240, 160, 800, 560)
-REPORT_BUTTON = pygame.Rect(1070, 24, 180, 40)
+HISTORY_DIALOG = pygame.Rect(140, 50, 1000, 800)
+HISTORY_LINE = 24
 MAX_REPORT_LENGTH = 4000
 NOTICE_MS = 6000
 CARD_ANIMATION_MS = 600
-DECK_RECT = pygame.Rect(855, 22, 42, 60)
+# Real cards are 63 x 88 mm, close to 5:7.
+CARD_ASPECT = 5 / 7
+MAX_CARD_HEIGHT = 105
+CARD_GAP = 4
+GROUP_GAP = 14
+# Cards are sized so this many fit side by side; larger hands overlap.
+CARDS_WITHOUT_OVERLAP = 9
+CARD_INK = (25, 45, 46)
+CORNER_LABELS = {
+    CardType.SECOND_CHANCE: 'SC',
+    CardType.FREEZE: 'FRZ',
+    CardType.FLIP_THREE: 'F3',
+    CardType.FLIP_FOUR: 'F4',
+    CardType.JUST_ONE_MORE: 'ONE',
+    CardType.SWAP: 'SWP',
+    CardType.STEAL: 'STL',
+    CardType.DISCARD: 'DSC',
+    CardType.ZERO: '0',
+    CardType.UNLUCKY_SEVEN: '7',
+    CardType.LUCKY_THIRTEEN: '13',
+}
 NON_NUMBER_ORDER = {
     CardType.ADD: 0,
     CardType.SUBTRACT: 1,
@@ -70,10 +102,12 @@ class Command(Enum):
     """UI-only actions that do not directly represent game decisions."""
 
     CONTINUE = auto()
-    RESTART = auto()
+    BACK_TO_SETUP = auto()
     REPORT_BUG = auto()
     SUBMIT_REPORT = auto()
     CANCEL_REPORT = auto()
+    SHOW_HISTORY = auto()
+    CLOSE_HISTORY = auto()
 
 
 @dataclass(frozen=True)
@@ -97,10 +131,10 @@ class _AnimatedDraw:
 def _wrap(text: str, font: pygame.font.Font, width: int) -> list[str]:
     """Split text into lines that fit ``width``, keeping explicit line breaks."""
     lines = []
-    for paragraph in text.split("\n"):
-        line = ""
-        for word in paragraph.split(" "):
-            candidate = f"{line} {word}" if line else word
+    for paragraph in text.split('\n'):
+        line = ''
+        for word in paragraph.split(' '):
+            candidate = f'{line} {word}' if line else word
             if font.size(candidate)[0] <= width:
                 line = candidate
                 continue
@@ -118,16 +152,34 @@ def _wrap(text: str, font: pygame.font.Font, width: int) -> list[str]:
 
 
 def _player_rects(count: int) -> list[pygame.Rect]:
-    height = (PLAYER_AREA.height + PANEL_GAP) // count - PANEL_GAP
+    """Lay out boards top to bottom in one column for up to 3 players, else two.
+
+    Boards are sized for at least three rows, so small tables keep the same
+    proportions: 4-6 players use a 2x3 grid, 7-8 use 2x4 and 9-10 use 2x5.
+    """
+    columns = 1 if count <= 3 else 2
+    per_column = -(-count // columns)
+    rows = max(3, per_column)
+    width = (PLAYER_AREA.width - PANEL_GAP * (columns - 1)) // columns
+    height = (PLAYER_AREA.height - PANEL_GAP * (rows - 1)) // rows
     return [
         pygame.Rect(
-            PLAYER_AREA.x,
-            PLAYER_AREA.y + index * (height + PANEL_GAP),
-            PLAYER_AREA.width,
+            PLAYER_AREA.x + index // per_column * (width + PANEL_GAP),
+            PLAYER_AREA.y + index % per_column * (height + PANEL_GAP),
+            width,
             height,
         )
         for index in range(count)
     ]
+
+
+def _seat_key(player: int) -> tuple[str, int] | None:
+    """The label and key that pick ``player``: 1-9, then 0 for the tenth seat."""
+    if player < 9:
+        return str(player + 1), pygame.K_1 + player
+    if player == 9:
+        return '0', pygame.K_0
+    return None
 
 
 def _shown_cards(player: PlayerView) -> tuple[Card, ...]:
@@ -139,12 +191,12 @@ def _shown_cards(player: PlayerView) -> tuple[Card, ...]:
 
 
 def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
-    """Lay out cards in sorted rows while returning rectangles in hand-index order.
+    """Lay out a board's cards in one sorted row, returning them in hand order.
 
-    Keeping the original indices lets a click map back to ``CHOOSE_CARD`` even
-    though the displayed cards are sorted.
+    Non-number cards come first, then numbers. Cards overlap, later ones on
+    top, when the row would not otherwise fit. Keeping the original indices
+    lets a click map back to ``CHOOSE_CARD`` even though the row is sorted.
     """
-    columns = 12
     groups = (
         sorted(
             (i for i, card in enumerate(cards) if not card.is_number),
@@ -160,37 +212,76 @@ def _card_rects(cards: Sequence[Card], rect: pygame.Rect) -> list[pygame.Rect]:
             key=lambda i: cards[i].value,
         ),
     )
-    rows = sum((len(group) + columns - 1) // columns for group in groups)
-    if not rows:
+    if not cards:
         return []
-    gap = 2
-    card_height = min(51, (rect.height - 47 - gap * (rows - 1)) // rows)
+    left, top = rect.x + 16, rect.y + 42
+    room = rect.width - 32
+    group_gap = GROUP_GAP if all(groups) else 0
+    fitted = (room - GROUP_GAP - CARD_GAP * (CARDS_WITHOUT_OVERLAP - 1)) / (
+        CARDS_WITHOUT_OVERLAP * CARD_ASPECT
+    )
+    space = rect.bottom - 8 - top
+    height = max(12, int(min(MAX_CARD_HEIGHT, space, fitted)))
+    top += max(0, space - height) // 2
+    width = round(height * CARD_ASPECT)
+    step: float = width + CARD_GAP
+    if len(cards) > 1 and len(cards) * step - CARD_GAP + group_gap > room:
+        step = (room - width - group_gap) / (len(cards) - 1)
     result = [pygame.Rect(0, 0, 0, 0) for _ in cards]
-    row = 0
+    x: float = left
     for group in groups:
-        for index, card_index in enumerate(group):
-            x = rect.x + 16 + (index % columns) * 70
-            y = rect.y + 42 + (row + index // columns) * (card_height + gap)
-            result[card_index] = pygame.Rect(x, y, 62, card_height)
-        row += (len(group) + columns - 1) // columns
+        for card_index in group:
+            result[card_index] = pygame.Rect(round(x), top, width, height)
+            x += step
+        if group:
+            x += group_gap
     return result
 
 
-def _action_button(action: Action, names: Sequence[str], rect: pygame.Rect) -> Button:
+def _visible_card_rects(rects: Sequence[pygame.Rect]) -> list[pygame.Rect]:
+    """Clip each card to the part not covered by the card drawn after it."""
+    visible = [rect.copy() for rect in rects]
+    order = sorted(range(len(rects)), key=lambda i: rects[i].x)
+    for current, following in pairwise(order):
+        visible[current].width = min(
+            rects[current].width, rects[following].x - rects[current].x
+        )
+    return visible
+
+
+def _history_box() -> pygame.Rect:
+    return pygame.Rect(
+        HISTORY_DIALOG.x + 28,
+        HISTORY_DIALOG.y + 96,
+        HISTORY_DIALOG.width - 56,
+        HISTORY_DIALOG.height - 96 - 100,
+    )
+
+
+def _history_lines() -> int:
+    """How many events fit in the history dialog at once."""
+    return (_history_box().height - 16) // HISTORY_LINE
+
+
+def _action_button(action: Action, rect: pygame.Rect) -> Button:
     match action:
         case Action(kind=ActionType.HIT):
-            return Button(rect, "Hit  [H]", action, pygame.K_h)
+            return Button(rect, 'Hit  [H]', action, pygame.K_h)
         case Action(kind=ActionType.STAY):
-            return Button(rect, "Stay  [S]", action, pygame.K_s)
+            return Button(rect, 'Stay  [S]', action, pygame.K_s)
         case Action(kind=ActionType.TAKE_BONUS):
-            return Button(rect, "Take bonus  [B]", action, pygame.K_b)
-        case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)) if target < 9:
-            return Button(
-                rect, f"{names[target]}  [{target + 1}]", action, pygame.K_1 + target
-            )
-        case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)):
-            return Button(rect, names[target], action)
-    raise ValueError(f"unsupported action: {action}")
+            return Button(rect, 'Take bonus  [B]', action, pygame.K_b)
+    raise ValueError(f'unsupported action: {action}')
+
+
+def _target_button(action: Action, names: Sequence[str], board: pygame.Rect) -> Button:
+    """A player's whole board is the button for choosing them."""
+    assert action.target is not None
+    key = _seat_key(action.target)
+    if key is None:
+        return Button(board, names[action.target], action)
+    label, shortcut = key
+    return Button(board, f'{names[action.target]}  [{label}]', action, shortcut)
 
 
 class GameScene:
@@ -202,9 +293,10 @@ class GameScene:
     """
 
     def __init__(
-        self, table: Table | None = None, *, report_dir: Path = Path("bug_reports")
+        self, table: Table | None = None, *, report_dir: Path = Path('bug_reports')
     ) -> None:
         self._table = table if table is not None else Table(default_seats())
+        self.return_to_setup = False
         self._report_dir = report_dir
         self._report_text: str | None = None
         self._report_hint: str | None = None
@@ -215,18 +307,20 @@ class GameScene:
         self._draws: deque[_AnimatedDraw] = deque()
         self._draw_started: int | None = None
         self._previous_round: Observation | None = None
+        self._history_open = False
+        self._history_scroll = 0
         self._title_font = pygame.font.Font(None, 42)
         self._heading_font = pygame.font.Font(None, 30)
         self._font = pygame.font.Font(None, 25)
         self._small_font = pygame.font.Font(None, 21)
-        self._card_font = pygame.font.Font(None, 25)
         self._compact_card_font = pygame.font.Font(None, 16)
+        self._sized_fonts: dict[int, pygame.font.Font] = {}
         self._queue_draws(None)
 
     @property
     def dialog_open(self) -> bool:
-        """Whether the bug report dialog is capturing keyboard input, including Esc."""
-        return self._report_text is not None
+        """Whether a dialog is capturing keyboard input, including Esc."""
+        return self._report_text is not None or self._history_open
 
     @property
     def notice(self) -> str | None:
@@ -235,75 +329,86 @@ class GameScene:
 
     def buttons(self) -> tuple[Button, ...]:
         """The buttons currently on screen, derived from the scene's state."""
-        if self.dialog_open:
+        if self._report_text is not None:
             y = DIALOG.bottom - 76
             return (
                 Button(
                     pygame.Rect(DIALOG.x + 28, y, 195, 50),
-                    "Submit  [Enter]",
+                    'Submit  [Enter]',
                     Command.SUBMIT_REPORT,
                     pygame.K_RETURN,
                 ),
                 Button(
                     pygame.Rect(DIALOG.x + 238, y, 195, 50),
-                    "Cancel  [Esc]",
+                    'Cancel  [Esc]',
                     Command.CANCEL_REPORT,
                     pygame.K_ESCAPE,
                 ),
             )
+        if self._history_open:
+            return (
+                Button(
+                    pygame.Rect(
+                        HISTORY_DIALOG.x + 28, HISTORY_DIALOG.bottom - 72, 195, 50
+                    ),
+                    'Close  [L]',
+                    Command.CLOSE_HISTORY,
+                    pygame.K_l,
+                ),
+            )
         report = Button(
-            REPORT_BUTTON, "Report bug  [F1]", Command.REPORT_BUG, pygame.K_F1
+            REPORT_BUTTON, 'Report bug  [F1]', Command.REPORT_BUG, pygame.K_F1
         )
-        return (*self._play_buttons(), report)
+        history = Button(
+            HISTORY_BUTTON, 'History  [L]', Command.SHOW_HISTORY, pygame.K_l
+        )
+        return (*self._play_buttons(), report, history)
 
     def _play_buttons(self) -> tuple[Button, ...]:
-        """Build currently available controls, including clickable card regions."""
+        """Build currently available controls, including clickable cards and boards."""
         table = self._table
         if self._animating:
             return ()
         corner = pygame.Rect(OVERLAY.x + 28, OVERLAY.bottom - 76, 195, 50)
         if table.round_summary is not None:
             return (
-                Button(corner, "Continue  [Enter]", Command.CONTINUE, pygame.K_RETURN),
+                Button(corner, 'Continue  [Enter]', Command.CONTINUE, pygame.K_RETURN),
             )
         if table.game.is_finished:
-            return (Button(corner, "Play again  [R]", Command.RESTART, pygame.K_r),)
+            return (
+                Button(corner, 'Back to setup  [R]', Command.BACK_TO_SETUP, pygame.K_r),
+            )
         if table.human_to_act is None:
             return ()
-        actions = table.observation.legal_actions
-        if actions and actions[0].kind is ActionType.CHOOSE_CARD:
-            observation = table.observation
-            panels = _player_rects(len(observation.players))
-            return tuple(
-                Button(
-                    _card_rects(
-                        _shown_cards(observation.players[action.target]),
-                        panels[action.target],
-                    )[action.card_index],
-                    "",
-                    action,
-                )
-                for action in actions
-                if action.target is not None and action.card_index is not None
-            )
-        gap = 15
-        width = min(
-            195, (CONTROLS.width - 40 - gap * (len(actions) - 1)) // len(actions)
-        )
-        return tuple(
-            _action_button(
-                action,
-                table.names,
-                pygame.Rect(
-                    CONTROLS.x + 20 + index * (width + gap), CONTROLS.y + 85, width, 55
-                ),
-            )
-            for index, action in enumerate(actions)
-        )
+        observation = table.observation
+        boards = _player_rects(len(observation.players))
+        buttons = []
+        controls = []
+        for action in observation.legal_actions:
+            match action:
+                case Action(
+                    kind=ActionType.CHOOSE_CARD,
+                    target=int(target),
+                    card_index=int(index),
+                ):
+                    cards = _shown_cards(observation.players[target])
+                    rects = _visible_card_rects(_card_rects(cards, boards[target]))
+                    buttons.append(Button(rects[index], '', action))
+                case Action(kind=ActionType.CHOOSE_TARGET, target=int(target)):
+                    buttons.append(_target_button(action, table.names, boards[target]))
+                case _:
+                    controls.append(action)
+        y = TURN_BOX.bottom - 62
+        for index, action in enumerate(controls):
+            rect = pygame.Rect(TURN_BOX.x + 16 + index * 202, y, 190, 48)
+            buttons.append(_action_button(action, rect))
+        return tuple(buttons)
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        """Handle a click or shortcut, or route text input to the report dialog."""
-        if self.dialog_open and self._edit_report(event):
+        """Handle a click or shortcut, or route input to an open dialog."""
+        if self._report_text is not None and self._edit_report(event):
+            return
+        if self._history_open and self._scroll_history(event):
             return
         buttons = self.buttons()
         button: Button | None = None
@@ -317,25 +422,60 @@ class GameScene:
                 pass
             case Button(action=Command.CONTINUE):
                 self._table.dismiss_summary()
-            case Button(action=Command.RESTART):
-                self._table.restart()
-                self._draws.clear()
-                self._draw_started = None
-                self._previous_round = None
-                self._queue_draws(None)
+            case Button(action=Command.BACK_TO_SETUP):
+                self.return_to_setup = True
             case Button(action=Command.REPORT_BUG):
-                self._report_text = ""
+                self._report_text = ''
                 self._report_hint = None
-                self._pause_started = self._now
-                self._table.pause()
+                self._pause()
             case Button(action=Command.SUBMIT_REPORT):
                 self._submit_report()
             case Button(action=Command.CANCEL_REPORT):
                 self._close_report()
+            case Button(action=Command.SHOW_HISTORY):
+                self._history_open = True
+                self._history_scroll = 0
+                self._pause()
+            case Button(action=Command.CLOSE_HISTORY):
+                self._close_history()
             case Button(action=Action() as action):
                 before = self._table.observation
                 self._table.choose(action)
                 self._queue_draws(before)
+
+    def _scroll_history(self, event: pygame.event.Event) -> bool:
+        """Scroll or close the history; return whether the event was used."""
+        steps = {
+            pygame.K_UP: 1,
+            pygame.K_DOWN: -1,
+            pygame.K_PAGEUP: 20,
+            pygame.K_PAGEDOWN: -20,
+        }
+        if event.type == pygame.MOUSEWHEEL:
+            self._history_scroll += 3 * event.y
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self._close_history()
+        elif event.type == pygame.KEYDOWN and event.key in steps:
+            self._history_scroll += steps[event.key]
+        else:
+            return False
+        newest = len(self._shown_history()) - _history_lines()
+        self._history_scroll = min(max(0, newest), max(0, self._history_scroll))
+        return True
+
+    def _pause(self) -> None:
+        self._pause_started = self._now
+        self._table.pause()
+
+    def _resume(self) -> None:
+        if self._draw_started is not None and self._pause_started is not None:
+            self._draw_started += self._now - self._pause_started
+        self._pause_started = None
+        self._table.resume()
+
+    def _close_history(self) -> None:
+        self._history_open = False
+        self._resume()
 
     def update(self, now: int) -> None:
         """Advance animations and, when unblocked, let the table process a bot move.
@@ -423,10 +563,10 @@ class GameScene:
         if event.key == pygame.K_BACKSPACE:
             self._report_text = self._report_text[:-1]
             return True
-        shift = getattr(event, "mod", 0) & pygame.KMOD_SHIFT
+        shift = getattr(event, 'mod', 0) & pygame.KMOD_SHIFT
         if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and shift:
             if len(self._report_text) < MAX_REPORT_LENGTH:
-                self._report_text += "\n"
+                self._report_text += '\n'
             return True
         if event.key == pygame.K_KP_ENTER:
             self._submit_report()
@@ -436,23 +576,20 @@ class GameScene:
     def _submit_report(self) -> None:
         assert self._report_text is not None
         if not self._report_text.strip():
-            self._report_hint = "Please describe the problem first."
+            self._report_hint = 'Please describe the problem first.'
             return
         try:
             path = write_report(self._table, self._report_text, self._report_dir)
         except OSError as error:
-            self._report_hint = f"Could not save the report: {error}"
+            self._report_hint = f'Could not save the report: {error}'
             return
         self._close_report()
-        self._notice = f"Bug report saved to {path}"
+        self._notice = f'Bug report saved to {path}'
         self._notice_until = self._now + NOTICE_MS
 
     def _close_report(self) -> None:
         self._report_text = None
-        if self._draw_started is not None and self._pause_started is not None:
-            self._draw_started += self._now - self._pause_started
-        self._pause_started = None
-        self._table.resume()
+        self._resume()
 
     def render(
         self, screen: pygame.Surface, mouse_pos: tuple[int, int] | None = None
@@ -467,30 +604,34 @@ class GameScene:
         ):
             observation = self._previous_round
         screen.fill(BACKGROUND)
-        self._text(screen, self._title_font, "FLIP 7", (35, 24), ACCENT)
-        self._text(
-            screen,
-            self._font,
-            f"Round {observation.round_number}  |  Dealer: {table.names[observation.dealer]}"
-            f"  |  Deck: {observation.cards_remaining}  |  Discard: {len(observation.discard)}",
-            (35, 69),
-            MUTED,
-        )
+        buttons = self.buttons()
+        self._draw_header(screen, observation)
+        self._draw_controls(screen, observation)
         self._draw_deck(screen)
+        self._draw_activity(screen)
 
-        for player, rect in zip(
-            observation.players, _player_rects(len(observation.players))
-        ):
+        boards = _player_rects(len(observation.players))
+        for player, rect in zip(observation.players, boards):
             self._draw_player(screen, player, rect, observation)
+        targets = {
+            b.action.target
+            for b in buttons
+            if isinstance(b.action, Action)
+            and b.action.kind is ActionType.CHOOSE_TARGET
+        }
+        if targets:
+            shade = pygame.Surface(boards[0].size, pygame.SRCALPHA)
+            shade.fill((0, 0, 0, 120))
+            for index, rect in enumerate(boards):
+                if index not in targets:
+                    screen.blit(shade, rect)
         if self._swap_first is not None and not self._animating:
             owner, index = self._swap_first
-            panel = _player_rects(len(observation.players))[owner]
-            rect = _card_rects(_shown_cards(observation.players[owner]), panel)[index]
+            cards = _shown_cards(observation.players[owner])
+            rect = _card_rects(cards, boards[owner])[index]
             pygame.draw.rect(
                 screen, ACCENT, rect.inflate(4, 4), width=2, border_radius=6
             )
-        self._draw_activity(screen, observation)
-        self._draw_controls(screen, observation)
         if self._animating:
             self._draw_animation(screen, observation)
 
@@ -501,11 +642,71 @@ class GameScene:
 
         if self._report_text is not None:
             self._draw_report_dialog(screen, self._report_text)
+        if self._history_open:
+            self._draw_history(screen)
         if self._notice is not None:
-            self._text(screen, self._small_font, self._notice, (35, 92), ACTIVE)
+            self._draw_notice(screen, self._notice)
 
-        for button in self.buttons():
+        for button in buttons:
             self._draw_button(screen, button, mouse_pos)
+
+    def _draw_header(self, screen: pygame.Surface, observation: Observation) -> None:
+        self._text(screen, self._title_font, 'FLIP 7', (35, 22), ACCENT)
+        dealer = self._table.names[observation.dealer]
+        self._text(
+            screen,
+            self._font,
+            self._fit(
+                f'Round {observation.round_number}  |  Dealer: {dealer}',
+                self._font,
+                TURN_BOX.x - 50,
+            ),
+            (35, 66),
+            MUTED,
+        )
+        self._text(
+            screen,
+            self._font,
+            f'Deck: {observation.cards_remaining}  |  '
+            f'Discard: {len(observation.discard)}',
+            (35, 94),
+            MUTED,
+        )
+        self._text(screen, self._small_font, 'Esc quits.', (232, 164), MUTED)
+
+    def _draw_notice(self, screen: pygame.Surface, notice: str) -> None:
+        label = self._small_font.render(notice, True, ACTIVE)
+        box = label.get_rect(midbottom=(screen.get_width() // 2, PLAYER_AREA.bottom))
+        box = box.inflate(28, 16)
+        pygame.draw.rect(screen, PANEL_ALT, box, border_radius=8)
+        pygame.draw.rect(screen, ACTIVE, box, width=1, border_radius=8)
+        screen.blit(label, label.get_rect(center=box.center))
+
+    def _shown_history(self) -> tuple[GameEvent, ...]:
+        """The game's events, up to the first draw that is still waiting to animate."""
+        history = self._table.game.history
+        pending = len(self._draws)
+        for index in range(len(history) - 1, -1, -1):
+            if not pending:
+                break
+            if isinstance(history[index], CardDrawn):
+                pending -= 1
+                if not pending:
+                    return history[:index]
+        return history
+
+    def _fit(self, text: str, font: pygame.font.Font, width: int) -> str:
+        """Shorten ``text`` with an ellipsis until it fits in ``width`` pixels."""
+        if font.size(text)[0] <= width:
+            return text
+        while text and font.size(text + '...')[0] > width:
+            text = text[:-1]
+        return text.rstrip() + '...'
+
+    def _sized_font(self, size: int) -> pygame.font.Font:
+        if size not in self._sized_fonts:
+            self._sized_fonts[size] = pygame.font.Font(None, size)
+        return self._sized_fonts[size]
 
     @staticmethod
     def _text(
@@ -527,12 +728,12 @@ class GameScene:
         color = PANEL_ALT if player.player in self._table.humans else PANEL
         pygame.draw.rect(screen, color, rect, border_radius=12)
         if player.player == observation.current_player:
-            pygame.draw.rect(screen, ACTIVE, rect, width=2, border_radius=12)
+            pygame.draw.rect(screen, PROMPT, rect, width=3, border_radius=12)
 
-        status = {
-            PlayerStatus.ACTIVE: "ACTIVE",
-            PlayerStatus.STAYED: "STAYED",
-            PlayerStatus.BUSTED: "BUSTED",
+        status, status_color = {
+            PlayerStatus.ACTIVE: ('ACTIVE', ACTIVE),
+            PlayerStatus.STAYED: ('STAYED', ACCENT),
+            PlayerStatus.BUSTED: ('BUSTED', DANGER),
         }[player.status]
         waiting = any(
             draw.event.player == player.player
@@ -540,22 +741,38 @@ class GameScene:
             for draw in self._draws
         )
         if waiting:
-            status = "..."
-        name = self._table.names[player.player]
-        self._text(screen, self._heading_font, name, (rect.x + 16, rect.y + 13))
-        self._text(
-            screen, self._small_font, status, (rect.x + 200, rect.y + 19), ACCENT
+            status, status_color = '...', MUTED
+        key = _seat_key(player.player)
+        if key is not None:
+            badge = pygame.Rect(rect.x + 12, rect.y + 10, 24, 24)
+            pygame.draw.rect(screen, BUTTON, badge, border_radius=6)
+            label = self._small_font.render(key[0], True, TEXT)
+            screen.blit(label, label.get_rect(center=badge.center))
+        live_score = '...' if waiting else str(player.round_score)
+        score = f'Total: {player.total_score}    Live round: {live_score}'
+        score_x = rect.right - 14 - self._font.size(score)[0]
+        self._text(screen, self._font, score, (score_x, rect.y + 14))
+        status_width = self._small_font.size('BUSTED')[0]
+        name = self._fit(
+            self._table.names[player.player],
+            self._heading_font,
+            score_x - rect.x - 44 - status_width - 30,
         )
-        live_score = "..." if waiting else str(player.round_score)
-        score = f"Total: {player.total_score}    Live round: {live_score}"
-        self._text(screen, self._font, score, (rect.x + 570, rect.y + 16))
+        self._text(screen, self._heading_font, name, (rect.x + 44, rect.y + 12))
+        self._text(
+            screen,
+            self._small_font,
+            status,
+            (rect.x + 58 + self._heading_font.size(name)[0], rect.y + 18),
+            status_color,
+        )
 
         cards = _shown_cards(player)
         if not cards:
             self._text(
                 screen,
                 self._small_font,
-                "No cards yet",
+                'No cards yet',
                 (rect.x + 18, rect.y + 50),
                 MUTED,
             )
@@ -568,23 +785,34 @@ class GameScene:
             and draw.event.round_number == observation.round_number
             and draw.event.player == player.player
         )
-        rects = _card_rects(cards, rect)
-        for card, card_rect in reversed(list(zip(cards, rects))):
-            if hidden[card]:
-                hidden[card] -= 1
+        # Cards still flying in are the most recently added copies.
+        shown = []
+        for index in reversed(range(len(cards))):
+            if hidden[cards[index]]:
+                hidden[cards[index]] -= 1
             else:
-                self._draw_card(screen, card, card_rect)
+                shown.append(index)
+        rects = _card_rects(cards, rect)
+        visible = _visible_card_rects(rects)
+        for index in sorted(shown, key=lambda i: rects[i].x):
+            self._draw_card(
+                screen, cards[index], rects[index], visible_width=visible[index].width
+            )
 
     def _draw_deck(self, screen: pygame.Surface) -> None:
-        pygame.draw.rect(screen, BUTTON, DECK_RECT, border_radius=6)
-        pygame.draw.rect(screen, ACCENT, DECK_RECT, width=2, border_radius=6)
-        self._text(
-            screen,
-            self._compact_card_font,
-            "DECK",
-            (DECK_RECT.x + 6, DECK_RECT.y + 23),
-            TEXT,
+        self._draw_card_back(screen, DECK_RECT)
+        label = self._small_font.render('DECK', True, MUTED)
+        screen.blit(
+            label, label.get_rect(midtop=(DECK_RECT.centerx, DECK_RECT.bottom + 8))
         )
+
+    def _draw_card_back(self, screen: pygame.Surface, rect: pygame.Rect) -> None:
+        radius = max(3, rect.width // 8)
+        pygame.draw.rect(screen, BUTTON, rect, border_radius=radius)
+        pygame.draw.rect(screen, ACCENT, rect, width=2, border_radius=radius)
+        inner = rect.inflate(-rect.width // 3, -rect.height // 3)
+        if inner.width > 4 and inner.height > 4:
+            pygame.draw.rect(screen, ACCENT, inner, width=1, border_radius=radius // 2)
 
     def _draw_animation(self, screen: pygame.Surface, observation: Observation) -> None:
         draw = self._draws[0]
@@ -621,10 +849,7 @@ class GameScene:
         width = max(1, round(destination.width * abs(1 - 2 * progress)))
         card_surface = pygame.Surface(destination.size, pygame.SRCALPHA)
         if progress < 0.5:
-            card_surface.fill(BUTTON)
-            pygame.draw.rect(
-                card_surface, ACCENT, card_surface.get_rect(), width=2, border_radius=6
-            )
+            self._draw_card_back(card_surface, card_surface.get_rect())
         else:
             self._draw_card(card_surface, event.card, card_surface.get_rect())
         flipped = pygame.transform.smoothscale(
@@ -632,7 +857,15 @@ class GameScene:
         )
         screen.blit(flipped, flipped.get_rect(center=center))
 
-    def _draw_card(self, screen: pygame.Surface, card: Card, rect: pygame.Rect) -> None:
+    def _draw_card(
+        self,
+        screen: pygame.Surface,
+        card: Card,
+        rect: pygame.Rect,
+        *,
+        visible_width: int | None = None,
+    ) -> None:
+        """Draw a card face; ``visible_width`` is how much the next card leaves showing."""
         if card.is_number:
             color = (232, 224, 193)
         elif card.kind in (
@@ -644,105 +877,159 @@ class GameScene:
             color = (236, 195, 106)
         else:
             color = (147, 205, 196)
-        pygame.draw.rect(screen, color, rect, border_radius=6)
-        if card.kind is CardType.SECOND_CHANCE and rect.height >= 40:
-            for index, line in enumerate(("SECOND", "CHANCE")):
-                label = self._small_font.render(line, True, (25, 45, 46))
-                center = (rect.centerx, rect.centery - 9 + index * 19)
-                screen.blit(label, label.get_rect(center=center))
-        else:
-            text = (
-                "2ND CH." if card.kind is CardType.SECOND_CHANCE else card_label(card)
-            )
-            font = self._compact_card_font if rect.height < 22 else self._card_font
-            label = font.render(text, True, (25, 45, 46))
-            if label.get_width() > rect.width - 6:
-                label = self._compact_card_font.render(text, True, (25, 45, 46))
+        radius = max(3, rect.width // 8)
+        pygame.draw.rect(screen, color, rect, border_radius=radius)
+        # The outline keeps overlapping cards distinct.
+        pygame.draw.rect(screen, CARD_INK, rect, width=1, border_radius=radius)
+        text = card_label(card)
+        if rect.height < 40:
+            label = self._compact_card_font.render(text, True, CARD_INK)
             screen.blit(label, label.get_rect(center=rect.center))
+            return
+        # Like a real card, the corner index stays visible when cards overlap.
+        corner = self._compact_card_font.render(
+            CORNER_LABELS.get(card.kind, text), True, CARD_INK
+        )
+        screen.blit(corner, (rect.x + 4, rect.y + 4))
+        if len(text) <= 3:
+            font = self._sized_font(max(16, rect.height // 2))
+            lines = [text]
+        else:
+            font = self._small_font
+            lines = text.split()
+        if any(font.size(line)[0] > rect.width - 6 for line in lines):
+            font = self._compact_card_font
+        widest = max(font.size(line)[0] for line in lines)
+        if visible_width is not None and (rect.width + widest) // 2 > visible_width - 2:
+            return  # covered: like a fanned hand, only the corner index shows
+        line_height = font.get_linesize()
+        top = rect.centery + 4 - line_height * len(lines) // 2
+        for index, line in enumerate(lines):
+            label = font.render(line, True, CARD_INK)
+            center = (rect.centerx, top + index * line_height + line_height // 2)
+            screen.blit(label, label.get_rect(center=center))
 
-    def _draw_activity(self, screen: pygame.Surface, observation: Observation) -> None:
-        rect = pygame.Rect(945, 112, 305, 558)
-        pygame.draw.rect(screen, PANEL, rect, border_radius=12)
+    def _draw_activity(self, screen: pygame.Surface) -> None:
+        pygame.draw.rect(screen, PANEL, ACTIVITY, border_radius=12)
         self._text(
-            screen, self._heading_font, "Recent activity", (rect.x + 16, rect.y + 16)
+            screen,
+            self._heading_font,
+            'Recent activity',
+            (ACTIVITY.x + 14, ACTIVITY.y + 16),
         )
-        pending = Counter(
-            draw.event
-            for draw in self._draws
-            if observation is not self._previous_round
-        )
-        visible = []
-        for event in reversed(observation.events):
-            if isinstance(event, CardDrawn) and pending[event]:
-                pending[event] -= 1
-            else:
-                visible.append(event)
-        for index, event in enumerate(list(reversed(visible))[-18:]):
-            position = (rect.x + 16, rect.y + 54 + index * 26)
+        line_height = 20
+        top = ACTIVITY.y + 52
+        count = (ACTIVITY.bottom - 6 - top) // line_height
+        for index, event in enumerate(self._shown_history()[-count:]):
             self._text(
                 screen,
                 self._small_font,
-                event_text(event, self._table.names),
-                position,
-                MUTED,
-            )
-        if observation.last_round is not None:
-            self._text(
-                screen,
-                self._small_font,
-                f"Last round: {observation.last_round.round_number}",
-                (rect.x + 16, rect.bottom - 34),
-                ACCENT,
+                self._fit(
+                    event_text(event, self._table.names),
+                    self._small_font,
+                    ACTIVITY.width - 28,
+                ),
+                (ACTIVITY.x + 14, top + index * line_height),
+                ACCENT if isinstance(event, RoundStarted | RoundEnded) else MUTED,
             )
 
     def _draw_controls(self, screen: pygame.Surface, observation: Observation) -> None:
-        pygame.draw.rect(screen, PANEL, CONTROLS, border_radius=12)
+        pygame.draw.rect(screen, PANEL, TURN_BOX, border_radius=12)
         table = self._table
         player = observation.current_player
+        hint = None
         if self._animating:
-            message = "Dealing cards..."
+            message = 'Dealing cards...'
         elif table.game.is_finished:
-            message = "Game over"
+            message = 'Game over'
         elif player is None or player not in table.humans:
             assert player is not None  # unfinished games await a decision
-            message = f"{table.names[player]} is deciding..."
+            message = f'{table.names[player]} is deciding...'
         else:
             # With several humans sharing the screen, say whose turn it is.
             turn = (
-                "Your turn"
+                'Your turn'
                 if len(table.humans) == 1
                 else f"{table.names[player]}'s turn"
             )
+            hint = 'Click a button or use its shortcut key.'
             match observation.decision:
                 case ChooseCard(card=card, first=first):
-                    step = "second" if first is not None else "first"
+                    step = 'second' if first is not None else 'first'
                     choice = (
-                        f"the {step} card" if card.kind is CardType.SWAP else "a card"
+                        f'the {step} card' if card.kind is CardType.SWAP else 'a card'
                     )
-                    message = f"{turn}: choose {choice} for {card_label(card)}"
+                    message = f'{turn}: choose {choice} for {card_label(card)}'
+                    hint = 'Click a highlighted card.'
                 case FlipSevenBonus():
-                    message = f"{turn}: take the bonus or subtract it from a player"
+                    message = f'{turn}: take the bonus or subtract it from a player'
+                    hint = 'Click a player, or press their seat number.'
                 case ChooseTarget(card=card) if card.kind is CardType.SECOND_CHANCE:
                     message = (
-                        f"{turn}: you already have a Second Chance, "
-                        "so give this one to another player"
+                        f'{turn}: you already have a Second Chance, '
+                        'so give this one to another player'
                     )
+                    hint = 'Click a player, or press their seat number.'
                 case ChooseTarget(card=card):
-                    message = f"{turn}: choose a player for {card_label(card)}"
+                    message = f'{turn}: choose a player for {card_label(card)}'
+                    hint = 'Click a player, or press their seat number.'
                 case HitOrStay(can_stay=False):
-                    message = f"{turn}: you must hit"
+                    message = f'{turn}: you must hit'
                 case _:
-                    message = f"{turn}: hit or stay"
+                    message = f'{turn}: hit or stay'
+        lines = _wrap(message, self._heading_font, TURN_BOX.width - 32)[:2]
+        if hint is not None:
+            pygame.draw.rect(screen, PROMPT, TURN_BOX, width=3, border_radius=12)
+        for index, line in enumerate(lines):
+            position = (TURN_BOX.x + 16, TURN_BOX.y + 16 + index * 26)
+            self._text(screen, self._heading_font, line, position)
+        if hint is not None:
+            self._text(
+                screen,
+                self._small_font,
+                hint,
+                (TURN_BOX.x + 16, TURN_BOX.y + 16 + len(lines) * 26 + 6),
+                MUTED,
+            )
+
+    def _draw_history(self, screen: pygame.Surface) -> None:
+        shade = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 180))
+        screen.blit(shade, (0, 0))
+        pygame.draw.rect(screen, PANEL_ALT, HISTORY_DIALOG, border_radius=15)
+        x = HISTORY_DIALOG.x + 28
         self._text(
-            screen, self._heading_font, message, (CONTROLS.x + 20, CONTROLS.y + 18)
+            screen, self._title_font, 'Game history', (x, HISTORY_DIALOG.y + 22), ACCENT
         )
         self._text(
             screen,
             self._small_font,
-            "Click a button or highlighted card, or use a shortcut. Esc quits.",
-            (CONTROLS.x + 20, CONTROLS.y + 52),
+            'Scroll with the mouse wheel, arrow keys or Page Up/Down. L or Esc closes.',
+            (x, HISTORY_DIALOG.y + 66),
             MUTED,
         )
+        box = _history_box()
+        pygame.draw.rect(screen, BACKGROUND, box, border_radius=8)
+        events = self._shown_history()
+        visible = _history_lines()
+        end = len(events) - min(self._history_scroll, len(events))
+        for index, event in enumerate(events[max(0, end - visible) : end]):
+            is_round = isinstance(event, RoundStarted | RoundEnded)
+            self._text(
+                screen,
+                self._font,
+                event_text(event, self._table.names),
+                (box.x + (12 if is_round else 32), box.y + 8 + index * HISTORY_LINE),
+                ACCENT if is_round else TEXT,
+            )
+        if end < len(events):
+            self._text(
+                screen,
+                self._small_font,
+                f'{len(events) - end} newer below',
+                (box.right - 140, box.bottom + 10),
+                MUTED,
+            )
 
     def _overlay(self, screen: pygame.Surface, title: str) -> pygame.Rect:
         shade = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
@@ -755,37 +1042,37 @@ class GameScene:
         return OVERLAY
 
     def _draw_round_summary(self, screen: pygame.Surface, result: RoundResult) -> None:
-        rect = self._overlay(screen, f"Round {result.round_number} complete")
+        rect = self._overlay(screen, f'Round {result.round_number} complete')
         names = self._table.names
         if result.flip_seven_player is not None:
-            message = f"{names[result.flip_seven_player]} got Flip 7!"
+            message = f'{names[result.flip_seven_player]} got Flip 7!'
             self._text(screen, self._font, message, (rect.x + 28, rect.y + 75), ACTIVE)
-        spacing = min(45, 190 // len(names))
+        spacing = min(45, (rect.height - 210) // len(names))
         for index, (score, total) in enumerate(zip(result.scores, result.totals)):
             self._text(
                 screen,
                 self._heading_font,
-                f"{names[index]}:  {score:+d}    total {total}",
+                f'{names[index]}:  {score:+d}    total {total}',
                 (rect.x + 28, rect.y + 120 + index * spacing),
             )
 
     def _draw_game_over(self, screen: pygame.Surface, observation: Observation) -> None:
-        rect = self._overlay(screen, "Game over")
+        rect = self._overlay(screen, 'Game over')
         names = self._table.names
-        winners = ", ".join(names[index] for index in observation.winners)
+        winners = ', '.join(names[index] for index in observation.winners)
         self._text(
             screen,
             self._heading_font,
-            f"Winner: {winners}",
+            f'Winner: {winners}',
             (rect.x + 28, rect.y + 90),
             ACTIVE,
         )
-        spacing = min(35, 165 // len(names))
+        spacing = min(35, (rect.height - 235) // len(names))
         for index, player in enumerate(observation.players):
             self._text(
                 screen,
                 self._font,
-                f"{names[index]}: {player.total_score} points",
+                f'{names[index]}: {player.total_score} points',
                 (rect.x + 28, rect.y + 145 + index * spacing),
             )
 
@@ -795,7 +1082,7 @@ class GameScene:
         screen.blit(shade, (0, 0))
         pygame.draw.rect(screen, PANEL_ALT, DIALOG, border_radius=15)
         x = DIALOG.x + 28
-        self._text(screen, self._title_font, "Report a bug", (x, DIALOG.y + 25), ACCENT)
+        self._text(screen, self._title_font, 'Report a bug', (x, DIALOG.y + 25), ACCENT)
         self._text(
             screen,
             self._small_font,
@@ -806,7 +1093,7 @@ class GameScene:
         self._text(
             screen,
             self._small_font,
-            "Enter submits, Shift+Enter starts a new line, Esc cancels.",
+            'Enter submits, Shift+Enter starts a new line, Esc cancels.',
             (x, DIALOG.y + 94),
             MUTED,
         )
@@ -814,7 +1101,7 @@ class GameScene:
         pygame.draw.rect(screen, BACKGROUND, box, border_radius=8)
         line_height = self._font.get_linesize()
         visible = (box.height - 20) // line_height
-        lines = _wrap(message + "|", self._font, box.width - 24)
+        lines = _wrap(message + '|', self._font, box.width - 24)
         for index, line in enumerate(lines[-visible:]):
             position = (box.x + 12, box.y + 10 + index * line_height)
             self._text(screen, self._font, line, position)
@@ -833,18 +1120,42 @@ class GameScene:
         hovered = mouse_pos is not None and button.rect.collidepoint(mouse_pos)
         if (
             isinstance(button.action, Action)
+            and button.action.kind is ActionType.CHOOSE_TARGET
+        ):
+            if hovered:
+                glow = pygame.Surface(button.rect.size, pygame.SRCALPHA)
+                pygame.draw.rect(glow, (*PROMPT, 40), glow.get_rect(), border_radius=12)
+                screen.blit(glow, button.rect)
+            pygame.draw.rect(
+                screen,
+                PROMPT,
+                button.rect,
+                width=4 if hovered else 2,
+                border_radius=12,
+            )
+            return
+        if (
+            isinstance(button.action, Action)
             and button.action.kind is ActionType.CHOOSE_CARD
         ):
             pygame.draw.rect(
                 screen,
-                ACCENT if hovered else ACTIVE,
+                PROMPT,
                 button.rect,
-                width=2,
+                width=3 if hovered else 2,
                 border_radius=6,
             )
             return
         pygame.draw.rect(
             screen, BUTTON_HOVER if hovered else BUTTON, button.rect, border_radius=8
         )
+        if isinstance(button.action, Action):
+            pygame.draw.rect(
+                screen,
+                PROMPT,
+                button.rect,
+                width=3 if hovered else 2,
+                border_radius=8,
+            )
         text = self._font.render(button.label, True, TEXT)
         screen.blit(text, text.get_rect(center=button.rect.center))

@@ -60,13 +60,13 @@ def test_samples_draw_the_hidden_deck_order_from_the_given_rng() -> None:
 def test_stale_observation_cannot_be_sampled() -> None:
     game, observation = hit_or_stay_observation()
     game.apply(HIT)
-    with pytest.raises(RuntimeError, match="out of date"):
+    with pytest.raises(RuntimeError, match='out of date'):
         observation.sample_game(Random(1))
 
 
 def test_unlinked_observation_cannot_be_sampled() -> None:
     _, observation = hit_or_stay_observation()
-    with pytest.raises(ValueError, match="not linked"):
+    with pytest.raises(ValueError, match='not linked'):
         replace(observation, _sampler=None).sample_game(Random(1))
 
 
@@ -89,7 +89,7 @@ def test_next_draws_fix_the_upcoming_cards() -> None:
 
 def test_next_draws_must_be_available() -> None:
     _, observation = hit_or_stay_observation()
-    with pytest.raises(ValueError, match="not available"):
+    with pytest.raises(ValueError, match='not available'):
         observation.sample_game(Random(0), next_draws=(Card(CardType.ZERO),))
 
 

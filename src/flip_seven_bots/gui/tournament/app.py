@@ -20,7 +20,7 @@ def main(options: TournamentOptions, *, show_setup: bool = False) -> None:
     try:
         pygame.display.set_icon(make_icon(crown=True))
         screen = pygame.display.set_mode((1280, 900))
-        pygame.display.set_caption("Flip 7 tournament")
+        pygame.display.set_caption('Flip 7 tournament')
         clock = pygame.time.Clock()
         scene = (
             TournamentSetupScene(options) if show_setup else TournamentScene(options)

@@ -48,13 +48,13 @@ def test_simulation_rejects_illegal_bot_action() -> None:
         def choose_action(self, observation: Observation) -> Action:
             return Action(ActionType.CHOOSE_TARGET, target=99)
 
-    with pytest.raises(ValueError, match="illegal action"):
+    with pytest.raises(ValueError, match='illegal action'):
         play_game([IllegalBot()], seed=42)
 
 
 def test_simulation_stops_endless_game() -> None:
     rules = Rules(build_deck=lambda: [Card(CardType.NUMBER, 0)] * 20)
-    with pytest.raises(RuntimeError, match="exceeded 100000 decisions"):
+    with pytest.raises(RuntimeError, match='exceeded 100000 decisions'):
         play_game([ThresholdBot(10), ThresholdBot(10)], seed=1, rules=rules)
 
 

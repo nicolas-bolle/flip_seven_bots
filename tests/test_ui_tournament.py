@@ -1,7 +1,9 @@
+import queue
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pygame
@@ -11,6 +13,7 @@ from flip_seven_bots.bots import ExpectedValueBot, RandomBot, ThresholdBot
 from flip_seven_bots.game import Action, Observation
 from flip_seven_bots.gui.tournament import app, run_scene
 from flip_seven_bots.gui.tournament.run_scene import (
+    CHART,
     NEW_BUTTON,
     SAVE_BUTTON,
     STANDINGS,
@@ -29,7 +32,12 @@ from flip_seven_bots.gui.tournament.setup_scene import (
     TournamentSetupScene,
     _row_rects,
 )
-from flip_seven_bots.tournament.cli import TournamentOptions, parse_options
+from flip_seven_bots.tournament import GameRecord
+from flip_seven_bots.tournament.cli import (
+    TournamentOptions,
+    parse_launch,
+    parse_options,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -55,9 +63,9 @@ def replace_field(scene: TournamentSetupScene, rect: pygame.Rect, value: str) ->
 
 def quick_options(**changes: object) -> TournamentOptions:
     options = parse_options(
-        ["--bot", "threshold:10", "--bot", "threshold:30", "--games", "5"]
+        ['--bot', 'threshold:10', '--bot', 'threshold:30', '--games', '5']
     )
-    return replace(options, **changes)
+    return replace(options, **({'jobs': 1} | changes))
 
 
 def wait_until(
@@ -65,52 +73,101 @@ def wait_until(
 ) -> None:
     deadline = time.monotonic() + timeout
     while not done():
-        assert time.monotonic() < deadline, "tournament did not progress in time"
+        assert time.monotonic() < deadline, 'tournament did not progress in time'
         scene.update(0)
         time.sleep(0.005)
 
 
-def test_setup_starts_with_the_given_options() -> None:
-    scene = TournamentSetupScene(parse_options([]))
+def test_setup_starts_with_the_gui_defaults() -> None:
+    scene = TournamentSetupScene(parse_launch([]).options)
     scene.render(pygame.Surface((1280, 900)))
     click(scene, START_BUTTON)
     assert scene.result is not None
     assert list(scene.result.bots) == [
-        "Random bot",
-        "Threshold 30",
-        "Expected value bot",
+        'Random',
+        'Threshold 20',
+        'Threshold 30',
+        'Threshold 40',
+        'Expected value',
     ]
-    assert isinstance(scene.result.bots["Expected value bot"], ExpectedValueBot)
-    assert scene.result.games == 100 and scene.result.players_per_game is None
+    assert isinstance(scene.result.bots['Random'], RandomBot)
+    for threshold in (20, 30, 40):
+        bot = scene.result.bots[f'Threshold {threshold}']
+        assert isinstance(bot, ThresholdBot) and bot.threshold == threshold
+    assert isinstance(scene.result.bots['Expected value'], ExpectedValueBot)
+    assert scene.result.games == 500 and scene.result.players_per_game is None
+    assert scene.result.jobs == -1
+
+
+def test_terminal_and_gui_share_defaults_without_overriding_explicit_options() -> None:
+    terminal = parse_launch(['--seed', '7']).options
+    defaults = parse_launch([]).options
+    assert terminal.games == defaults.games == 500
+    assert list(terminal.bots) == list(defaults.bots)
+
+    gui = parse_launch(
+        ['--gui', '--games', '25', '--bot', 'random', '--bot', 'threshold:10']
+    ).options
+    assert gui.games == 25
+    assert list(gui.bots) == ['Random', 'Threshold 10']
 
 
 def test_setup_edits_bots_mode_and_numbers() -> None:
-    scene = TournamentSetupScene(parse_options(["--k-factor", "16"]))
+    scene = TournamentSetupScene(
+        parse_options(
+            [
+                '--k-factor',
+                '16',
+                '--bot',
+                'random',
+                '--bot',
+                'threshold:30',
+                '--bot',
+                'expected',
+            ]
+        )
+    )
     click(scene, VENGEANCE_BUTTON)
-    replace_field(scene, GAMES_FIELD, "12")
-    replace_field(scene, TABLE_FIELD, "2")
-    replace_field(scene, SEED_FIELD, "7x")  # non-digits are ignored
-    replace_field(scene, JOBS_FIELD, "2")
+    replace_field(scene, GAMES_FIELD, '12')
+    replace_field(scene, TABLE_FIELD, '2')
+    replace_field(scene, SEED_FIELD, '7x')  # non-digits are ignored
+    replace_field(scene, JOBS_FIELD, '2')
     click(scene, _row_rects(0)[1])  # random -> threshold
-    replace_field(scene, _row_rects(0)[2], "15")
-    replace_field(scene, _row_rects(2)[0], "Threshold 30")
+    click(scene, START_BUTTON)
+    assert scene.result is None
+    assert scene.error == "missing required parameters for 'threshold': threshold"
+    replace_field(scene, _row_rects(0)[2], '15')
+    replace_field(scene, _row_rects(2)[0], 'Threshold 30')
     click(scene, ADD_BUTTON)
     scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
 
     result = scene.result
     assert result is not None
     assert list(result.bots) == [
-        "Random bot",
-        "Threshold 30 1",
-        "Threshold 30 2",
-        "Threshold 30 3",
+        'Random',
+        'Threshold 30 1',
+        'Threshold 30 2',
+        'Threshold 30 3',
     ]
-    assert isinstance(result.bots["Random bot"], ThresholdBot)
-    assert result.bots["Random bot"].threshold == 15
-    assert isinstance(result.bots["Threshold 30 2"], ExpectedValueBot)
+    assert isinstance(result.bots['Random'], ThresholdBot)
+    assert result.bots['Random'].threshold == 15
+    assert isinstance(result.bots['Threshold 30 2'], ExpectedValueBot)
     assert (result.games, result.players_per_game, result.seed) == (12, 2, 7)
     assert result.jobs == 2
     assert result.vengeance and not result.brutal and result.k_factor == 16
+
+
+def test_setup_accepts_automatic_workers_and_rejects_invalid_counts() -> None:
+    scene = TournamentSetupScene(parse_options([]))
+    for value in ('0', '-2', '-'):
+        replace_field(scene, JOBS_FIELD, value)
+        click(scene, START_BUTTON)
+        assert scene.result is None
+        assert scene.error == 'use -1 or at least one worker'
+    replace_field(scene, JOBS_FIELD, '-')
+    scene.handle_event(pygame.event.Event(pygame.TEXTINPUT, text='1'))
+    click(scene, START_BUTTON)
+    assert scene.result is not None and scene.result.jobs == -1
 
 
 def test_setup_limits_bot_count() -> None:
@@ -133,21 +190,21 @@ def test_setup_fits_the_most_bots_between_the_settings_and_buttons() -> None:
 def test_standings_fit_the_most_bots_in_distinct_colors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    names = [f"bot {index}" for index in range(MAX_BOTS)]
-    argv = [arg for name in names for arg in ("--bot", f"{name}=random")]
-    scene = TournamentScene(parse_options([*argv, "--games", "1"]))
+    names = [f'bot {index}' for index in range(MAX_BOTS)]
+    argv = [arg for name in names for arg in ('--bot', f'{name}=random')]
+    scene = TournamentScene(parse_options([*argv, '--games', '1']))
     drawn: dict[str, tuple[int, int]] = {}
     colors: set[object] = set()
     monkeypatch.setattr(
         run_scene,
-        "draw_text",
-        lambda _screen, _font, text, position, _color=None: drawn.setdefault(
+        'draw_text',
+        lambda _screen, _font, text, position, _color=None, **_kwargs: drawn.setdefault(
             text, position
         ),
     )
     monkeypatch.setattr(
         run_scene.pygame.draw,
-        "rect",
+        'rect',
         lambda _screen, color, *_args, **_kwargs: colors.add(tuple(color)),
     )
     try:
@@ -160,13 +217,13 @@ def test_standings_fit_the_most_bots_in_distinct_colors(
 
 
 @pytest.mark.parametrize(
-    ("field", "value", "error"),
+    ('field', 'value', 'error'),
     [
-        (GAMES_FIELD, "0", "play at least one game"),
-        (TABLE_FIELD, "4", "players per game must be between 2 and 3"),
-        (_row_rects(1)[0], " ", "every bot needs a name"),
+        (GAMES_FIELD, '0', 'play at least one game'),
+        (TABLE_FIELD, '6', 'players per game must be between 2 and 5'),
+        (_row_rects(1)[0], ' ', 'every bot needs a name'),
     ],
-    ids=["no-games", "table-too-big", "blank-name"],
+    ids=['no-games', 'table-too-big', 'blank-name'],
 )
 def test_setup_rejects_invalid_settings(
     field: pygame.Rect, value: str, error: str
@@ -178,7 +235,7 @@ def test_setup_rejects_invalid_settings(
 
 
 def test_tournament_runs_in_the_background_and_shows_results(tmp_path: Path) -> None:
-    scene = TournamentScene(quick_options(seed=3), save_dir=tmp_path / "saved")
+    scene = TournamentScene(quick_options(seed=3), save_dir=tmp_path / 'saved')
     surface = pygame.Surface((1280, 900))
     scene.render(surface)
     wait_until(scene, lambda: scene.finished)
@@ -187,13 +244,13 @@ def test_tournament_runs_in_the_background_and_shows_results(tmp_path: Path) -> 
     assert scene.error is None and len(scene.records) == 5
     assert scene.result is not None
     summary = scene.result.summary
-    assert summary["games"].sum() == 10
-    assert summary["rating_low"].notna().all()
+    assert summary['games'].sum() == 10
+    assert summary['rating_low'].notna().all()
     click(scene, SAVE_BUTTON)
     assert scene.saved is not None
     games_csv, summary_csv = scene.saved
     assert (
-        games_csv.parent.parent == tmp_path / "saved"
+        games_csv.parent.parent == tmp_path / 'saved'
     )  # a timestamped folder per save
     assert games_csv.exists() and summary_csv.exists()
     click(scene, NEW_BUTTON)
@@ -209,30 +266,104 @@ def test_tournament_window_runs_with_parallel_workers() -> None:
 def test_tournament_saves_automatically_to_the_output_folder(tmp_path: Path) -> None:
     scene = TournamentScene(quick_options(output=tmp_path))
     wait_until(scene, lambda: scene.finished)
-    assert scene.saved is not None and (tmp_path / "summary.csv").exists()
+    assert scene.saved is not None and (tmp_path / 'summary.csv').exists()
 
 
-def test_stop_ends_the_tournament_early() -> None:
-    scene = TournamentScene(quick_options(games=100_000))
-    wait_until(scene, lambda: len(scene.records) > 0)
-    click(scene, STOP_BUTTON)
+@pytest.mark.parametrize('stop_early', [False, True])
+def test_finished_chart_draws_fitted_ratings_and_confidence_bars(
+    monkeypatch: pytest.MonkeyPatch, stop_early: bool
+) -> None:
+    total = 100_000 if stop_early else 5
+    scene = TournamentScene(quick_options(seed=3, games=total))
+    if stop_early:
+        wait_until(scene, lambda: len(scene.records) >= 2)
+        click(scene, STOP_BUTTON)
     wait_until(scene, lambda: scene.finished)
+
+    draw_line = Mock(wraps=pygame.draw.line)
+    monkeypatch.setattr(pygame.draw, 'line', draw_line)
     scene.render(pygame.Surface((1280, 900)))
-    assert 0 < len(scene.records) < 100_000 and scene.error is None
+    assert scene.error is None
+    if stop_early:
+        assert 2 <= len(scene.records) < total
+    else:
+        assert len(scene.records) == total
+
+    for color in run_scene.LINE_COLORS[:2]:
+        segments = [
+            (start, end)
+            for call in draw_line.call_args_list
+            for _, line_color, start, end, *_ in [call.args]
+            if line_color == color
+        ]
+        [(top, bottom)] = [(a, b) for a, b in segments if a[0] == b[0] and a[1] < b[1]]
+        assert CHART.collidepoint(top) and CHART.collidepoint(bottom)
+        for x, y in (top, bottom):
+            assert ((x - 3, y), (x + 3, y)) in segments
+        assert any(
+            top[1] <= a[1] == b[1] <= bottom[1] and b[0] - a[0] == 4
+            for a, b in segments
+        )
 
 
 def test_bot_errors_are_shown_instead_of_crashing() -> None:
     class Broken:
         def choose_action(self, observation: Observation) -> Action:
-            raise RuntimeError("boom")
+            raise RuntimeError('boom')
 
     scene = TournamentScene(
-        quick_options(bots={"broken": lambda seed: Broken(), "random": RandomBot()})
+        quick_options(bots={'broken': lambda seed: Broken(), 'random': RandomBot()})
     )
     wait_until(scene, lambda: scene.finished)
     scene.render(pygame.Surface((1280, 900)))
-    assert scene.error == "RuntimeError: boom" and scene.records == []
+    assert scene.error == 'RuntimeError: boom' and scene.records == []
     assert scene.result is None
+
+
+def test_status_rate_holds_between_games_and_later_text_stays_put(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(run_scene, 'time', SimpleNamespace(monotonic=lambda: now[0]))
+    base = quick_options(seed=3, games=50)
+    first = next(base.start())
+    feed: queue.Queue[GameRecord | None] = queue.Queue()
+
+    class Scripted(TournamentOptions):
+        def start(self) -> Iterator[GameRecord]:
+            yield from iter(feed.get, None)
+
+    scene = TournamentScene(
+        Scripted(**{field.name: getattr(base, field.name) for field in fields(base)})
+    )
+    drawn: dict[str, tuple[int, int]] = {}
+    monkeypatch.setattr(
+        run_scene,
+        'draw_text',
+        lambda _screen, _font, text, position, _color=None, **_kwargs: (
+            drawn.__setitem__(text, position)
+        ),
+    )
+
+    def frame(at: float) -> dict[str, tuple[int, int]]:
+        now[0] = at
+        scene.update(0)
+        drawn.clear()
+        scene.render(pygame.Surface((1280, 900)))
+        return dict(drawn)
+
+    try:
+        now[0] = 2.0
+        feed.put(first)
+        wait_until(scene, lambda: len(scene.records) == 1)
+        # One game in 2 s is 0.5 games/s, or 100 s for all 50 games.
+        ten_left, nine_left = frame(90.0), frame(91.0)
+    finally:
+        scene.close()
+        feed.put(None)
+    assert ten_left['0.5'] == nine_left['0.5']
+    assert '10' in ten_left and '9' in nine_left
+    assert ten_left[' s left'] == nine_left[' s left']
 
 
 def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(
@@ -252,18 +383,18 @@ def test_app_moves_from_setup_to_tournament_and_stops_it_on_quit(
         ]
     )
     cleanup = Mock()
-    monkeypatch.setattr(pygame, "init", Mock())
-    monkeypatch.setattr(pygame, "quit", cleanup)
+    monkeypatch.setattr(pygame, 'init', Mock())
+    monkeypatch.setattr(pygame, 'quit', cleanup)
     monkeypatch.setattr(
-        pygame.display, "set_mode", Mock(return_value=pygame.Surface((1280, 900)))
+        pygame.display, 'set_mode', Mock(return_value=pygame.Surface((1280, 900)))
     )
-    monkeypatch.setattr(pygame.display, "set_caption", Mock())
-    monkeypatch.setattr(pygame.display, "flip", Mock())
-    monkeypatch.setattr(pygame.time, "Clock", Mock())
-    monkeypatch.setattr(pygame.time, "get_ticks", lambda: 0)
-    monkeypatch.setattr(pygame.mouse, "get_pos", lambda: (0, 0))
-    monkeypatch.setattr(pygame.event, "get", lambda: next(frames))
-    monkeypatch.setattr(app, "TournamentScene", Recording)
+    monkeypatch.setattr(pygame.display, 'set_caption', Mock())
+    monkeypatch.setattr(pygame.display, 'flip', Mock())
+    monkeypatch.setattr(pygame.time, 'Clock', Mock())
+    monkeypatch.setattr(pygame.time, 'get_ticks', lambda: 0)
+    monkeypatch.setattr(pygame.mouse, 'get_pos', lambda: (0, 0))
+    monkeypatch.setattr(pygame.event, 'get', lambda: next(frames))
+    monkeypatch.setattr(app, 'TournamentScene', Recording)
 
     app.main(parse_options([]), show_setup=True)
 
