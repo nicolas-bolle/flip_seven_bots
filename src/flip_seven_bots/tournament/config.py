@@ -1,6 +1,6 @@
 """Tournament settings shared by the terminal and window."""
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -26,7 +26,7 @@ DEFAULT_K_HALF_LIFE = 50.0
 class TournamentOptions:
     """Settings for a tournament."""
 
-    bots: dict[str, Bot | BotFactory]
+    bots: Mapping[str, Bot | BotFactory]
     games: int
     players_per_game: int | None
     seed: int | None
