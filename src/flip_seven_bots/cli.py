@@ -64,9 +64,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         for kind in kinds():
             line = f"{kind.kind:12} {kind.label}"
             if kind.parameters:
-                parameters = ", ".join(
-                    f"{p.name} (default: {p.default!r})" for p in kind.parameters
-                )
+                parameters = ", ".join(p.name for p in kind.parameters)
                 line += f" (parameters: {parameters})"
             print(line)
     elif args.command == "trace":

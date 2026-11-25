@@ -82,3 +82,19 @@ def test_setup_validates_names_and_player_limit() -> None:
     for _ in range(MAX_PLAYERS):
         click(scene, ADD_BUTTON)
     assert len(scene.players) == MAX_PLAYERS
+
+
+def test_switching_to_threshold_requires_a_value() -> None:
+    scene = SetupScene()
+    _, kind, parameter, _ = _row_rects(0)
+    click(scene, kind)  # human -> random
+    click(scene, kind)  # random -> threshold
+    click(scene, START_BUTTON)
+    assert scene.result is None
+    assert scene.error == "missing required parameters for 'threshold': threshold"
+
+    replace_field(scene, parameter, "21")
+    click(scene, START_BUTTON)
+    assert scene.result is not None
+    assert isinstance(scene.result.seats[0].bot, ThresholdBot)
+    assert scene.result.seats[0].bot.threshold == 21

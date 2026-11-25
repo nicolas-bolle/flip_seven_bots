@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 
 import pygame
 
-from flip_seven_bots.bots.registry import default_parameters, kinds
+from flip_seven_bots.bots.registry import kinds
 from flip_seven_bots.bots.specs import bot_spec, number_duplicates, parse_bot
 from flip_seven_bots.tournament.config import TournamentOptions
 
@@ -155,11 +155,9 @@ class TournamentSetupScene:
                 if name.collidepoint(pos):
                     self._focus = ("name", index)
                 elif kind.collidepoint(pos):
-                    definitions = kinds()
-                    names = tuple(kind.kind for kind in definitions)
-                    definition = definitions[(names.index(bot.kind) + 1) % len(names)]
-                    bot.kind = definition.kind
-                    bot.parameter = default_parameters(definition)
+                    names = tuple(kind.kind for kind in kinds())
+                    bot.kind = names[(names.index(bot.kind) + 1) % len(names)]
+                    bot.parameter = ""
                 elif (
                     parameter.collidepoint(pos)
                     and next(k for k in kinds() if k.kind == bot.kind).parameters

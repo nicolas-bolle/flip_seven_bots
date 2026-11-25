@@ -17,7 +17,7 @@ from flip_seven_bots.game import HitOrStay
 
 
 class CarefulBot:
-    def __init__(self, *, seed, threshold=25):
+    def __init__(self, *, seed, threshold):
         # A bot that uses randomness should create its own Random(seed).
         self.threshold = threshold
 
@@ -34,7 +34,7 @@ register(
         label="Careful bot",
         constructor=CarefulBot,
         bot_type=CarefulBot,
-        parameters=(Parameter("threshold", 25),),
+        parameters=(Parameter("threshold", int),),
     )
 )
 ```
@@ -54,17 +54,18 @@ runs when the package loads:
 from . import careful as careful
 ```
 
-Registration makes the bot available as the spec `careful` or
+Registration makes the bot available as `careful:20` or
 `careful:threshold=20` in every command and setup screen. The rules:
 
 - The constructor takes `seed` as a keyword argument, even if it ignores it.
   `seed` is reserved and cannot be a parameter.
 - Each parameter is also an instance attribute of the same name, so bots can
   be described and saved.
-- Parameters are integers unless `Parameter` gets another parser, for example
-  `Parameter("style", "safe", str)`. With several parameters, use
-  `kind:name=value,other=value`; percent-encode reserved characters in text
-  values, for example `%2C` for a comma.
+- Each `Parameter` declares a parser, such as `Parameter("threshold", int)`
+  or `Parameter("style", str)`. Every declared parameter needs an explicit
+  value. With several parameters, use `kind:name=value,other=value`;
+  percent-encode reserved characters in text values, for example `%2C` for a
+  comma.
 - The constructor, parsers, and any `display_name` function must be defined at
   module level, so that parallel tournament workers can import them.
 
@@ -73,7 +74,7 @@ Registration makes the bot available as the spec `careful` or
 ```shell
 uv run flip7 bots
 uv run flip7 compare careful:25 threshold:30 --games 100 --seed 42 --jobs 2
-uv run flip7 trace --bot careful --bot random --seed 1 --step
+uv run flip7 trace --bot careful:25 --bot random --seed 1 --step
 ```
 
 ## 4. Test it

@@ -10,11 +10,10 @@ from .simple import ExpectedValueBot, RandomBot, ThresholdBot
 
 @dataclass(frozen=True)
 class Parameter:
-    """A bot parameter, its default, and its text parser."""
+    """A required bot parameter and its text parser."""
 
     name: str
-    default: object
-    parse: Callable[[str], object] = int
+    parse: Callable[[str], object]
 
 
 @dataclass(frozen=True)
@@ -80,7 +79,8 @@ class BotConfig:
     def spec(self) -> str:
         if not self.values:
             return self.definition.kind
-        if len(self.values) == 1:
+        # A named empty value stays distinct from a blank setup field.
+        if len(self.values) == 1 and str(self.values[0]):
             return f"{self.definition.kind}:{quote(str(self.values[0]), safe='')}"
         values = ",".join(
             f"{parameter.name}={quote(str(value), safe='')}"
@@ -89,23 +89,14 @@ class BotConfig:
         return f"{self.definition.kind}:{values}"
 
 
-def default_parameters(kind: BotKind) -> str:
-    """Return editable default parameters for a setup screen."""
-    if len(kind.parameters) == 1:
-        return quote(str(kind.parameters[0].default), safe="")
-    return ",".join(
-        f"{p.name}={quote(str(p.default), safe='')}" for p in kind.parameters
-    )
-
-
 def parse_config(spec: str) -> BotConfig:
-    """Parse ``kind``, ``kind:value`` or ``kind:name=value,...``."""
+    """Parse a bot spec with explicit values for all its parameters."""
     name, separator, text = spec.partition(":")
     if name not in _KINDS:
         raise ValueError(f"unknown bot {spec!r}; choose from {', '.join(_KINDS)}")
     definition = _KINDS[name]
     parameters = definition.parameters
-    values = {parameter.name: parameter.default for parameter in parameters}
+    values: dict[str, object] = {}
     if separator:
         if not parameters:
             raise ValueError(f"invalid parameters for {name!r}")
@@ -118,16 +109,19 @@ def parse_config(spec: str) -> BotConfig:
                 if not equals or not key:
                     raise ValueError(f"invalid parameter {entry!r}")
                 entries.append((key, value))
-        seen: set[str] = set()
         for key, value in entries:
             parameter = next((p for p in parameters if p.name == key), None)
-            if parameter is None or key in seen:
+            if parameter is None or key in values:
                 raise ValueError(f"unknown or duplicate parameter {key!r}")
-            seen.add(key)
             try:
                 values[key] = parameter.parse(unquote(value, errors="strict"))
             except ValueError as error:
                 raise ValueError(f"invalid {key}: {error}") from error
+    missing = [p.name for p in parameters if p.name not in values]
+    if missing:
+        raise ValueError(
+            f"missing required parameters for {name!r}: {', '.join(missing)}"
+        )
     config = BotConfig(definition, tuple(values[p.name] for p in parameters))
     # Validate constructor constraints at input time.
     config(None)
@@ -168,7 +162,7 @@ register(
         "Threshold bot",
         _threshold,
         ThresholdBot,
-        (Parameter("threshold", 30),),
+        (Parameter("threshold", int),),
         _threshold_name,
     )
 )

@@ -45,7 +45,7 @@ def test_seats_follow_option_order() -> None:
 
 
 def test_a_table_can_be_all_bots() -> None:
-    seats = parse_options(["--bot", "random", "--bot", "threshold"]).seats
+    seats = parse_options(["--bot", "random", "--bot", "threshold:30"]).seats
     assert all(seat.bot is not None for seat in seats)
 
 
@@ -60,6 +60,7 @@ def test_duplicate_names_are_numbered() -> None:
         ["--bot", "chess"],
         ["--bot", "random:3"],
         ["--bot", "expected:3"],
+        ["--bot", "threshold"],
         ["--bot", "threshold:lots"],
         ["--bot", "threshold:-1"],
         ["--human", " "],
@@ -69,6 +70,7 @@ def test_duplicate_names_are_numbered() -> None:
         "unknown",
         "random-param",
         "expected-param",
+        "missing-threshold",
         "not-a-number",
         "negative",
         "blank-name",

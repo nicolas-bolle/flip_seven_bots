@@ -31,10 +31,13 @@ FLIP_THREE = Card(CardType.FLIP_THREE)
 FREEZE = Card(CardType.FREEZE)
 
 
+BOT_TEST_SPECS = {"threshold": "threshold:30"}
+
+
 @pytest.mark.parametrize("kind", [kind.kind for kind in kinds()])
 @pytest.mark.parametrize("mode", ["base", "vengeance", "brutal"])
 def test_registered_bots_play_legal_reproducible_games(kind: str, mode: str) -> None:
-    config = parse_config(kind)
+    config = parse_config(BOT_TEST_SPECS.get(kind, kind))
     rules = (
         Rules(target_score=25)
         if mode == "base"

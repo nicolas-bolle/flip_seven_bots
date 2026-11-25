@@ -80,6 +80,8 @@ def test_setup_starts_with_the_given_options() -> None:
         "Threshold 30",
         "Expected value bot",
     ]
+    assert isinstance(scene.result.bots["Threshold 30"], ThresholdBot)
+    assert scene.result.bots["Threshold 30"].threshold == 30
     assert isinstance(scene.result.bots["Expected value bot"], ExpectedValueBot)
     assert scene.result.games == 100 and scene.result.players_per_game is None
 
@@ -92,6 +94,9 @@ def test_setup_edits_bots_mode_and_numbers() -> None:
     replace_field(scene, SEED_FIELD, "7x")  # non-digits are ignored
     replace_field(scene, JOBS_FIELD, "2")
     click(scene, _row_rects(0)[1])  # random -> threshold
+    click(scene, START_BUTTON)
+    assert scene.result is None
+    assert scene.error == "missing required parameters for 'threshold': threshold"
     replace_field(scene, _row_rects(0)[2], "15")
     replace_field(scene, _row_rects(2)[0], "Threshold 30")
     click(scene, ADD_BUTTON)

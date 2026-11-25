@@ -86,7 +86,7 @@ Rules notes:
 | Bot | Spec (command line and setup screens) | Strategy |
 | --- | --- | --- |
 | `RandomBot` | `random` | Picks a random legal action |
-| `ThresholdBot` | `threshold[:SCORE]` (default 30) | Hits until its round score reaches the threshold |
+| `ThresholdBot` | `threshold:SCORE` | Hits until its round score reaches the threshold |
 | `ExpectedValueBot` | `expected` | Hits only if one more card is expected to raise its round score |
 
 All of them support every decision in every game mode.

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from flip_seven_bots.bots.registry import config_for, default_parameters, kinds
+from flip_seven_bots.bots.registry import config_for, kinds
 
 from ..common.theme import ACCENT, BACKGROUND, MUTED, TEXT
 from ..common.widgets import draw_button, draw_field, draw_text
@@ -150,12 +150,7 @@ class SetupScene:
                 elif kind.collidepoint(pos):
                     names = ("human", *(kind.kind for kind in kinds()))
                     player.kind = names[(names.index(player.kind) + 1) % len(names)]
-                    definition = next(
-                        (k for k in kinds() if k.kind == player.kind), None
-                    )
-                    player.parameter = (
-                        default_parameters(definition) if definition else ""
-                    )
+                    player.parameter = ""
                 elif (
                     parameter.collidepoint(pos)
                     and player.kind != "human"

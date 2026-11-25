@@ -8,12 +8,13 @@ to any command for its full options.
 | `flip7 play` | Play a game in a window |
 | `flip7 tournament` | Open tournament setup, or pass options to run a tournament in terminal |
 | `flip7 compare A B` | Rate two bots against each other |
-| `flip7 bots` | List available bots, their parameter names, and default values |
+| `flip7 bots` | List available bots and their required parameter names |
 | `flip7 trace` | Print one bot's decisions during a game |
 | `flip7 replay REPORT` | Rebuild a game from a bug report |
 
 Bots are given as specs such as `random`, `threshold:25` or
-`rival=threshold:25`; see [Included bots](reference.md#included-bots).
+`rival=threshold:25`. All parameters of a configurable bot must be supplied;
+see [Included bots](reference.md#included-bots).
 
 ## Play
 
